@@ -1,0 +1,3 @@
+packages:
+  - "ponder-indexers"
+  # Add future packages here (e.g., mcp-bridge, frontend)

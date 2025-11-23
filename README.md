@@ -55,7 +55,16 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
    # Should show: All 108 tests passing
    ```
 
-**Note**: Rust backend services and Ponder indexers are currently in development.
+6. **Set up Ponder indexers** (optional - for blockchain event indexing):
+   ```bash
+   cd ponder-indexers
+   ./setup.sh
+   # Edit .env and add your RPC API keys
+   # Update contract addresses in ponder.config.ts
+   pnpm dev
+   ```
+
+**Note**: Rust backend services are currently in development.
 See the roadmap below for implementation status.
 
 ## Architecture
@@ -244,7 +253,7 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 
 ### Phase 2: Core Services (In Progress)
 - 🔄 Rust workspace setup
-- 🔄 Ponder indexers for all registries (Identity, Reputation, Validation)
+- ✅ Ponder indexers for all registries (Identity, Reputation, Validation)
 - ⏳ API Gateway (Actix-web, authentication, rate limiting)
 - ⏳ Event Processor (trigger evaluation engine)
 - ⏳ Action Workers (Telegram, REST webhooks)

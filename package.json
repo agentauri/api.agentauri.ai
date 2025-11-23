@@ -1,0 +1,25 @@
+{
+  "name": "@api.8004.dev/root",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERC-8004 Backend Infrastructure - Monorepo Root",
+  "scripts": {
+    "dev:ponder": "pnpm --filter @api.8004.dev/ponder-indexers dev",
+    "build:ponder": "pnpm --filter @api.8004.dev/ponder-indexers build",
+    "test:ponder": "pnpm --filter @api.8004.dev/ponder-indexers test",
+    "lint:ponder": "pnpm --filter @api.8004.dev/ponder-indexers lint",
+    "format": "pnpm -r format",
+    "format:check": "pnpm -r format:check",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r exec rm -rf node_modules dist .ponder && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
