@@ -1,5 +1,9 @@
 # api.8004.dev - ERC-8004 Backend Infrastructure
 
+[![CI](https://github.com/matteoscurati/api.8004.dev/actions/workflows/ci.yml/badge.svg)](https://github.com/matteoscurati/api.8004.dev/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/matteoscurati/api.8004.dev/actions/workflows/security.yml/badge.svg)](https://github.com/matteoscurati/api.8004.dev/actions/workflows/security.yml)
+[![Code Quality](https://github.com/matteoscurati/api.8004.dev/actions/workflows/lint.yml/badge.svg)](https://github.com/matteoscurati/api.8004.dev/actions/workflows/lint.yml)
+
 Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events. Enables programmable triggers that execute automated actions based on blockchain events from Identity, Reputation, and Validation registries.
 
 ## Features
@@ -24,47 +28,35 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-org/api.8004.dev.git
+   git clone https://github.com/matteoscurati/api.8004.dev.git
    cd api.8004.dev
    ```
 
-2. **Start infrastructure** (PostgreSQL, Redis):
+2. **Configure environment variables**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set secure passwords (use: openssl rand -base64 32)
+   ```
+
+3. **Start infrastructure** (PostgreSQL + TimescaleDB, Redis, Prometheus, Grafana):
    ```bash
    docker-compose up -d
    ```
 
-3. **Run database migrations**:
+4. **Verify services are running**:
    ```bash
-   cd rust-backend
-   sqlx migrate run
+   docker-compose ps
+   # All services should show "Up" and "healthy" status
    ```
 
-4. **Start Ponder indexers**:
+5. **Run database tests** (optional, to verify setup):
    ```bash
-   cd ponder-indexers
-   pnpm install
-   pnpm dev
+   ./scripts/run-tests.sh
+   # Should show: All 108 tests passing
    ```
 
-5. **Start API Gateway**:
-   ```bash
-   cd rust-backend/crates/api-gateway
-   cargo run
-   ```
-
-6. **Start Event Processor**:
-   ```bash
-   cd rust-backend/crates/event-processor
-   cargo run
-   ```
-
-7. **Start Action Workers**:
-   ```bash
-   cd rust-backend/crates/action-workers
-   cargo run
-   ```
-
-The API will be available at `http://localhost:8000`.
+**Note**: Rust backend services and Ponder indexers are currently in development.
+See the roadmap below for implementation status.
 
 ## Architecture
 
@@ -98,15 +90,29 @@ See [CLAUDE.md](./CLAUDE.md) for comprehensive architecture documentation.
 
 ### Running Tests
 
+The project enforces **100% test coverage** before commits. All tests must pass for CI/CD to succeed.
+
 ```bash
-# Rust tests
+# Run all tests (database, Rust, TypeScript)
+./scripts/run-tests.sh
+
+# Database tests only (108 tests covering schema, TimescaleDB, integrity, notifications, performance)
+docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-schema.sql
+docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-timescaledb.sql
+docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-data-integrity.sql
+docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-notifications.sql
+docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-performance-simple.sql
+
+# Rust tests (when implemented)
 cd rust-backend
 cargo test
 
-# TypeScript tests
+# TypeScript tests (when implemented)
 cd ponder-indexers
 pnpm test
 ```
+
+**Current Status**: ✅ 108 database tests passing (100% coverage)
 
 ### Code Style
 
@@ -196,11 +202,26 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 
 MIT License - see [LICENSE](./LICENSE) for details.
 
+## Security
+
+This project implements comprehensive security best practices:
+
+- **Environment Variables**: All sensitive credentials stored in `.env` (never committed)
+- **Strong Passwords**: Generated with `openssl rand -base64 32`
+- **Authentication Required**: Redis, PostgreSQL, and Grafana all require authentication
+- **Localhost Binding**: All ports bound to `127.0.0.1` to prevent external access
+- **Pinned Dependencies**: Docker images pinned to specific versions
+- **Resource Limits**: Container resource limits to prevent DoS attacks
+- **Security Scanning**: Automated vulnerability scanning via GitHub Actions
+- **Regular Audits**: Weekly security scans with Trivy, Gitleaks, and dependency audits
+
+See `.env.example` for configuration guidelines.
+
 ## Support
 
 - **Documentation**: [CLAUDE.md](./CLAUDE.md)
-- **Issues**: [GitHub Issues](https://github.com/your-org/api.8004.dev/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/api.8004.dev/discussions)
+- **Issues**: [GitHub Issues](https://github.com/matteoscurati/api.8004.dev/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/matteoscurati/api.8004.dev/discussions)
 
 ## Related Projects
 
@@ -213,23 +234,35 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and milestones.
 
-### Phase 1: MVP (Weeks 1-8)
-- ✅ Documentation and project structure
-- Database schema and migrations
-- Ponder indexers for all registries
-- Basic trigger engine
-- Telegram worker
+### Phase 1: Foundation (Completed)
+- ✅ Documentation and project structure (CLAUDE.md, README.md, docs/)
+- ✅ Database schema and migrations (PostgreSQL + TimescaleDB)
+- ✅ Comprehensive test suite (108 database tests, 100% coverage)
+- ✅ Security hardening (environment variables, authentication, localhost binding)
+- ✅ CI/CD pipelines (GitHub Actions for testing, security scanning, linting)
+- ✅ Docker infrastructure (PostgreSQL, Redis, Prometheus, Grafana)
 
-### Phase 2: Full Feature Set (Weeks 9-12)
-- Stateful triggers (EMA, rate limits)
-- REST/HTTP worker
-- MCP integration
+### Phase 2: Core Services (In Progress)
+- 🔄 Rust workspace setup
+- 🔄 Ponder indexers for all registries (Identity, Reputation, Validation)
+- ⏳ API Gateway (Actix-web, authentication, rate limiting)
+- ⏳ Event Processor (trigger evaluation engine)
+- ⏳ Action Workers (Telegram, REST webhooks)
+- ⏳ Basic trigger CRUD operations
 
-### Phase 3: Production Ready (Weeks 13-16)
-- Observability stack
-- Load testing
-- CI/CD pipelines
-- Security audit
+### Phase 3: Advanced Features
+- ⏳ Stateful triggers (EMA, rate limits)
+- ⏳ MCP integration for agent feedback
+- ⏳ WebSocket support for real-time updates
+- ⏳ Advanced monitoring and alerting
+
+### Phase 4: Production Ready
+- ⏳ Load testing and performance optimization
+- ⏳ Production deployment documentation
+- ⏳ External security audit
+- ⏳ Multi-region support
+
+Legend: ✅ Complete | 🔄 In Progress | ⏳ Planned
 
 ---
 
