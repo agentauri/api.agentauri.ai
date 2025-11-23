@@ -128,7 +128,7 @@ jobs:
   rust-tests:
     name: Rust Tests
     runs-on: ubuntu-latest
-    if: hashFiles('rust-backend/Cargo.toml') != ''
+    if: ${{ hashFiles('rust-backend/Cargo.toml') != '' }}
 
     steps:
       - name: Checkout code
@@ -184,7 +184,7 @@ jobs:
   typescript-tests:
     name: TypeScript/Ponder Tests
     runs-on: ubuntu-latest
-    if: hashFiles('ponder-indexers/package.json') != ''
+    if: ${{ hashFiles('ponder-indexers/package.json') != '' }}
 
     steps:
       - name: Checkout code
@@ -242,7 +242,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: [database-tests]
-    if: hashFiles('scripts/run-tests.sh') != ''
+    if: ${{ hashFiles('scripts/run-tests.sh') != '' }}
 
     services:
       postgres:
