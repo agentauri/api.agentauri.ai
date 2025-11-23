@@ -1,0 +1,239 @@
+# ============================================================================
+# Security Scanning Workflow
+# ============================================================================
+# Runs security scans on dependencies, Docker images, and code
+# Scheduled to run weekly and on pull requests
+# ============================================================================
+
+name: Security Scanning
+
+on:
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run npm audit (if package.json exists)
+        if: hashFiles('ponder-indexers/package.json') != ''
+        working-directory: ponder-indexers
+        continue-on-error: true
+        run: |
+          echo "## NPM Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if command -v npm &> /dev/null; then
+            npm audit --audit-level=high || echo "Vulnerabilities found - review required"
+            echo "NPM audit completed. Check logs for details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "NPM not available, skipping audit" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Run cargo audit (if Cargo.toml exists)
+        if: hashFiles('rust-backend/Cargo.toml') != ''
+        continue-on-error: true
+        run: |
+          echo "## Cargo Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if ! command -v cargo-audit &> /dev/null; then
+            cargo install cargo-audit
+          fi
+          cd rust-backend
+          cargo audit || echo "Vulnerabilities found - review required"
+          echo "Cargo audit completed. Check logs for details." >> $GITHUB_STEP_SUMMARY
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fail-on-severity: high
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+
+  docker-security-scan:
+    name: Docker Image Security Scan
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        image:
+          - timescale/timescaledb:2.23.1-pg15
+          - redis:7.4-alpine
+          - prom/prometheus:v2.51.0
+          - grafana/grafana:10.4.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pull Docker image
+        run: docker pull ${{ matrix.image }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.image }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.image }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.image }}.sarif'
+          category: 'docker-${{ matrix.image }}'
+
+      - name: Generate security summary
+        run: |
+          echo "## Docker Security Scan: ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Trivy scan completed. Check Security tab for detailed results." >> $GITHUB_STEP_SUMMARY
+
+  dockerfile-lint:
+    name: Dockerfile Linting
+    runs-on: ubuntu-latest
+    if: hashFiles('docker/**/*.Dockerfile') != '' || hashFiles('**/Dockerfile') != ''
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/*.Dockerfile
+          failure-threshold: warning
+          ignore: DL3008,DL3009
+
+      - name: Generate Dockerfile lint summary
+        if: always()
+        run: |
+          echo "## Dockerfile Linting Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Hadolint scan completed." >> $GITHUB_STEP_SUMMARY
+
+  sql-security-scan:
+    name: SQL Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for SQL injection patterns
+        run: |
+          echo "## SQL Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for potential SQL injection vulnerabilities
+          # This is a basic check - adjust patterns as needed
+          if grep -r "SELECT.*||" database/ --include="*.sql" 2>/dev/null; then
+            echo "⚠️ Warning: String concatenation found in SQL files" >> $GITHUB_STEP_SUMMARY
+            echo "Review for potential SQL injection vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No obvious SQL injection patterns detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check for hardcoded credentials
+        run: |
+          # Check for common password patterns
+          if grep -ri "password.*=.*['\"]" database/ --include="*.sql" 2>/dev/null | grep -v "placeholder\|example\|CHANGE_THIS"; then
+            echo "⚠️ Warning: Potential hardcoded credentials found" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ No hardcoded credentials detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate secrets scan summary
+        if: always()
+        run: |
+          echo "## Secrets Scanning Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Gitleaks scan completed." >> $GITHUB_STEP_SUMMARY
+          echo "No secrets should be committed to the repository." >> $GITHUB_STEP_SUMMARY
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check .env file is not committed
+        run: |
+          if [ -f .env ]; then
+            echo "❌ ERROR: .env file should not be committed!" >> $GITHUB_STEP_SUMMARY
+            echo "Remove .env file and add it to .gitignore" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ No .env file in repository" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Verify .env.example exists
+        run: |
+          if [ -f .env.example ]; then
+            echo "✅ .env.example file exists" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Warning: .env.example file missing" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check for TODO/FIXME comments
+        run: |
+          echo "## Code Quality Notes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          TODO_COUNT=$(grep -r "TODO\|FIXME" --include="*.rs" --include="*.ts" --include="*.sql" . 2>/dev/null | wc -l || echo "0")
+          echo "Found $TODO_COUNT TODO/FIXME comments" >> $GITHUB_STEP_SUMMARY
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, docker-security-scan, secrets-scan, code-quality]
+    if: always()
+
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Scan Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- Dependency Scan: ${{ needs.dependency-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Security: ${{ needs.docker-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Secrets Scan: ${{ needs.secrets-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review the Security tab for detailed vulnerability reports." >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if critical security issues found
+        if: |
+          needs.secrets-scan.result == 'failure' ||
+          needs.code-quality.result == 'failure'
+        run: |
+          echo "Critical security issues detected!"
+          exit 1
