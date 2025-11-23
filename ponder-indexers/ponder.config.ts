@@ -40,32 +40,44 @@ const networks: Record<string, NetworkConfig> = {
 };
 
 // ============================================================================
-// CONTRACT ADDRESSES
+// CONTRACT ADDRESSES (from environment variables)
 // ============================================================================
 
-// Placeholder contract addresses - Update these with actual deployed addresses
-// Format: contracts[network][registry] = address
+// All contract addresses are loaded from environment variables for security
+// and flexibility across different environments (dev, staging, production)
 const contracts: Record<string, Record<string, `0x${string}`>> = {
   ethereumSepolia: {
-    identity: "0x0000000000000000000000000000000000000000",
-    reputation: "0x0000000000000000000000000000000000000000",
-    validation: "0x0000000000000000000000000000000000000000",
+    identity: (process.env.ETHEREUM_SEPOLIA_IDENTITY_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    reputation: (process.env.ETHEREUM_SEPOLIA_REPUTATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    validation: (process.env.ETHEREUM_SEPOLIA_VALIDATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
   },
   baseSepolia: {
-    identity: "0x0000000000000000000000000000000000000000",
-    reputation: "0x0000000000000000000000000000000000000000",
-    validation: "0x0000000000000000000000000000000000000000",
+    identity: (process.env.BASE_SEPOLIA_IDENTITY_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    reputation: (process.env.BASE_SEPOLIA_REPUTATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    validation: (process.env.BASE_SEPOLIA_VALIDATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
   },
   lineaSepolia: {
-    identity: "0x0000000000000000000000000000000000000000",
-    reputation: "0x0000000000000000000000000000000000000000",
-    validation: "0x0000000000000000000000000000000000000000",
+    identity: (process.env.LINEA_SEPOLIA_IDENTITY_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    reputation: (process.env.LINEA_SEPOLIA_REPUTATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    validation: (process.env.LINEA_SEPOLIA_VALIDATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
   },
   polygonAmoy: {
-    identity: "0x0000000000000000000000000000000000000000",
-    reputation: "0x0000000000000000000000000000000000000000",
-    validation: "0x0000000000000000000000000000000000000000",
+    identity: (process.env.POLYGON_AMOY_IDENTITY_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    reputation: (process.env.POLYGON_AMOY_REPUTATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    validation: (process.env.POLYGON_AMOY_VALIDATION_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
   },
+};
+
+// ============================================================================
+// START BLOCKS (from environment variables)
+// ============================================================================
+
+// Start block numbers for each network - set to deployment block for faster sync
+const startBlocks: Record<string, number> = {
+  ethereumSepolia: parseInt(process.env.ETHEREUM_SEPOLIA_START_BLOCK || "0", 10),
+  baseSepolia: parseInt(process.env.BASE_SEPOLIA_START_BLOCK || "0", 10),
+  lineaSepolia: parseInt(process.env.LINEA_SEPOLIA_START_BLOCK || "0", 10),
+  polygonAmoy: parseInt(process.env.POLYGON_AMOY_START_BLOCK || "0", 10),
 };
 
 // ============================================================================
@@ -108,25 +120,25 @@ export default createConfig({
       network: "ethereumSepolia",
       abi: IdentityRegistryAbi,
       address: contracts.ethereumSepolia.identity,
-      startBlock: 0, // Update with actual deployment block
+      startBlock: startBlocks.ethereumSepolia,
     },
     IdentityRegistryBaseSepolia: {
       network: "baseSepolia",
       abi: IdentityRegistryAbi,
       address: contracts.baseSepolia.identity,
-      startBlock: 0,
+      startBlock: startBlocks.baseSepolia,
     },
     IdentityRegistryLineaSepolia: {
       network: "lineaSepolia",
       abi: IdentityRegistryAbi,
       address: contracts.lineaSepolia.identity,
-      startBlock: 0,
+      startBlock: startBlocks.lineaSepolia,
     },
     IdentityRegistryPolygonAmoy: {
       network: "polygonAmoy",
       abi: IdentityRegistryAbi,
       address: contracts.polygonAmoy.identity,
-      startBlock: 0,
+      startBlock: startBlocks.polygonAmoy,
     },
 
     // ========================================================================
@@ -136,25 +148,25 @@ export default createConfig({
       network: "ethereumSepolia",
       abi: ReputationRegistryAbi,
       address: contracts.ethereumSepolia.reputation,
-      startBlock: 0,
+      startBlock: startBlocks.ethereumSepolia,
     },
     ReputationRegistryBaseSepolia: {
       network: "baseSepolia",
       abi: ReputationRegistryAbi,
       address: contracts.baseSepolia.reputation,
-      startBlock: 0,
+      startBlock: startBlocks.baseSepolia,
     },
     ReputationRegistryLineaSepolia: {
       network: "lineaSepolia",
       abi: ReputationRegistryAbi,
       address: contracts.lineaSepolia.reputation,
-      startBlock: 0,
+      startBlock: startBlocks.lineaSepolia,
     },
     ReputationRegistryPolygonAmoy: {
       network: "polygonAmoy",
       abi: ReputationRegistryAbi,
       address: contracts.polygonAmoy.reputation,
-      startBlock: 0,
+      startBlock: startBlocks.polygonAmoy,
     },
 
     // ========================================================================
@@ -164,25 +176,25 @@ export default createConfig({
       network: "ethereumSepolia",
       abi: ValidationRegistryAbi,
       address: contracts.ethereumSepolia.validation,
-      startBlock: 0,
+      startBlock: startBlocks.ethereumSepolia,
     },
     ValidationRegistryBaseSepolia: {
       network: "baseSepolia",
       abi: ValidationRegistryAbi,
       address: contracts.baseSepolia.validation,
-      startBlock: 0,
+      startBlock: startBlocks.baseSepolia,
     },
     ValidationRegistryLineaSepolia: {
       network: "lineaSepolia",
       abi: ValidationRegistryAbi,
       address: contracts.lineaSepolia.validation,
-      startBlock: 0,
+      startBlock: startBlocks.lineaSepolia,
     },
     ValidationRegistryPolygonAmoy: {
       network: "polygonAmoy",
       abi: ValidationRegistryAbi,
       address: contracts.polygonAmoy.validation,
-      startBlock: 0,
+      startBlock: startBlocks.polygonAmoy,
     },
   },
 });

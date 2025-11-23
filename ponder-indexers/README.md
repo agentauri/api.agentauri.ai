@@ -39,29 +39,37 @@ cp .env.example .env
 # Edit .env and add your RPC API keys
 ```
 
-Required environment variables:
+Required environment variables in `.env`:
+
+**RPC URLs:**
 - `ETHEREUM_SEPOLIA_RPC_URL`
 - `BASE_SEPOLIA_RPC_URL`
 - `LINEA_SEPOLIA_RPC_URL`
 - `POLYGON_AMOY_RPC_URL`
+
+**Database:**
 - `DATABASE_URL` (same as Rust backend)
 
-### 3. Update Contract Addresses
+**Contract Addresses** (12 total - see `.env.example`):
+- `ETHEREUM_SEPOLIA_IDENTITY_ADDRESS`
+- `ETHEREUM_SEPOLIA_REPUTATION_ADDRESS`
+- `ETHEREUM_SEPOLIA_VALIDATION_ADDRESS`
+- `ETHEREUM_SEPOLIA_START_BLOCK`
+- (+ 8 more for Base, Linea, Polygon - see [CONTRACTS.md](./CONTRACTS.md))
 
-Before running, update the contract addresses in `ponder.config.ts`:
+### 3. Configure Contract Addresses
 
-```typescript
-const contracts = {
-  ethereumSepolia: {
-    identity: "0xYOUR_IDENTITY_CONTRACT_ADDRESS",
-    reputation: "0xYOUR_REPUTATION_CONTRACT_ADDRESS",
-    validation: "0xYOUR_VALIDATION_CONTRACT_ADDRESS",
-  },
-  // ... repeat for other networks
-};
+Update the contract addresses in your `.env` file. See [CONTRACTS.md](./CONTRACTS.md) for detailed instructions.
+
+Example:
+```bash
+ETHEREUM_SEPOLIA_IDENTITY_ADDRESS=0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
+ETHEREUM_SEPOLIA_REPUTATION_ADDRESS=0x8F2E097E79B1c51Be9cA9dF1c8B5aC2b7ddEEd20
+ETHEREUM_SEPOLIA_VALIDATION_ADDRESS=0x9D4E94dB8EfBa94BdBABFC33B7e45e4E5c5e5e5e
+ETHEREUM_SEPOLIA_START_BLOCK=5000000
 ```
 
-Also update the `startBlock` for each contract to the deployment block number for faster syncing.
+⚠️ **Important:** Set `START_BLOCK` to the deployment block number for faster initial sync.
 
 ### 4. Run the Indexer
 
