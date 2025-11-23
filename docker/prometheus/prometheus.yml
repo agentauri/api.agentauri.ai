@@ -1,0 +1,50 @@
+# ============================================================================
+# Prometheus Configuration for ERC-8004 Backend
+# ============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'erc8004-dev'
+    environment: 'development'
+
+# Alertmanager configuration (optional, for production)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # PostgreSQL monitoring (when postgres_exporter is added)
+  # - job_name: 'postgresql'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Redis monitoring (when redis_exporter is added)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # API Gateway metrics (when implemented)
+  # - job_name: 'api-gateway'
+  #   static_configs:
+  #     - targets: ['api-gateway:8000']
+  #   metrics_path: '/metrics'
+
+  # Event Processor metrics (when implemented)
+  # - job_name: 'event-processor'
+  #   static_configs:
+  #     - targets: ['event-processor:8001']
+  #   metrics_path: '/metrics'

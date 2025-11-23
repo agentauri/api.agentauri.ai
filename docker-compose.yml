@@ -1,67 +1,124 @@
-version: '3.8'
+# ============================================================================
+# Docker Compose Configuration for ERC-8004 Backend
+# ============================================================================
+# SECURITY: This file uses environment variables for sensitive data
+# Create a .env file with your credentials (see .env.example)
+# NEVER commit the .env file to version control!
+# ============================================================================
 
 services:
   postgres:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.23.1-pg15  # Pinned version for security
     container_name: erc8004-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: erc8004_backend
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password must be set in .env file}
+      POSTGRES_DB: ${DB_NAME:-erc8004_backend}
     ports:
-      - "5432:5432"
+      # SECURITY: Bind to localhost only to prevent external access
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # Resource limits to prevent DoS
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine  # Pinned version for security
     container_name: erc8004-redis
     ports:
-      - "6379:6379"
+      # SECURITY: Bind to localhost only
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    # SECURITY: Enable authentication and AOF persistence
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:?Redis password must be set in .env file}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.51.0  # Pinned version for security
     container_name: erc8004-prometheus
     ports:
-      - "9090:9090"
+      # SECURITY: Bind to localhost only
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
     depends_on:
       - postgres
       - redis
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.0  # Pinned version for security
     container_name: erc8004-grafana
     ports:
-      - "3000:3000"
+      # SECURITY: Bind to localhost only
+      - "127.0.0.1:3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      # SECURITY: Use environment variables for credentials
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Grafana password must be set in .env file}
       GF_INSTALL_PLUGINS: grafana-clock-panel
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3000
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
 volumes:
   postgres_data:
