@@ -1,0 +1,61 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Node.js / TypeScript
+node_modules/
+dist/
+.ponder/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.dump
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Build artifacts
+*.wasm
+*.bin
+
+# Test coverage
+coverage/
+*.profdata
+*.profraw
+
+# Secrets
+*.pem
+*.key
+secrets/
+.secret
+
+# Temporary files
+tmp/
+temp/
+*.tmp
