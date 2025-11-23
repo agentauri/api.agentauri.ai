@@ -25,6 +25,38 @@ env:
   REDIS_PASSWORD: ci_redis_password_12345
 
 jobs:
+  check-files:
+    name: Check File Existence
+    runs-on: ubuntu-latest
+    outputs:
+      rust-exists: ${{ steps.check.outputs.rust-exists }}
+      typescript-exists: ${{ steps.check.outputs.typescript-exists }}
+      integration-exists: ${{ steps.check.outputs.integration-exists }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check which test suites are available
+        id: check
+        run: |
+          if [ -f "rust-backend/Cargo.toml" ]; then
+            echo "rust-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "rust-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -f "ponder-indexers/package.json" ]; then
+            echo "typescript-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "typescript-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -f "scripts/run-tests.sh" ]; then
+            echo "integration-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "integration-exists=false" >> $GITHUB_OUTPUT
+          fi
+
   database-tests:
     name: Database Tests
     runs-on: ubuntu-latest
@@ -128,7 +160,8 @@ jobs:
   rust-tests:
     name: Rust Tests
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('rust-backend/Cargo.toml') != '' }}
+    needs: check-files
+    if: needs.check-files.outputs.rust-exists == 'true'
 
     steps:
       - name: Checkout code
@@ -184,7 +217,8 @@ jobs:
   typescript-tests:
     name: TypeScript/Ponder Tests
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('ponder-indexers/package.json') != '' }}
+    needs: check-files
+    if: needs.check-files.outputs.typescript-exists == 'true'
 
     steps:
       - name: Checkout code
@@ -241,8 +275,8 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [database-tests]
-    if: ${{ hashFiles('scripts/run-tests.sh') != '' }}
+    needs: [database-tests, check-files]
+    if: needs.check-files.outputs.integration-exists == 'true'
 
     services:
       postgres:
@@ -310,7 +344,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [database-tests, rust-tests, typescript-tests, integration-tests]
+    needs: [database-tests, rust-tests, typescript-tests, integration-tests, check-files]
     if: always()
 
     steps:
