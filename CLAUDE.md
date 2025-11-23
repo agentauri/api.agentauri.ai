@@ -745,6 +745,100 @@ api.8004.dev/
         └── deploy.yml          # Deployment pipeline
 ```
 
+### Quality Standards & Testing Policy
+
+**CRITICAL RULE: 100% Test Coverage Before Commits**
+
+All code changes MUST have passing tests before being committed to the repository. This is a non-negotiable requirement for maintaining code quality and preventing regressions.
+
+#### Testing Requirements
+
+1. **Pre-Commit Verification**:
+   - ALL tests must pass before creating a commit
+   - Run the full test suite: `./scripts/run-tests.sh`
+   - No commits with failing tests are allowed
+   - No commits without tests for new functionality
+
+2. **Test Coverage Requirements**:
+   - **Database**: 100% of migrations, schema changes, and queries must be tested
+   - **Backend Services (Rust)**: Minimum 80% code coverage for all crates
+   - **Ponder Indexers (TypeScript)**: 100% of event handlers must be tested
+   - **API Endpoints**: 100% of endpoints must have integration tests
+   - **Critical Paths**: 100% coverage for trigger matching, action execution, and state management
+
+3. **Test Types Required**:
+
+   **Unit Tests**:
+   - Test individual functions and modules in isolation
+   - Mock external dependencies
+   - Fast execution (<1s per test suite)
+   - Example: Database query functions, condition evaluators, parsers
+
+   **Integration Tests**:
+   - Test component interactions
+   - Use test database with migrations applied
+   - Test API → Database, Event Processor → Queue flows
+   - Example: API endpoint creates trigger in database, event triggers action
+
+   **Database Tests**:
+   - Verify migrations apply correctly
+   - Test constraints, indexes, and triggers
+   - Verify data integrity rules
+   - Test rollback scenarios
+   - Example: Foreign key cascades, unique constraints, TimescaleDB hypertable behavior
+
+   **End-to-End Tests**:
+   - Test complete workflows
+   - Simulate real-world scenarios
+   - Example: Blockchain event → trigger match → notification sent
+
+4. **Test Execution Workflow**:
+
+   ```bash
+   # Before committing
+   ./scripts/run-tests.sh
+
+   # Individual test suites
+   cd rust-backend && cargo test           # Rust tests
+   cd ponder-indexers && pnpm test         # TypeScript tests
+   cd database && ./test-migrations.sh      # Database tests
+   ```
+
+5. **Continuous Integration**:
+   - GitHub Actions runs all tests on every PR
+   - PRs cannot be merged if tests fail
+   - Test coverage reports are generated automatically
+   - Failing tests block deployment to all environments
+
+6. **Test Documentation**:
+   - Each test file must include a header comment explaining what is being tested
+   - Complex test scenarios must have inline comments
+   - Test naming convention: `test_<functionality>_<scenario>_<expected_outcome>`
+   - Example: `test_trigger_matching_score_threshold_below_60_matches`
+
+7. **Test Data Management**:
+   - Use `database/seeds/test_data.sql` for consistent test data
+   - Reset database state between test runs
+   - Never use production data in tests
+   - Clean up test data after test execution
+
+#### Enforcement
+
+- **Git Pre-Commit Hook**: Automatically runs tests before allowing commit
+- **CI Pipeline**: Blocks PRs with failing tests
+- **Code Review**: Reviewers must verify test coverage
+- **No Exceptions**: Even "minor" changes require tests
+
+#### Testing Philosophy
+
+> "If it's not tested, it's broken. If it's not automatically tested, it will break."
+
+Tests are not optional. They are:
+- **Documentation**: Tests show how code should be used
+- **Safety Net**: Prevent regressions when refactoring
+- **Design Tool**: Writing tests first improves API design
+- **Confidence**: Deploy knowing the system works
+
 ### Coding Standards
 
 #### Rust
