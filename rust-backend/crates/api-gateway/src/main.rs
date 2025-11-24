@@ -47,6 +47,8 @@ async fn main() -> anyhow::Result<()> {
             .wrap(Logger::default())
             // Add CORS middleware
             .wrap(middleware::cors())
+            // Configure JSON payload size limit (1MB)
+            .app_data(web::JsonConfig::default().limit(1_048_576))
             // Store database pool in app state
             .app_data(web::Data::new(db_pool.clone()))
             .app_data(web::Data::new(config.clone()))

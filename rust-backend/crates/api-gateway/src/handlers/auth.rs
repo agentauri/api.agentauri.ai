@@ -5,7 +5,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use shared::{Config, DbPool};
 use validator::Validate;
 
@@ -94,9 +94,9 @@ pub async fn register(
     };
 
     // Generate JWT token
-    let claims = Claims::new(user.id.clone(), user.username.clone(), 24 * 7); // 7 days
+    let claims = Claims::new(user.id.clone(), user.username.clone(), 1); // 1 hour
     let token = match encode(
-        &Header::default(),
+        &Header::new(Algorithm::HS256),
         &claims,
         &EncodingKey::from_secret(config.server.jwt_secret.as_bytes()),
     ) {
@@ -195,9 +195,9 @@ pub async fn login(
     }
 
     // Generate JWT token
-    let claims = Claims::new(user.id.clone(), user.username.clone(), 24 * 7); // 7 days
+    let claims = Claims::new(user.id.clone(), user.username.clone(), 1); // 1 hour
     let token = match encode(
-        &Header::default(),
+        &Header::new(Algorithm::HS256),
         &claims,
         &EncodingKey::from_secret(config.server.jwt_secret.as_bytes()),
     ) {

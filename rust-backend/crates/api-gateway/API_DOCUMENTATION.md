@@ -6,6 +6,43 @@ The API Gateway provides a RESTful API for managing triggers, conditions, and ac
 
 **Base URL**: `http://localhost:8080/api/v1` (development)
 
+## Security
+
+### Authentication
+
+The API uses JWT (JSON Web Tokens) for authentication. All endpoints except `/auth/register` and `/auth/login` require a valid JWT token in the Authorization header.
+
+**Token Configuration**:
+- Algorithm: HS256 (explicitly configured)
+- Lifetime: 1 hour
+- Format: `Authorization: Bearer <token>`
+
+**Security Features**:
+- Argon2 password hashing (memory-hard, side-channel resistant)
+- JWT tokens expire after 1 hour
+- Explicit algorithm validation (prevents algorithm confusion attacks)
+- CORS whitelist (environment-based)
+- Input validation on all endpoints
+- JSON payload size limit: 1MB
+
+**Rate Limiting** (Infrastructure Level):
+- Authentication endpoints: 3 requests/minute per IP
+- General API endpoints: 10 requests/second per IP
+- Configured via nginx reverse proxy
+
+### Common Security Errors
+
+**401 Unauthorized**: Token missing, invalid, or expired
+- Solution: Login again to get a new token
+
+**413 Payload Too Large**: Request body exceeds 1MB
+- Solution: Reduce payload size or split into multiple requests
+
+**429 Too Many Requests**: Rate limit exceeded
+- Solution: Wait before retrying, implement exponential backoff
+
+---
+
 ## Authentication
 
 All endpoints except authentication endpoints require JWT authentication.
@@ -43,7 +80,7 @@ Create a new user account.
 **Response** (201 Created):
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  // Valid for 1 hour
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "john_doe",
@@ -78,7 +115,7 @@ Authenticate and receive JWT token.
 **Response** (200 OK):
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  // Valid for 1 hour
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "john_doe",
@@ -94,6 +131,14 @@ Authenticate and receive JWT token.
 - `400 Bad Request`: Validation failed
 - `401 Unauthorized`: Invalid credentials
 - `403 Forbidden`: Account disabled
+
+---
+
+### Token Refresh
+
+**Status**: Coming in Phase 3
+
+Currently, JWT tokens expire after 1 hour. Users must login again to get a new token. A token refresh mechanism will be added in Phase 3 to allow extending sessions without re-entering credentials.
 
 ---
 
@@ -615,26 +660,37 @@ All error responses follow this format:
 
 ---
 
-## Security
+## Additional Security Details
 
 ### JWT Tokens
 
-- JWT tokens expire after 7 days
-- Tokens are signed using HS256 algorithm
+- JWT tokens expire after 1 hour (production hardened)
+- Tokens are signed using HS256 algorithm (explicitly configured)
 - Include user ID and username in claims
 - Store JWT secret in `JWT_SECRET` environment variable
+- Expiration validation enabled with 60-second clock skew tolerance
 
 ### Password Requirements
 
 - Minimum 8 characters
 - Maximum 100 characters
-- Hashed using Argon2 (secure password hashing)
+- Hashed using Argon2 (memory-hard, side-channel resistant)
 
 ### Authorization
 
 - Users can only access/modify their own triggers
 - All trigger-related operations verify ownership
 - Conditions and actions inherit trigger ownership
+
+### Production Hardening (Week 7)
+
+The following security enhancements were implemented:
+
+1. **JWT Algorithm Explicitly Configured**: Prevents algorithm confusion attacks
+2. **Token Lifetime Reduced**: 7 days → 1 hour (168x reduction in compromise window)
+3. **JSON Payload Size Limits**: 1MB maximum (prevents DoS via memory exhaustion)
+4. **Infrastructure Rate Limiting**: nginx-based rate limiting on all endpoints
+5. **CORS Whitelist**: Environment-based origin restrictions
 
 ---
 

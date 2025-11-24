@@ -7,7 +7,7 @@ use actix_web::{
     http, Error, HttpMessage,
 };
 use futures_util::future::LocalBoxFuture;
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use std::{
     env,
     future::{ready, Ready},
@@ -135,7 +135,10 @@ where
             };
 
             // Validate JWT token
-            let validation = Validation::default();
+            let mut validation = Validation::new(Algorithm::HS256);
+            validation.validate_exp = true; // Explicitly enable expiration validation
+            validation.leeway = 60; // 60 seconds clock skew tolerance
+
             let token_data = decode::<Claims>(
                 token,
                 &DecodingKey::from_secret(jwt_secret.as_bytes()),
