@@ -15,6 +15,7 @@ use shared::models::{Event, Trigger};
 /// # Returns
 ///
 /// `true` if all conditions match, `false` otherwise
+#[allow(dead_code)]
 pub fn evaluate_trigger(_event: &Event, _trigger: &Trigger) -> Result<bool> {
     // TODO: Implement condition evaluation logic
     // This will be implemented in Phase 3
@@ -74,6 +75,6 @@ mod tests {
         };
 
         // Currently returns false - will be implemented later
-        assert!(evaluate_trigger(&event, &trigger).unwrap() == false);
+        assert!(!evaluate_trigger(&event, &trigger).unwrap());
     }
 }

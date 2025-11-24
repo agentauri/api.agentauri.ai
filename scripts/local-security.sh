@@ -30,22 +30,22 @@ print_header() {
 
 print_success() {
     echo -e "${GREEN}✅ $1${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 }
 
 print_error() {
     echo -e "${RED}❌ $1${NC}"
-    ((FAILED++))
+    FAILED=$((FAILED+1))
 }
 
 print_warning() {
     echo -e "${YELLOW}⚠️  $1${NC}"
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS+1))
 }
 
 print_skip() {
     echo -e "${YELLOW}⏭️  $1${NC}"
-    ((SKIPPED++))
+    SKIPPED=$((SKIPPED+1))
 }
 
 command_exists() {
@@ -64,28 +64,28 @@ if command_exists cargo-audit; then
     print_success "cargo-audit available"
 else
     print_warning "cargo-audit not installed. Install with: cargo install cargo-audit"
-    ((TOOLS_MISSING++))
+    TOOLS_MISSING=$((TOOLS_MISSING+1))
 fi
 
 if command_exists trivy; then
     print_success "trivy available"
 else
     print_warning "trivy not installed. Install with: brew install trivy (macOS)"
-    ((TOOLS_MISSING++))
+    TOOLS_MISSING=$((TOOLS_MISSING+1))
 fi
 
 if command_exists gitleaks; then
     print_success "gitleaks available"
 else
     print_warning "gitleaks not installed. Install with: brew install gitleaks (macOS)"
-    ((TOOLS_MISSING++))
+    TOOLS_MISSING=$((TOOLS_MISSING+1))
 fi
 
 if command_exists hadolint; then
     print_success "hadolint available"
 else
     print_warning "hadolint not installed. Install with: brew install hadolint (macOS)"
-    ((TOOLS_MISSING++))
+    TOOLS_MISSING=$((TOOLS_MISSING+1))
 fi
 
 if [ $TOOLS_MISSING -gt 0 ]; then

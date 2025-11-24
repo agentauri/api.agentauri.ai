@@ -29,12 +29,12 @@ print_header() {
 
 print_success() {
     echo -e "${GREEN}✅ $1${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 }
 
 print_error() {
     echo -e "${RED}❌ $1${NC}"
-    ((FAILED++))
+    FAILED=$((FAILED+1))
 }
 
 print_warning() {
@@ -43,7 +43,7 @@ print_warning() {
 
 print_skip() {
     echo -e "${YELLOW}⏭️  $1${NC}"
-    ((SKIPPED++))
+    SKIPPED=$((SKIPPED+1))
 }
 
 # Check if command exists

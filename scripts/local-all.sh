@@ -145,7 +145,7 @@ print_section "1/3: Running CI Tests"
 
 START_TIME=$(date +%s)
 
-if ./scripts/local-ci.sh; then
+if ./scripts/local-ci.sh --yes; then
     CI_RESULT=0
     print_success "CI tests PASSED"
 else
@@ -164,7 +164,7 @@ print_section "2/3: Running Lint Checks"
 
 START_TIME=$(date +%s)
 
-if ./scripts/local-lint.sh; then
+if ./scripts/local-lint.sh --yes; then
     LINT_RESULT=0
     print_success "Lint checks PASSED"
 else
@@ -183,7 +183,7 @@ print_section "3/3: Running Security Audit"
 
 START_TIME=$(date +%s)
 
-if ./scripts/local-security.sh; then
+if ./scripts/local-security.sh --yes; then
     SECURITY_RESULT=0
     print_success "Security audit PASSED"
 else

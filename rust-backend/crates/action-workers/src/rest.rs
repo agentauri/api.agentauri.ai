@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 /// REST action configuration
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct RestConfig {
     /// HTTP method
     pub method: String,
@@ -23,6 +24,7 @@ pub struct RestConfig {
     pub timeout_ms: u64,
 }
 
+#[allow(dead_code)]
 fn default_timeout() -> u64 {
     30000 // 30 seconds
 }
@@ -37,6 +39,7 @@ fn default_timeout() -> u64 {
 /// # Returns
 ///
 /// Result indicating success or failure
+#[allow(dead_code)]
 pub async fn execute(_config: RestConfig, _event_data: serde_json::Value) -> Result<()> {
     // TODO: Implement REST API call
     // This will be implemented in Phase 4

@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 /// Telegram action configuration
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct TelegramConfig {
     /// Telegram chat ID
     pub chat_id: String,
@@ -17,6 +18,7 @@ pub struct TelegramConfig {
     pub parse_mode: String,
 }
 
+#[allow(dead_code)]
 fn default_parse_mode() -> String {
     "Markdown".to_string()
 }
@@ -31,6 +33,7 @@ fn default_parse_mode() -> String {
 /// # Returns
 ///
 /// Result indicating success or failure
+#[allow(dead_code)]
 pub async fn execute(_config: TelegramConfig, _event_data: serde_json::Value) -> Result<()> {
     // TODO: Implement Telegram message sending
     // This will be implemented in Phase 3
