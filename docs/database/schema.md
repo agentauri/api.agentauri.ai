@@ -35,7 +35,10 @@ CREATE TABLE users (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL, -- bcrypt hash
+    password_hash TEXT NOT NULL,       -- Argon2 hash
+    wallet_address TEXT UNIQUE,        -- Optional: for wallet-based auth
+    auth_method TEXT DEFAULT 'password'
+        CHECK (auth_method IN ('password', 'wallet', 'both')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     last_login_at TIMESTAMPTZ,
@@ -44,6 +47,7 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_wallet ON users(wallet_address) WHERE wallet_address IS NOT NULL;
 
 -- Trigger to update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -457,27 +461,141 @@ CREATE INDEX idx_a2a_tasks_tool ON a2a_tasks(tool);
 
 ### api_keys
 
-API key authentication for external agents.
+API key authentication for external agents (Layer 1 Authentication).
 
 ```sql
 CREATE TABLE api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    key_hash TEXT NOT NULL,  -- bcrypt hash of API key
+    key_hash TEXT NOT NULL,           -- Argon2 hash (not bcrypt)
     name TEXT NOT NULL,
-    prefix TEXT NOT NULL,    -- First 8 chars for identification (e.g., "ak_8004_")
+    prefix TEXT NOT NULL UNIQUE,      -- 'sk_live_' or 'sk_test_' + first 8 chars
+    environment TEXT NOT NULL CHECK (environment IN ('live', 'test')),
+    key_type TEXT NOT NULL DEFAULT 'standard'
+        CHECK (key_type IN ('standard', 'restricted', 'admin')),
     permissions JSONB NOT NULL DEFAULT '["read"]',
+    rate_limit_override INTEGER,      -- NULL = use org default
     last_used_at TIMESTAMPTZ,
+    last_used_ip INET,
     expires_at TIMESTAMPTZ,
+    created_by TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (prefix)
+    revoked_at TIMESTAMPTZ,
+    revoked_by TEXT,
+    revocation_reason TEXT
 );
 
-CREATE INDEX idx_api_keys_prefix ON api_keys(prefix);
-CREATE INDEX idx_api_keys_org ON api_keys(organization_id);
+CREATE INDEX idx_api_keys_prefix ON api_keys(prefix) WHERE revoked_at IS NULL;
+CREATE INDEX idx_api_keys_org ON api_keys(organization_id) WHERE revoked_at IS NULL;
+CREATE INDEX idx_api_keys_env ON api_keys(organization_id, environment) WHERE revoked_at IS NULL;
 
--- API keys are prefixed with 'ak_8004_' for easy identification
--- Full key is shown once at creation, then only prefix is stored
+-- API keys format: sk_live_xxx (production) or sk_test_xxx (testing)
+-- Full key shown once at creation; only Argon2 hash stored
+-- Revoked keys are kept for audit trail but excluded from lookup indexes
+```
+
+### agent_links
+
+Links on-chain agents to organization accounts (Layer 2 Authentication).
+
+```sql
+CREATE TABLE agent_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id BIGINT NOT NULL,
+    chain_id INTEGER NOT NULL,
+    account_id TEXT NOT NULL,         -- References organizations.id
+    wallet_address TEXT NOT NULL,     -- Checksummed Ethereum address
+    linked_at TIMESTAMPTZ DEFAULT NOW(),
+    linked_by_signature TEXT NOT NULL,
+    signature_message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'revoked')),
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (agent_id, chain_id)
+);
+
+CREATE INDEX idx_agent_links_agent ON agent_links(agent_id, chain_id) WHERE status = 'active';
+CREATE INDEX idx_agent_links_account ON agent_links(account_id) WHERE status = 'active';
+CREATE INDEX idx_agent_links_wallet ON agent_links(wallet_address) WHERE status = 'active';
+
+-- Each agent (identified by agent_id + chain_id) can only be linked to one account
+-- Linking requires wallet signature proving ownership of the agent NFT
+-- On-chain verification: IdentityRegistry.ownerOf(agentId) == wallet_address
+```
+
+### used_nonces
+
+Tracks consumed nonces for replay attack prevention.
+
+```sql
+CREATE TABLE used_nonces (
+    nonce_hash TEXT PRIMARY KEY,      -- SHA-256 hash of nonce
+    agent_id BIGINT,
+    wallet_address TEXT,
+    used_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL   -- 5 minutes after creation
+);
+
+CREATE INDEX idx_used_nonces_expires ON used_nonces(expires_at);
+
+-- Nonces are 16-byte random hex strings
+-- Each nonce can only be used once within its validity window
+-- Expired nonces are cleaned up by scheduled job (retained 24h for debugging)
+```
+
+### oauth_clients
+
+OAuth 2.0 client applications (future third-party integrations).
+
+```sql
+CREATE TABLE oauth_clients (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id TEXT UNIQUE NOT NULL,
+    client_secret_hash TEXT NOT NULL, -- Argon2 hash
+    name TEXT NOT NULL,
+    description TEXT,
+    redirect_uris JSONB NOT NULL DEFAULT '[]',
+    allowed_scopes JSONB NOT NULL DEFAULT '["read"]',
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    is_confidential BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_oauth_clients_client_id ON oauth_clients(client_id) WHERE is_active = true;
+CREATE INDEX idx_oauth_clients_org ON oauth_clients(organization_id);
+
+-- OAuth 2.0 clients for third-party app integrations
+-- Tables created in Phase 3.5 Week 13; full OAuth flow implemented later
+```
+
+### oauth_tokens
+
+OAuth 2.0 access and refresh tokens.
+
+```sql
+CREATE TABLE oauth_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token_type TEXT NOT NULL CHECK (token_type IN ('access', 'refresh')),
+    token_hash TEXT NOT NULL,         -- Argon2 hash
+    client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scopes JSONB NOT NULL DEFAULT '[]',
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_oauth_tokens_hash ON oauth_tokens(token_hash) WHERE revoked_at IS NULL;
+CREATE INDEX idx_oauth_tokens_user ON oauth_tokens(user_id);
+CREATE INDEX idx_oauth_tokens_client ON oauth_tokens(client_id);
+CREATE INDEX idx_oauth_tokens_expires ON oauth_tokens(expires_at) WHERE revoked_at IS NULL;
+
+-- Access tokens: 1 hour expiry
+-- Refresh tokens: 30 days expiry
+-- Revoked tokens kept for audit trail
 ```
 
 ### query_cache

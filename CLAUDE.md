@@ -27,9 +27,25 @@ psql < database/seeds/test_data.sql   # Load test data
 ### Key Endpoints (API Gateway)
 
 ```
-# Authentication
+# User Authentication (JWT)
 POST   /api/v1/auth/register          # Create user account
 POST   /api/v1/auth/login             # Get JWT token
+
+# API Key Management (Layer 1)
+POST   /api/v1/api-keys               # Create API key
+GET    /api/v1/api-keys               # List organization's keys
+GET    /api/v1/api-keys/:id           # Get key details (masked)
+DELETE /api/v1/api-keys/:id           # Revoke key
+POST   /api/v1/api-keys/:id/rotate    # Rotate key
+
+# Wallet Authentication (Layer 2)
+POST   /api/v1/auth/wallet/challenge  # Request signing challenge
+POST   /api/v1/auth/wallet/verify     # Submit signature, get JWT
+
+# Agent Linking (Layer 2)
+POST   /api/v1/agents/link            # Link agent to organization
+GET    /api/v1/agents/linked          # List linked agents
+DELETE /api/v1/agents/:agent_id/link  # Unlink agent
 
 # Triggers (PUSH Layer)
 GET    /api/v1/triggers               # List user triggers (paginated)
@@ -94,6 +110,26 @@ This backend transforms these raw blockchain signals into intelligent actions: n
   - x402 protocol (crypto)
   - Credits system (prepaid)
 - **Multi-tenant Account Model** with organizations and role-based access
+
+**Authentication System** (3-layer model):
+- **Layer 0: Anonymous** - No authentication required
+  - x402 payment only (crypto micropayments)
+  - IP-based rate limiting (10 calls/hour)
+  - Tier 0-1 queries only
+- **Layer 1: API Key** - Account-based authentication
+  - Format: `sk_live_xxx` (production) / `sk_test_xxx` (testing)
+  - Argon2 hashing with secure storage
+  - All payment methods (Stripe, x402, Credits)
+  - Per-plan rate limits (Starter: 100/hr, Pro: 500/hr, Enterprise: 2000/hr)
+  - Full access to Tier 0-3 queries
+- **Layer 2: Wallet Signature** - On-chain agent authentication
+  - EIP-191 signature verification
+  - Agent → Account linking via challenge-response
+  - On-chain ownership verification (IdentityRegistry.ownerOf)
+  - Nonce management for replay attack prevention
+  - Inherits account permissions and rate limits
+
+See [Authentication Documentation](docs/auth/AUTHENTICATION.md) for complete details.
 
 ### ERC-8004 Protocol Reference
 
@@ -182,11 +218,15 @@ REST API server providing trigger management and system queries.
 - Health: `/api/v1/health` (system status)
 
 **Security Features**:
+- **3-layer authentication** (Anonymous, API Key, Wallet Signature)
 - JWT authentication middleware (jsonwebtoken crate)
-- Argon2 password hashing (secure, modern algorithm)
+- API Key authentication middleware (`sk_live_xxx` format)
+- EIP-191 wallet signature verification (alloy crate)
+- Argon2 hashing for passwords and API keys
 - User ownership validation on all trigger operations
 - CORS whitelist with environment configuration
 - Input validation with validator crate
+- Redis-based rate limiting (per-tier, per-account, per-IP)
 
 **Architecture**:
 - 3-layer design: Handlers → Repositories → Database

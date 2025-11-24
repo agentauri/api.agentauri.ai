@@ -264,27 +264,79 @@ CREATE INDEX idx_api_keys_org ON api_keys(organization_id);
 
 ## Authentication
 
-### API Key Authentication
+The A2A protocol supports all three authentication layers. Each layer provides different capabilities and rate limits.
 
-External agents authenticate using API keys:
+### Layer 0: Anonymous Access
 
+No authentication required. Pay-per-query with x402 micropayments.
+
+```http
+POST /api/v1/a2a/rpc
+X-Payment: x402 <payment_proof>
+Content-Type: application/json
+
+{"jsonrpc": "2.0", "method": "tasks/send", ...}
 ```
-Authorization: Bearer ak_8004_abc123...
+
+**Limitations**:
+- Rate limit: 10 requests/hour per IP
+- Query tiers: 0-1 only (raw and aggregated)
+- Payment: x402 only
+
+### Layer 1: API Key Authentication
+
+Account-based authentication with API keys.
+
+```http
+POST /api/v1/a2a/rpc
+Authorization: Bearer sk_live_abc123def456...
+Content-Type: application/json
+
+{"jsonrpc": "2.0", "method": "tasks/send", ...}
 ```
 
-API keys are:
-- Prefixed with `ak_8004_` for easy identification
-- Hashed with bcrypt before storage
-- Scoped to organizations
-- Support expiration dates
+**API Key Format**:
+- Production: `sk_live_` prefix
+- Testing: `sk_test_` prefix
+- Storage: Argon2 hash (original shown once at creation)
 
-### Rate Limiting
+**Capabilities**:
+- All query tiers (0-3)
+- All payment methods (Stripe, x402, Credits)
+- Per-plan rate limits
 
-| Plan | Requests/minute | Concurrent tasks |
-|------|----------------|------------------|
-| Starter | 10 | 2 |
-| Pro | 100 | 10 |
-| Enterprise | 1000 | 50 |
+### Layer 2: Wallet Signature
+
+On-chain agents authenticate via wallet signature (EIP-191).
+
+```http
+POST /api/v1/a2a/rpc
+X-Agent-Id: 42
+X-Chain-Id: 84532
+X-Timestamp: 1705312800
+X-Nonce: abc123xyz
+X-Signature: 0x1234...abcd
+Content-Type: application/json
+
+{"jsonrpc": "2.0", "method": "tasks/send", ...}
+```
+
+**Requirements**:
+- Agent must be linked to an organization account
+- Wallet must own the agent NFT (verified on-chain)
+- Each request requires fresh nonce (5-minute validity)
+
+See [Authentication Documentation](../auth/AUTHENTICATION.md) for complete details.
+
+### Rate Limiting by Layer
+
+| Layer | Auth Method | Requests/Hour | Concurrent Tasks | Tiers |
+|-------|-------------|---------------|------------------|-------|
+| 0 | Anonymous (IP) | 10 | 1 | 0-1 |
+| 1 | API Key (Starter) | 100 | 2 | 0-3 |
+| 1 | API Key (Pro) | 500 | 10 | 0-3 |
+| 1 | API Key (Enterprise) | 2000 | 50 | 0-3 |
+| 2 | Wallet Signature | Inherit | Inherit | 0-3 |
 
 ## Agent Card (Discovery)
 

@@ -25,11 +25,19 @@ This document outlines the complete implementation roadmap for the api.8004.dev 
 
 **Pull Layer (NEW)**
 The roadmap now includes Pull Layer features for agent-initiated queries:
-- Phase 3.5: Payment Foundation (Organizations, Credits, Stripe)
+- Phase 3.5: Payment & Authentication Foundation (Organizations, Credits, Stripe, 3-Layer Auth)
 - Phase 5 Extended: A2A Protocol + MCP Query Tools
-- Timeline extended to 24 weeks (+2 weeks)
+- Timeline extended to 25 weeks (+3 weeks from original 22)
 
 See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
+
+**Authentication System (NEW)**
+3-layer authentication for different client types:
+- Layer 0: Anonymous (x402 only, IP-based rate limiting)
+- Layer 1: API Key (`sk_live_xxx`, account-based)
+- Layer 2: Wallet Signature (EIP-191, agent → account linking)
+
+See [Authentication Documentation](../docs/auth/AUTHENTICATION.md) for details.
 
 ## Project Phases
 
@@ -269,21 +277,24 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 
 ---
 
-### Phase 3.5: Payment Foundation (Weeks 11-12) - NEW
+### Phase 3.5: Payment & Authentication Foundation (Weeks 11-13) - EXTENDED +1
 
-**Goal**: Establish multi-tenant account model and payment infrastructure for Pull Layer.
+**Goal**: Establish multi-tenant account model, payment infrastructure, and 3-layer authentication for Pull Layer.
 
-#### Week 11: Account Model + Organizations
+#### Week 11: Organizations + API Key Auth (Layer 1)
 
 **Deliverables**:
 - Organizations table with multi-tenant support
 - Organization members with role-based access
 - Organization CRUD API endpoints
 - JWT middleware updates for organization context
+- **Enhanced API Keys** with `sk_live_xxx` / `sk_test_xxx` format (Layer 1 Auth)
+- API Key CRUD endpoints and middleware
 
 **Database Migrations**:
 - `20250125000001_create_organizations_table.sql`
 - `20250125000002_create_organization_members_table.sql`
+- `20250125000003_create_api_keys_enhanced.sql`
 
 **Subagents**:
 - `backend-architect` - Account model design
@@ -295,6 +306,10 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 3. Implement organization repository and handlers
 4. Update JWT middleware to include organization context
 5. Create API endpoints for organization CRUD and member management
+6. **Create enhanced api_keys table** (environment, key_type, permissions, Argon2 hash)
+7. **Implement API key generation** with secure random prefix (`sk_live_`, `sk_test_`)
+8. **Create ApiKeyAuth middleware** for Layer 1 authentication
+9. **Implement dual auth support** (JWT OR API Key for all endpoints)
 
 **API Endpoints**:
 - `POST /api/v1/organizations` - Create organization
@@ -305,8 +320,13 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 - `POST /api/v1/organizations/:id/members` - Invite member
 - `GET /api/v1/organizations/:id/members` - List members
 - `DELETE /api/v1/organizations/:id/members/:user_id` - Remove member
+- **`POST /api/v1/api-keys`** - Create API key
+- **`GET /api/v1/api-keys`** - List organization's keys
+- **`GET /api/v1/api-keys/:id`** - Get key details (masked)
+- **`DELETE /api/v1/api-keys/:id`** - Revoke key
+- **`POST /api/v1/api-keys/:id/rotate`** - Rotate key
 
-#### Week 12: Credits System + Stripe Basics
+#### Week 12: Credits + Wallet Auth (Layer 2)
 
 **Deliverables**:
 - Credits table for balance tracking
@@ -314,15 +334,21 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 - Stripe customer integration
 - Credit purchase API with Stripe checkout
 - Stripe webhook handler
+- **Wallet authentication** with EIP-191 signature verification (Layer 2 Auth)
+- **Agent → Account linking** with challenge-response flow
+- **Nonce management** for replay attack prevention
 
 **Database Migrations**:
-- `20250125000003_create_credits_table.sql`
-- `20250125000004_create_credit_transactions_table.sql`
-- `20250125000005_create_subscriptions_table.sql`
+- `20250125000004_create_credits_table.sql`
+- `20250125000005_create_credit_transactions_table.sql`
+- `20250125000006_create_subscriptions_table.sql`
+- `20250125000007_add_wallet_to_users.sql`
+- `20250125000008_create_agent_links.sql`
+- `20250125000009_create_used_nonces.sql`
 
 **Subagents**:
 - `backend-architect` - Payment flow design
-- `rust-engineer` - Stripe integration
+- `rust-engineer` - Stripe and wallet verification integration
 
 **Tasks**:
 1. Create credits table (organization_id, balance, reserved)
@@ -333,29 +359,79 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 6. Create Stripe customer on organization creation
 7. Implement credit purchase flow via Stripe checkout
 8. Create webhook handler for payment.succeeded events
+9. **Add `alloy` crate** for Ethereum wallet verification
+10. **Implement EIP-191 signature verification** module
+11. **Create wallet challenge/verify endpoints** with nonce management
+12. **Create agent_links table** (agent_id, chain_id, account_id, wallet_address)
+13. **Implement agent linking flow** with on-chain ownership verification (ownerOf call)
+14. **Create used_nonces table** for replay attack prevention (5-min expiration)
 
 **API Endpoints**:
 - `GET /api/v1/billing/credits` - Get credit balance
 - `POST /api/v1/billing/credits/purchase` - Purchase credits (Stripe checkout)
 - `GET /api/v1/billing/transactions` - List credit transactions
 - `POST /api/v1/webhooks/stripe` - Stripe webhook handler
+- **`POST /api/v1/auth/wallet/challenge`** - Request signing challenge
+- **`POST /api/v1/auth/wallet/verify`** - Submit signature, get JWT
+- **`POST /api/v1/agents/link`** - Link agent to organization
+- **`GET /api/v1/agents/linked`** - List linked agents
+- **`DELETE /api/v1/agents/:agent_id/link`** - Unlink agent
 
 **Dependencies**:
 - `stripe-rust = "0.26"` - Add to api-gateway Cargo.toml
+- **`alloy = "0.1"`** - Ethereum signature verification
+
+#### Week 13: Auth Completion + Rate Limiting + OAuth 2.0 - NEW
+
+**Deliverables**:
+- **Layer 0 (Anonymous) IP-based rate limiting**
+- **Enhanced rate limiting middleware** (per-tier, per-account, per-IP)
+- **Auth layer precedence logic** (L0 < L1 < L2)
+- **OAuth 2.0 tables** for future third-party integrations
+- **Comprehensive auth integration tests**
+
+**Database Migrations**:
+- `20250125000010_create_oauth_clients.sql`
+- `20250125000011_create_oauth_tokens.sql`
+
+**Subagents**:
+- `rust-engineer` - Rate limiting and auth completion
+- `backend-architect` - OAuth 2.0 schema design
+
+**Tasks**:
+1. **Implement Redis-based sliding window rate limiting**
+2. **Create per-tier rate limit configuration** (Anonymous: 10/hr, Starter: 100/hr, Pro: 1000/hr)
+3. **Implement IP-based rate limiting** for Layer 0 (anonymous) users
+4. **Create auth layer precedence extractor** (check L2 → L1 → L0 in order)
+5. **Create oauth_clients table** (client_id, client_secret_hash, redirect_uris, scopes)
+6. **Create oauth_tokens table** (access tokens, refresh tokens, expiration)
+7. **Write integration tests** for all 3 auth layers
+8. **Write rate limiting tests** (IP-based, account-based, tier-based)
+9. **Write signature verification tests** (valid, invalid, expired nonce)
+10. **Document authentication flow** in API documentation
+
+**API Endpoints** (OAuth 2.0 - tables ready, endpoints later):
+- Tables prepared for future: `POST /oauth/authorize`, `POST /oauth/token`
+
+**Rate Limit Configuration**:
+| Layer | Auth Method | Rate Limit | Tiers Allowed |
+|-------|-------------|------------|---------------|
+| 0 | None (IP) | 10/hour | 0-1 |
+| 1 | API Key | Per-plan (100-1000/hr) | 0-3 |
+| 2 | Wallet Signature | Inherit from account | 0-3 + agent ops |
 
 ---
 
-### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - SHIFTED +2
+### Phase 4: Advanced Triggers & Actions (Weeks 14-16) - SHIFTED +1
 
 **Goal**: Implement stateful triggers and additional action types.
 
-#### Week 13: Stateful Triggers + API Rate Limiting (was Week 11)
+#### Week 14: Stateful Triggers
 
 **Deliverables**:
 - EMA (Exponential Moving Average) condition
 - Rate limit condition for triggers
 - Trigger state management in PostgreSQL
-- API rate limiting middleware (Pull Layer foundation)
 
 **Subagents**:
 - `rust-engineer` - Stateful trigger implementation
@@ -367,10 +443,8 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 4. Create `rate_limit` condition evaluator
 5. Add state update logic in Event Processor
 6. Test state consistency under concurrent events
-7. Implement Redis-based API rate limiting middleware
-8. Configure per-tier rate limits (Free: 100/hr, Pro: 500/hr)
 
-#### Week 14: REST/HTTP Worker + Discovery Endpoint (was Week 12)
+#### Week 15: REST/HTTP Worker + Discovery Endpoint
 
 **Deliverables**:
 - HTTP client integration (Reqwest)
@@ -393,7 +467,7 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 8. Create `GET /.well-known/agent.json` endpoint for agent discovery
 9. Populate agent card with service capabilities and pricing
 
-#### Week 15: Circuit Breaker & Payment Nonces (was Week 13)
+#### Week 16: Circuit Breaker & Payment Nonces
 
 **Deliverables**:
 - Per-trigger execution rate limits
@@ -420,11 +494,11 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 
 ---
 
-### Phase 5: MCP + A2A Integration (Weeks 16-18) - EXTENDED
+### Phase 5: MCP + A2A Integration (Weeks 17-19) - SHIFTED +1
 
 **Goal**: Enable agent feedback push via MCP protocol AND agent-initiated queries via A2A/MCP (Pull Layer).
 
-#### Week 16: MCP Bridge + A2A Protocol (was Week 14)
+#### Week 17: MCP Bridge + A2A Protocol
 
 **Deliverables**:
 - TypeScript MCP bridge HTTP service
@@ -459,7 +533,7 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 - `GET /api/v1/a2a/tasks/:id` - Task status
 - `GET /api/v1/a2a/tasks/:id/stream` - SSE progress updates
 
-#### Week 17: MCP Worker + Query Tools (Tier 0-2) (was Week 15)
+#### Week 18: MCP Worker + Query Tools (Tier 0-2)
 
 **Deliverables**:
 - Rust MCP worker
@@ -502,7 +576,7 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 | 2 | `getClientAnalysis` | 0.05 USDC | Feedback patterns by client |
 | 2 | `compareToBaseline` | 0.05 USDC | Compare to category average |
 
-#### Week 18: Query Tools (Tier 3) + Full Payment (was Week 16)
+#### Week 19: Query Tools (Tier 3) + Full Payment
 
 **Deliverables**:
 - MCP Query Tools Tier 3 with AI analysis (Pull Layer)
@@ -537,16 +611,17 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 
 ---
 
-### Phase 6: Testing & Observability (Weeks 19-21) - SHIFTED +2
+### Phase 6: Testing & Observability (Weeks 20-22) - SHIFTED +1
 
 **Goal**: Comprehensive testing and production observability including Pull Layer.
 
-#### Week 19: Test Coverage + Payment Integration (was Week 17)
+#### Week 20: Test Coverage + Auth Integration
 
 **Deliverables**:
 - Unit tests for all components (>80% coverage)
 - Integration tests for cross-component flows
 - Property-based tests for critical logic
+- **Authentication integration tests** for all 3 layers
 - Payment integration tests (Pull Layer)
 
 **Subagents**:
@@ -559,18 +634,23 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 4. Write integration tests for Event Processor → Queue
 5. Property-based tests for EMA calculations
 6. Achieve >80% code coverage
-7. Test credit deduction atomicity
-8. Test Stripe payment flow
-9. Test x402 payment verification
-10. Test query caching behavior
+7. **Test API Key authentication flow** (Layer 1)
+8. **Test wallet signature verification** (Layer 2)
+9. **Test agent linking with on-chain verification**
+10. **Test rate limiting per-tier enforcement**
+11. Test credit deduction atomicity
+12. Test Stripe payment flow
+13. Test x402 payment verification
+14. Test query caching behavior
 
-#### Week 20: Observability + Payment Monitoring (was Week 18)
+#### Week 21: Observability + Auth Monitoring
 
 **Deliverables**:
 - Prometheus metrics export
 - Grafana dashboards
 - Structured logging with Loki
 - Distributed tracing (Jaeger/Tempo)
+- **Authentication metrics and alerts**
 - Payment and revenue dashboards (Pull Layer)
 
 **Subagents**:
@@ -583,20 +663,26 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
    - Per-chain event rates
    - Action worker performance
    - Database query performance
+   - **Authentication success/failure rates by layer**
+   - **Rate limit hit rates by tier**
+   - **Agent linking activity**
    - Payment success rate and revenue (Pull Layer)
    - Query tool usage by tier (Pull Layer)
 3. Set up Loki for log aggregation
 4. Implement distributed tracing with tracing-opentelemetry
 5. Create alerting rules in Prometheus
-6. Add payment failure alerts (Pull Layer)
+6. **Add auth failure spike alerts**
+7. **Add rate limit exhaustion alerts**
+8. Add payment failure alerts (Pull Layer)
 
-#### Week 21: Load Testing + Query Performance (was Week 19)
+#### Week 22: Load Testing + Rate Limit Performance
 
 **Deliverables**:
 - Load tests with k6 or Artillery
 - Performance benchmarks
 - Scalability analysis
 - Optimization recommendations
+- **Rate limiting performance benchmarks**
 - Query tool performance benchmarks (Pull Layer)
 
 **Subagents**:
@@ -610,17 +696,20 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 5. Identify bottlenecks
 6. Optimize critical paths
 7. Document performance characteristics
-8. Benchmark query tools by tier (Pull Layer)
-9. Test cache hit rates and optimize (Pull Layer)
-10. Load test A2A protocol (1000+ concurrent tasks)
+8. **Benchmark API key validation latency** (target: <50ms p95)
+9. **Benchmark wallet signature verification** (target: <100ms p95)
+10. **Benchmark rate limit check latency** (target: <10ms p95)
+11. Benchmark query tools by tier (Pull Layer)
+12. Test cache hit rates and optimize (Pull Layer)
+13. Load test A2A protocol (1000+ concurrent tasks)
 
 ---
 
-### Phase 7: Production Deployment (Weeks 22-24) - SHIFTED +2
+### Phase 7: Production Deployment (Weeks 23-25) - SHIFTED +1
 
 **Goal**: Production-ready deployment and documentation including Pull Layer.
 
-#### Week 22: CI/CD Pipelines (was Week 20)
+#### Week 23: CI/CD Pipelines
 
 **Deliverables**:
 - GitHub Actions workflows for CI
@@ -639,13 +728,14 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 5. Implement deployment scripts
 6. Set up environment-specific configurations
 
-#### Week 23: Security Audit (was Week 21)
+#### Week 24: Security Audit
 
 **Deliverables**:
 - Security audit report
 - Vulnerability fixes
 - Secrets management implementation
 - Security best practices documentation
+- **3-layer authentication security audit**
 - Payment security audit (Pull Layer)
 
 **Subagents**:
@@ -659,17 +749,23 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 5. Add rate limiting and DDoS protection
 6. Document security considerations
 7. Fix identified vulnerabilities
-8. Audit payment processing security (Pull Layer)
-9. Audit x402 verification logic (Pull Layer)
-10. Secure Stripe webhook handling (Pull Layer)
+8. **Audit API key generation and storage** (Argon2 hashing)
+9. **Audit wallet signature verification** (EIP-191 compliance)
+10. **Audit nonce management** for replay attack prevention
+11. **Audit agent linking flow** for impersonation attacks
+12. **Audit rate limiting** for bypass vulnerabilities
+13. Audit payment processing security (Pull Layer)
+14. Audit x402 verification logic (Pull Layer)
+15. Secure Stripe webhook handling (Pull Layer)
 
-#### Week 24: API Documentation & User Guides (was Week 22)
+#### Week 25: API Documentation & User Guides
 
 **Deliverables**:
 - OpenAPI/Swagger specification
 - Postman collection
 - User guides and tutorials
 - Example trigger configurations
+- **Authentication documentation** (docs/auth/)
 - Pull Layer documentation
 
 **Subagents**:
@@ -684,13 +780,18 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 5. Write user guide: Configuring Actions
 6. Create example trigger configurations (docs/examples/)
 7. Write troubleshooting guide
-8. Document Pull Layer API (A2A, MCP Query Tools)
-9. Document payment flows (Stripe, x402, Credits)
-10. Document pricing tiers and rate limits
+8. **Finalize docs/auth/AUTHENTICATION.md** (3-layer overview)
+9. **Finalize docs/auth/API_KEYS.md** (key management)
+10. **Finalize docs/auth/WALLET_SIGNATURES.md** (EIP-191, agent linking)
+11. **Finalize docs/auth/RATE_LIMITING.md** (per-tier limits)
+12. **Finalize docs/auth/SECURITY_MODEL.md** (threat model)
+13. Document Pull Layer API (A2A, MCP Query Tools)
+14. Document payment flows (Stripe, x402, Credits)
+15. Document pricing tiers and rate limits
 
 ---
 
-### Phase 8: AI Integration (Future - Weeks 25+)
+### Phase 8: AI Integration (Future - Weeks 26+)
 
 **Goal**: AI-powered trigger intelligence and event interpretation.
 
@@ -749,19 +850,27 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 - Can detect blockchain events from testnets
 - Can send Telegram notifications when triggers match
 
-### Milestone 1.5: Payment Foundation (End of Week 12) - NEW
+### Milestone 1.5: Payment & Auth Foundation (End of Week 13) - EXTENDED +1
 
 **Deliverables**:
 - Multi-tenant account model (Organizations)
 - Credits system with Stripe integration
 - Payment webhooks and billing API
+- **3-layer authentication system** (Anonymous, API Key, Wallet Signature)
+- **Agent → Account linking** with on-chain verification
+- **Enhanced rate limiting** (per-tier, per-account, per-IP)
+- **OAuth 2.0 tables** (ready for future implementation)
 
 **Success Criteria**:
 - Can create organizations and invite members
 - Can purchase credits via Stripe
 - Credit balance tracking working
+- **Can authenticate via API key (`sk_live_xxx`)**
+- **Can authenticate via wallet signature (EIP-191)**
+- **Can link agents to organizations**
+- **Rate limiting enforced per authentication layer**
 
-### Milestone 2: Full Feature Set (End of Week 18) - SHIFTED +2
+### Milestone 2: Full Feature Set (End of Week 19) - SHIFTED +1
 
 **Deliverables**:
 - Stateful triggers (EMA, rate limits)
@@ -781,7 +890,7 @@ See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
 - Production-grade error handling
 - >80% test coverage
 
-### Milestone 3: Production Ready (End of Week 24) - SHIFTED +2
+### Milestone 3: Production Ready (End of Week 25) - SHIFTED +1
 
 **Deliverables**:
 - Full observability stack
@@ -867,4 +976,4 @@ After completing Phase 7 (Production Deployment), the project will enter mainten
 **Current Phase**: Phase 2 (Core Services) - 85% Complete
 **Current Week**: Week 8 (Trigger Evaluation Engine) - Ready to Start
 **Next Milestone**: MVP (End of Week 10)
-**Total Timeline**: 24 weeks (+2 weeks for Pull Layer integration)
+**Total Timeline**: 25 weeks (+3 weeks: Pull Layer +2, Authentication +1)

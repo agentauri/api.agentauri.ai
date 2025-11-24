@@ -21,6 +21,12 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 - **Payment System**: Stripe (fiat), x402 (crypto), Credits (prepaid)
 - **Multi-tenant Account Model** with organizations and role-based access
 
+**Authentication System** (3-layer):
+- **Layer 0**: Anonymous access with x402 micropayments, IP-based rate limiting
+- **Layer 1**: API Key authentication (`sk_live_xxx`), per-plan rate limits
+- **Layer 2**: Wallet signature (EIP-191), agent → account linking
+- **OAuth 2.0**: Third-party application integrations (future)
+
 ## Quick Start
 
 ### Prerequisites
@@ -118,7 +124,8 @@ See [CLAUDE.md](./CLAUDE.md) for comprehensive architecture documentation.
 
 - [CLAUDE.md](./CLAUDE.md) - Complete project documentation
 - [docs/architecture/](./docs/architecture/) - System architecture and diagrams
-- [docs/protocols/](./docs/protocols/) - ERC-8004, MCP, OASF integration guides
+- [docs/protocols/](./docs/protocols/) - ERC-8004, MCP, OASF, A2A integration guides
+- [docs/auth/](./docs/auth/) - Authentication system (API keys, wallet signatures, rate limiting)
 - [docs/database/](./docs/database/) - Database schema and migration strategy
 - [API Documentation](./rust-backend/crates/api-gateway/API_DOCUMENTATION.md) - REST API specification
 

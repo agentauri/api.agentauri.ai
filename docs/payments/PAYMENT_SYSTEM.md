@@ -9,6 +9,59 @@ The payment system supports three payment methods:
 - **x402** (crypto) - HTTP-native cryptocurrency payments
 - **Credits** - Prepaid balance system
 
+## Authentication × Payment Matrix
+
+Payment methods are available based on authentication layer:
+
+| Auth Layer | Stripe | x402 | Credits | No Payment |
+|------------|--------|------|---------|------------|
+| **Layer 0** (Anonymous) | - | Tier 0-1 | - | - |
+| **Layer 1** (API Key) | Tier 0-3 | Tier 0-3 | Tier 0-3 | Health only |
+| **Layer 2** (Wallet) | Inherit | Inherit | Inherit | Agent profile |
+
+### Layer 0: Anonymous (x402 Only)
+
+Anonymous users can only pay via x402 micropayments:
+- No account required
+- Pay-per-query model
+- Limited to Tier 0-1 queries
+- Rate limited by IP (10 requests/hour)
+
+```http
+GET /api/v1/queries/getAgentProfile?agentId=42
+X-Payment: x402 <payment_proof>
+```
+
+### Layer 1: API Key (All Methods)
+
+Authenticated users with API keys can use all payment methods:
+- Stripe for subscriptions and one-time payments
+- x402 for crypto payments
+- Credits for prepaid balance
+- Full access to Tier 0-3 queries
+
+```http
+GET /api/v1/queries/getReputationReport?agentId=42
+Authorization: Bearer sk_live_abc123...
+X-Payment-Method: credits
+```
+
+### Layer 2: Wallet Signature (Inherit)
+
+Agents authenticating via wallet signature inherit payment methods from their linked account:
+- Uses linked organization's credits balance
+- Can trigger Stripe charges if configured
+- Supports x402 for crypto-native agents
+
+```http
+GET /api/v1/queries/getMyFeedbacks
+X-Agent-Id: 42
+X-Chain-Id: 84532
+X-Signature: 0x...
+```
+
+See [Authentication Documentation](../auth/AUTHENTICATION.md) for complete auth layer details.
+
 ## Architecture
 
 ```
