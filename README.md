@@ -143,6 +143,78 @@ pnpm test
 
 **Current Status**: ✅ 108 database tests passing (100% coverage)
 
+### Local Testing
+
+Replicate GitHub Actions CI/CD checks locally before pushing. All scripts are located in `scripts/` and provide colored output with detailed feedback.
+
+#### Quick Reference
+
+```bash
+# Daily development workflow (fastest, 2-5 min)
+./scripts/local-ci.sh
+
+# Pre-PR code quality checks (3-5 min)
+./scripts/local-lint.sh
+
+# Security audit - run weekly/monthly (5-10 min)
+./scripts/local-security.sh
+
+# Complete CI replication - run before pushing to main (10-15 min)
+./scripts/local-all.sh
+```
+
+#### Script Details
+
+**`local-ci.sh` - Daily Development Workflow**
+- Database tests (schema, TimescaleDB, integrity, notifications, performance)
+- Rust tests (formatting, Clippy, build, unit tests)
+- TypeScript tests (type-check, linting, tests)
+
+**`local-lint.sh` - Pre-PR Code Quality**
+- SQL linting (style consistency, trailing whitespace)
+- Rust linting (formatting, Clippy warnings, unsafe code, TODO comments)
+- TypeScript linting (formatting, ESLint, type checking)
+- Documentation checks (required files, broken links)
+- Docker Compose validation
+- Shell script linting with ShellCheck (if installed)
+
+**`local-security.sh` - Security Audit**
+- Dependency vulnerability scanning (cargo-audit, npm audit)
+- Docker image security (Trivy)
+- Secrets detection (Gitleaks)
+- Dockerfile linting (hadolint)
+- Configuration security checks (JWT, CORS, .env)
+
+**`local-all.sh` - Complete CI Replication**
+- Runs all three scripts in sequence
+- Provides comprehensive summary with timing
+- Pass `--yes` or `-y` to skip confirmation prompt
+
+#### Optional Security Tools
+
+For complete security coverage, install these tools:
+
+```bash
+# Rust dependency audit
+cargo install cargo-audit
+
+# macOS (Homebrew)
+brew install trivy gitleaks hadolint shellcheck
+
+# Ubuntu/Debian
+apt install shellcheck
+# (trivy, gitleaks, hadolint: see official installation docs)
+```
+
+Scripts will gracefully skip checks if tools aren't installed.
+
+#### Exit Codes
+
+All scripts follow GitHub Actions conventions:
+- `0`: All checks passed
+- `1`: Critical failures found
+- Some scripts may exit `0` with warnings (review output)
+
 ### Code Style
 
 ```bash
