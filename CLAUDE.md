@@ -1,5 +1,44 @@
 # api.8004.dev - ERC-8004 Backend Infrastructure
 
+## Quick Reference
+
+### Common Commands
+
+```bash
+# Development setup
+docker-compose up -d                  # Start local services (PostgreSQL, Redis)
+sqlx migrate run                      # Apply database migrations
+cargo run --bin api-gateway           # Start API server
+
+# Testing
+./scripts/local-ci.sh                 # Daily workflow validation (2-5 min)
+./scripts/local-lint.sh               # Pre-PR quality checks (3-5 min)
+./scripts/local-security.sh           # Security audit (5-10 min)
+./scripts/local-all.sh                # Complete validation (10-15 min)
+cargo test                            # Rust unit/integration tests
+cd ponder-indexers && pnpm test       # TypeScript tests
+
+# Database operations
+sqlx migrate add <name>               # Create new migration
+psql erc8004_backend                  # Connect to database
+psql < database/seeds/test_data.sql   # Load test data
+```
+
+### Key Endpoints (API Gateway)
+
+```
+POST   /api/v1/auth/register          # Create user account
+POST   /api/v1/auth/login             # Get JWT token
+GET    /api/v1/triggers               # List user triggers (paginated)
+POST   /api/v1/triggers               # Create new trigger
+GET    /api/v1/triggers/{id}          # Get trigger details
+PUT    /api/v1/triggers/{id}          # Update trigger
+DELETE /api/v1/triggers/{id}          # Delete trigger
+GET    /api/v1/health                 # System health status
+```
+
+Full API documentation: `rust-backend/crates/api-gateway/API_DOCUMENTATION.md`
+
 ## Project Overview
 
 This project provides a real-time backend infrastructure for monitoring, interpreting, and reacting to events from the ERC-8004 standard's three on-chain registries: Identity, Reputation, and Validation. It enables programmable triggers that execute automated actions based on blockchain events, creating a bridge between on-chain agent activity and off-chain systems.
@@ -133,10 +172,7 @@ REST API server providing trigger management and system queries.
 
 **Responsibility**: Blockchain data access via JSON-RPC protocol.
 
-**Providers**:
-- Alchemy (primary)
-- Infura (fallback)
-- QuickNode (additional fallback)
+**Providers**: Alchemy (primary), Infura (fallback), QuickNode (additional fallback)
 
 **Features**:
 - Connection pooling for throughput
@@ -149,10 +185,7 @@ REST API server providing trigger management and system queries.
 
 **Responsibility**: Real-time blockchain event monitoring, normalization, and persistence.
 
-**Technology Stack**:
-- Ponder (blockchain indexing framework)
-- Viem (Ethereum interactions)
-- Node.js runtime
+**Technology Stack**: Ponder (blockchain indexing framework), Viem (Ethereum interactions), Node.js runtime
 
 **Architecture**:
 - **One indexer per chain** (parallel, independent operation)
@@ -177,188 +210,48 @@ onValidationRequest(validatorAddress, agentId, requestUri, requestHash)
 onValidationResponse(validatorAddress, agentId, requestHash, response, responseUri, tag)
 ```
 
-**Supported Chains** (Initial):
-- Ethereum Sepolia
-- Base Sepolia
-- Linea Sepolia
-- Polygon Amoy
+**Supported Chains** (Initial): Ethereum Sepolia, Base Sepolia, Linea Sepolia, Polygon Amoy
 
 #### 4. Trigger Store (PostgreSQL)
 
 **Responsibility**: Persistent storage of user-defined trigger configurations.
 
-**Schema**:
+**Key Tables**:
+- `triggers` - Trigger definitions (user_id, name, chain_id, registry, enabled, is_stateful)
+- `trigger_conditions` - Matching conditions (condition_type, field, operator, value, config JSONB)
+- `trigger_actions` - Actions to execute (action_type, priority, config JSONB)
+- `trigger_state` - State for stateful triggers (state_data JSONB)
 
-```sql
--- Trigger definitions
-CREATE TABLE triggers (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    chain_id INTEGER NOT NULL,
-    registry TEXT NOT NULL CHECK (registry IN ('identity', 'reputation', 'validation')),
-    enabled BOOLEAN DEFAULT true,
-    is_stateful BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+See `database/migrations/` for complete schema definitions.
 
--- Trigger matching conditions
-CREATE TABLE trigger_conditions (
-    id SERIAL PRIMARY KEY,
-    trigger_id TEXT NOT NULL,
-    condition_type TEXT NOT NULL,
-    field TEXT NOT NULL,
-    operator TEXT NOT NULL,
-    value TEXT NOT NULL,
-    config JSONB,  -- For complex conditions (window_size, alpha, etc.)
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT fk_trigger FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
-);
-
--- Actions to execute when trigger matches
-CREATE TABLE trigger_actions (
-    id SERIAL PRIMARY KEY,
-    trigger_id TEXT NOT NULL,
-    action_type TEXT NOT NULL CHECK (action_type IN ('telegram', 'rest', 'mcp')),
-    priority INTEGER DEFAULT 1,
-    config JSONB NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT fk_trigger FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
-);
-
--- State for stateful triggers (EMA, counters, etc.)
-CREATE TABLE trigger_state (
-    trigger_id TEXT PRIMARY KEY,
-    state_data JSONB NOT NULL,
-    last_updated TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT fk_trigger FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
-);
-```
-
-**Indexes**:
-```sql
-CREATE INDEX idx_triggers_user_id ON triggers(user_id);
-CREATE INDEX idx_triggers_chain_registry_enabled ON triggers(chain_id, registry, enabled) WHERE enabled = true;
-CREATE INDEX idx_trigger_conditions_trigger_id ON trigger_conditions(trigger_id);
-CREATE INDEX idx_trigger_actions_trigger_id ON trigger_actions(trigger_id);
-```
+**Key Indexes**:
+- `idx_triggers_user_id` - User trigger lookups
+- `idx_triggers_chain_registry_enabled` - Fast trigger matching (partial index on enabled=true)
+- Foreign key indexes for joins
 
 #### 5. Event Store (PostgreSQL + TimescaleDB)
 
 **Responsibility**: Immutable log of all blockchain events for audit, analytics, and recovery.
 
-**Technology Stack**:
-- PostgreSQL 15+
-- TimescaleDB extension for time-series optimization
-- PostgreSQL NOTIFY/LISTEN for real-time notifications
+**Key Tables**:
+- `events` - Main event table (TimescaleDB hypertable, partitioned by created_at)
+  - Common fields: chain_id, block_number, registry, event_type, agent_id, timestamp
+  - Registry-specific fields: owner, token_uri, score, tags, validator_address, etc.
+- `checkpoints` - Last processed block per chain
 
-**Schema**:
+**Key Features**:
+- PostgreSQL NOTIFY trigger on INSERT (notifies Event Processor)
+- TimescaleDB continuous aggregates for analytics (events_hourly)
+- Retention policies for old data (configurable)
+- Optimized indexes for common query patterns
 
-```sql
--- Main events table (converted to hypertable)
-CREATE TABLE events (
-    id TEXT PRIMARY KEY,
-    chain_id INTEGER NOT NULL,
-    block_number BIGINT NOT NULL,
-    block_hash TEXT NOT NULL,
-    transaction_hash TEXT NOT NULL,
-    log_index INTEGER NOT NULL,
-    registry TEXT NOT NULL CHECK (registry IN ('identity', 'reputation', 'validation')),
-    event_type TEXT NOT NULL,
-
-    -- Common fields
-    agent_id BIGINT,
-    timestamp BIGINT NOT NULL,
-
-    -- Identity Registry fields
-    owner TEXT,
-    token_uri TEXT,
-    metadata_key TEXT,
-    metadata_value TEXT,
-
-    -- Reputation Registry fields
-    client_address TEXT,
-    feedback_index BIGINT,
-    score INTEGER,
-    tag1 TEXT,
-    tag2 TEXT,
-    file_uri TEXT,
-    file_hash TEXT,
-
-    -- Validation Registry fields
-    validator_address TEXT,
-    request_hash TEXT,
-    response INTEGER,
-    response_uri TEXT,
-    response_hash TEXT,
-    tag TEXT,
-
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Convert to TimescaleDB hypertable for efficient time-series operations
-SELECT create_hypertable('events', 'created_at');
-
--- Checkpoint tracking per chain
-CREATE TABLE checkpoints (
-    chain_id INTEGER PRIMARY KEY,
-    last_block_number BIGINT NOT NULL,
-    last_block_hash TEXT NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Trigger function for NOTIFY on new events
-CREATE OR REPLACE FUNCTION notify_new_event()
-RETURNS TRIGGER AS $$
-BEGIN
-    PERFORM pg_notify('new_event', NEW.id);
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER events_notify_trigger
-    AFTER INSERT ON events
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_new_event();
-```
-
-**Indexes**:
-```sql
-CREATE INDEX idx_events_chain_id_created_at ON events(chain_id, created_at DESC);
-CREATE INDEX idx_events_agent_id ON events(agent_id) WHERE agent_id IS NOT NULL;
-CREATE INDEX idx_events_registry_type ON events(registry, event_type);
-CREATE INDEX idx_events_client_address ON events(client_address) WHERE client_address IS NOT NULL;
-```
-
-**Retention Policy**:
-```sql
--- Continuous aggregates for long-term analytics
-CREATE MATERIALIZED VIEW events_hourly
-WITH (timescaledb.continuous) AS
-SELECT
-    time_bucket('1 hour', created_at) AS hour,
-    chain_id,
-    registry,
-    event_type,
-    COUNT(*) as event_count
-FROM events
-GROUP BY hour, chain_id, registry, event_type;
-
--- Retention policy (optional, depends on requirements)
-SELECT add_retention_policy('events', INTERVAL '365 days');
-```
+See `database/migrations/` for complete schema and indexes.
 
 #### 6. Event Processor (Rust/Tokio)
 
 **Responsibility**: Core trigger matching engine that evaluates events against user-defined conditions.
 
-**Technology Stack**:
-- Tokio (async runtime)
-- SQLx (database access)
-- Redis client (job queueing)
+**Technology Stack**: Tokio (async runtime), SQLx (database access), Redis client (job queueing)
 
 **Processing Flow**:
 
@@ -389,13 +282,9 @@ SELECT add_retention_policy('events', INTERVAL '365 days');
 | `rate_limit` | Event rate in time window | `count(feedback) > 10/hour` |
 | `file_uri_exists` | File URI is present | `file_uri IS NOT NULL` |
 
-**Rate Limiting**:
-- Per-trigger execution limits (e.g., max 10 executions/hour)
+**Rate Limiting & Circuit Breaking**:
+- Per-trigger execution limits (default: max 10 executions/hour)
 - Redis-based sliding window counters
-- Prevents spam and cost overruns
-
-**Circuit Breaker**:
-- Monitors action failure rates per trigger
 - Auto-disables triggers with >80% failure rate
 - Auto-recovery after configurable timeout (default: 1 hour)
 
@@ -403,108 +292,26 @@ SELECT add_retention_policy('events', INTERVAL '365 days');
 
 **Responsibility**: Execute actions in response to matched triggers.
 
-**Technology Stack**:
-- Tokio (async runtime)
-- Reqwest (HTTP client for REST and MCP)
-- Teloxide (Telegram bot SDK)
-- TypeScript MCP SDK (bridged from Rust)
+**Technology Stack**: Tokio (async runtime), Reqwest (HTTP client), Teloxide (Telegram bot SDK), TypeScript MCP SDK (bridged from Rust)
 
 **Worker Types**:
 
 ##### Telegram Worker
-
 Sends formatted notifications via Telegram Bot API.
 
-**Features**:
-- Message template support with variable substitution
-- Markdown/HTML formatting
-- Automatic retry on rate limits
-- Message chunking for long content
-
-**Configuration Example**:
-```json
-{
-  "action_type": "telegram",
-  "config": {
-    "chat_id": "123456789",
-    "message_template": "⚠️ Agent #{{agent_id}} received low score: {{score}}/100\nFrom: {{client_address}}\nBlock: {{block_number}}",
-    "parse_mode": "Markdown"
-  }
-}
-```
+**Features**: Message templates with variable substitution, Markdown/HTML formatting, automatic retry on rate limits, message chunking
 
 ##### REST/HTTP Worker
-
 Executes HTTP requests to external APIs.
 
-**Features**:
-- Support for GET, POST, PUT, DELETE, PATCH methods
-- Custom headers (auth tokens, content-type)
-- Request body templating
-- Response validation
-- Timeout configuration (default: 30s)
-
-**Configuration Example**:
-```json
-{
-  "action_type": "rest",
-  "config": {
-    "method": "POST",
-    "url": "https://api.example.com/webhooks/feedback",
-    "headers": {
-      "Authorization": "Bearer xxx",
-      "Content-Type": "application/json"
-    },
-    "body_template": {
-      "agent_id": "{{agent_id}}",
-      "score": "{{score}}",
-      "chain_id": "{{chain_id}}"
-    },
-    "timeout_ms": 30000
-  }
-}
-```
+**Features**: Support for GET/POST/PUT/DELETE/PATCH methods, custom headers, request body templating, response validation, timeout configuration (default: 30s)
 
 ##### MCP Server Worker
-
 Pushes updates to agent MCP servers using the Model Context Protocol.
 
-**Features**:
-- Automatic endpoint resolution from registration file (tokenURI)
-- File hash verification before sending
-- IPFS content fetching and validation
-- OASF schema validation
-- MCP authentication handling
+**Features**: Automatic endpoint resolution from registration file (tokenURI), file hash verification, IPFS content fetching and validation, OASF schema validation, MCP authentication handling
 
-**Implementation Approach**:
-- Use TypeScript MCP SDK (@modelcontextprotocol/sdk)
-- Bridge from Rust via HTTP subprocess or embedded runtime
-- Cache agent endpoint configurations
-
-**Configuration Example**:
-```json
-{
-  "action_type": "mcp",
-  "config": {
-    "resolve_endpoint": true,
-    "tool_name": "agent.receiveFeedback",
-    "verify_file_hash": true,
-    "include_file_content": true,
-    "validate_oasf": true,
-    "payload_template": {
-      "score": "{{score}}",
-      "tag1": "{{tag1}}",
-      "tag2": "{{tag2}}",
-      "clientAddress": "{{client_address}}",
-      "feedbackIndex": "{{feedback_index}}",
-      "fileUri": "{{file_uri}}",
-      "fileHash": "{{file_hash}}",
-      "fileContent": "{{verified_file_content}}",
-      "blockNumber": "{{block_number}}"
-    }
-  }
-}
-```
+**Implementation**: TypeScript MCP SDK (@modelcontextprotocol/sdk), bridged from Rust via HTTP subprocess or embedded runtime, caches agent endpoint configurations
 
 **Common Worker Features**:
 - Exponential backoff retry (3 attempts: 1s, 2s, 4s)
@@ -516,44 +323,11 @@ Pushes updates to agent MCP servers using the Model Context Protocol.
 
 **Responsibility**: Audit trail of all action executions.
 
-**Schema**:
+**Key Tables**:
+- `action_results` - Execution logs (job_id, trigger_id, event_id, action_type, status, duration_ms, error_message, retry_count)
+- `action_metrics_hourly` - Materialized view for analytics (aggregated by hour, action_type with success/failure counts)
 
-```sql
-CREATE TABLE action_results (
-    id TEXT PRIMARY KEY,
-    job_id TEXT NOT NULL,
-    trigger_id TEXT,
-    event_id TEXT,
-    action_type TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('success', 'failed', 'retrying')),
-    executed_at TIMESTAMPTZ DEFAULT NOW(),
-    duration_ms INTEGER,
-    error_message TEXT,
-    response_data JSONB,
-    retry_count INTEGER DEFAULT 0,
-    CONSTRAINT fk_trigger FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE SET NULL,
-    CONSTRAINT fk_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
-);
-
-CREATE INDEX idx_action_results_trigger_id ON action_results(trigger_id);
-CREATE INDEX idx_action_results_status ON action_results(status);
-CREATE INDEX idx_action_results_executed_at ON action_results(executed_at DESC);
-```
-
-**Analytics Views**:
-```sql
--- Hourly action metrics
-CREATE MATERIALIZED VIEW action_metrics_hourly AS
-SELECT
-    DATE_TRUNC('hour', executed_at) as hour,
-    action_type,
-    COUNT(*) as total_executions,
-    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
-    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failure_count,
-    AVG(duration_ms) as avg_duration_ms
-FROM action_results
-GROUP BY hour, action_type;
-```
+See `database/migrations/` for complete schema.
 
 #### 9. Output Channels
 
@@ -570,7 +344,7 @@ GROUP BY hour, action_type;
 **MCP Protocol Servers**:
 - Agent-controlled servers exposing tools/resources
 - Endpoint URLs retrieved from agent registration file (tokenURI)
-- Authentication via MCP protocol mechanisms (to be determined by agent)
+- Authentication via MCP protocol mechanisms (determined by agent)
 
 ### Data Flow Example
 
@@ -578,42 +352,23 @@ Complete flow for a reputation feedback event:
 
 ```
 1. Client submits NewFeedback transaction to ReputationRegistry contract on Base Sepolia
-   ↓
 2. RPC Node (Alchemy) detects new block with transaction
-   ↓
 3. Ponder Indexer (Base Sepolia) processes onNewFeedback event
-   ↓
 4. Event normalized and written to Event Store (PostgreSQL)
-   ↓
 5. PostgreSQL NOTIFY triggers on 'new_event' channel
-   ↓
 6. Event Processor (Rust) receives notification
-   ↓
-7. Query Trigger Store for triggers matching:
-   - chain_id = 84532 (Base Sepolia)
-   - registry = 'reputation'
-   - enabled = true
-   ↓
+7. Query Trigger Store for triggers matching: chain_id=84532, registry='reputation', enabled=true
 8. For each matching trigger:
-   a. Evaluate conditions (e.g., score < 60 AND agent_id = 42)
-   b. Update stateful triggers (EMA, rate counters)
-   c. Check rate limits and circuit breaker
-   ↓
+   - Evaluate conditions (e.g., score < 60 AND agent_id = 42)
+   - Update stateful triggers (EMA, rate counters)
+   - Check rate limits and circuit breaker
 9. If trigger matches:
-   a. Create job for each action (Telegram, MCP)
-   b. Enqueue jobs to Redis (with priority)
-   ↓
+   - Create job for each action (Telegram, MCP)
+   - Enqueue jobs to Redis (with priority)
 10. Action Workers consume jobs from Redis:
     - Telegram Worker: Send formatted message to chat
-    - MCP Worker:
-      a. Fetch tokenURI from Identity Registry
-      b. Parse registration file for MCP endpoint
-      c. Fetch IPFS file content
-      d. Verify file hash
-      e. POST to agent's MCP server: agent.receiveFeedback
-   ↓
+    - MCP Worker: Fetch tokenURI → Parse MCP endpoint → Fetch IPFS file → Verify hash → POST to agent's MCP server
 11. Log action results to Result Logger (PostgreSQL)
-   ↓
 12. Agent receives feedback via MCP and updates internal model
 ```
 
@@ -642,11 +397,8 @@ Complete flow for a reputation feedback event:
 - **TimescaleDB 2.x** - Time-series extension for events
 - **SQLx-CLI** - Migration management
 
-#### Message Queue
+#### Message Queue & External Services
 - **Redis 7.x** - Job queuing and caching
-- **BullMQ** (optional) - Advanced queue management
-
-#### External Services
 - **Alchemy** - Primary RPC provider
 - **Infura** - Fallback RPC provider
 - **Pinata/Web3.Storage** - IPFS file fetching
@@ -663,23 +415,10 @@ Complete flow for a reputation feedback event:
 - **Git** - Version control
 - **GitHub Actions** - CI/CD pipelines
 
-### Testing
+### Testing & Observability
 
-- **Rust**:
-  - cargo test - Unit and integration tests
-  - criterion - Benchmarking
-  - mockall - Mocking
-
-- **TypeScript**:
-  - Vitest - Unit testing
-  - Ponder test utilities
-
-### Observability
-
-- **Prometheus** - Metrics collection
-- **Grafana** - Metrics visualization
-- **Loki** - Log aggregation
-- **Tracing** - Distributed tracing (Jaeger/Tempo)
+- **Testing**: cargo test, criterion (benchmarking), mockall (mocking), Vitest (TypeScript)
+- **Observability**: Prometheus (metrics), Grafana (dashboards), Loki (logs), Tracing (distributed tracing)
 
 ## Development Guidelines
 
@@ -690,55 +429,26 @@ api.8004.dev/
 ├── CLAUDE.md                    # This file
 ├── README.md                    # User-facing documentation
 ├── docs/                        # Detailed documentation
-│   ├── architecture/
-│   ├── api/
-│   ├── protocols/
-│   ├── database/
-│   ├── operations/
-│   ├── development/
-│   └── examples/
 ├── rust-backend/                # Rust workspace
 │   ├── Cargo.toml              # Workspace manifest
 │   ├── crates/
 │   │   ├── api-gateway/        # REST API server
 │   │   ├── event-processor/    # Trigger matching engine
 │   │   ├── action-workers/     # Action execution workers
-│   │   └── shared/             # Shared libraries
-│   │       ├── db/             # Database utilities
-│   │       ├── models/         # Common data models
-│   │       ├── mcp/            # MCP protocol client
-│   │       └── utils/          # Helpers
-│   └── tests/
-│       ├── integration/
-│       └── e2e/
+│   │   └── shared/             # Shared libraries (db, models, mcp, utils)
+│   └── tests/                  # Integration and e2e tests
 ├── ponder-indexers/            # Blockchain indexers
-│   ├── package.json
 │   ├── ponder.config.ts        # Multi-chain configuration
-│   ├── src/
-│   │   ├── identity-registry.ts
-│   │   ├── reputation-registry.ts
-│   │   └── validation-registry.ts
+│   ├── src/                    # Event handlers per registry
 │   ├── abis/                   # Contract ABIs
 │   └── tests/
 ├── database/
 │   ├── migrations/             # SQL migrations
 │   ├── seeds/                  # Test data
 │   └── schema.sql              # Full schema reference
-├── scripts/
-│   ├── setup-dev.sh            # Local environment setup
-│   ├── run-tests.sh            # Test runner
-│   └── deploy.sh               # Deployment script
-├── docker/
-│   ├── docker-compose.yml      # Local development stack
-│   ├── docker-compose.prod.yml # Production configuration
-│   ├── api-gateway.Dockerfile
-│   ├── event-processor.Dockerfile
-│   ├── action-workers.Dockerfile
-│   └── ponder.Dockerfile
-└── .github/
-    └── workflows/
-        ├── ci.yml              # Continuous integration
-        └── deploy.yml          # Deployment pipeline
+├── scripts/                    # Setup, testing, deployment scripts
+├── docker/                     # Dockerfiles and docker-compose configs
+└── .github/workflows/          # CI/CD pipelines
 ```
 
 ### Quality Standards & Testing Policy
@@ -771,21 +481,17 @@ All code changes MUST have passing tests before being committed to the repositor
    - Example: Database query functions, condition evaluators, parsers
 
    **Integration Tests**:
-   - Test component interactions
+   - Test component interactions (API → Database, Event Processor → Queue)
    - Use test database with migrations applied
-   - Test API → Database, Event Processor → Queue flows
    - Example: API endpoint creates trigger in database, event triggers action
 
    **Database Tests**:
    - Verify migrations apply correctly
    - Test constraints, indexes, and triggers
-   - Verify data integrity rules
-   - Test rollback scenarios
    - Example: Foreign key cascades, unique constraints, TimescaleDB hypertable behavior
 
    **End-to-End Tests**:
    - Test complete workflows
-   - Simulate real-world scenarios
    - Example: Blockchain event → trigger match → notification sent
 
 4. **Test Execution Workflow**:
@@ -853,10 +559,8 @@ Tests are not optional. They are:
 pub enum TriggerError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
-
     #[error("Invalid trigger configuration: {0}")]
     InvalidConfig(String),
-
     #[error("Trigger {0} not found")]
     NotFound(String),
 }
@@ -868,9 +572,7 @@ pub async fn process_event(event_id: &str) -> Result<()> {
     let event = fetch_event(event_id)
         .await
         .context("Failed to fetch event from database")?;
-
     // ... processing logic
-
     Ok(())
 }
 ```
@@ -881,12 +583,8 @@ pub async fn process_event(event_id: &str) -> Result<()> {
 pub async fn fetch_triggers(chain_id: i32, registry: &str) -> Result<Vec<Trigger>> {
     sqlx::query_as!(
         Trigger,
-        r#"
-        SELECT * FROM triggers
-        WHERE chain_id = $1 AND registry = $2 AND enabled = true
-        "#,
-        chain_id,
-        registry
+        r#"SELECT * FROM triggers WHERE chain_id = $1 AND registry = $2 AND enabled = true"#,
+        chain_id, registry
     )
     .fetch_all(&pool)
     .await
@@ -894,15 +592,9 @@ pub async fn fetch_triggers(chain_id: i32, registry: &str) -> Result<Vec<Trigger
 }
 
 // Use tokio::spawn for concurrent tasks
-let handles: Vec<_> = triggers
-    .into_iter()
-    .map(|trigger| {
-        tokio::spawn(async move {
-            evaluate_trigger(trigger).await
-        })
-    })
+let handles: Vec<_> = triggers.into_iter()
+    .map(|trigger| tokio::spawn(async move { evaluate_trigger(trigger).await }))
     .collect();
-
 let results = futures::future::join_all(handles).await;
 ```
 
@@ -911,48 +603,11 @@ let results = futures::future::join_all(handles).await;
 use tracing::{info, warn, error, debug, instrument};
 
 #[instrument(skip(pool), fields(trigger_id = %trigger.id))]
-pub async fn evaluate_trigger(
-    trigger: Trigger,
-    event: Event,
-    pool: &PgPool
-) -> Result<bool> {
+pub async fn evaluate_trigger(trigger: Trigger, event: Event, pool: &PgPool) -> Result<bool> {
     debug!("Evaluating trigger conditions");
-
     let matches = check_conditions(&trigger, &event)?;
-
-    if matches {
-        info!("Trigger matched, enqueueing actions");
-    } else {
-        debug!("Trigger did not match");
-    }
-
+    if matches { info!("Trigger matched, enqueueing actions"); }
     Ok(matches)
-}
-```
-
-**Testing**:
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_score_threshold_condition() {
-        let condition = Condition {
-            condition_type: "score_threshold".to_string(),
-            field: "score".to_string(),
-            operator: "<".to_string(),
-            value: "60".to_string(),
-            config: None,
-        };
-
-        let event = Event {
-            score: Some(45),
-            ..Default::default()
-        };
-
-        assert!(evaluate_condition(&condition, &event).unwrap());
-    }
 }
 ```
 
@@ -980,9 +635,6 @@ ponder.on("ReputationRegistry:NewFeedback", async ({ event, context }) => {
     id: `${context.network.chainId}-${event.block.number}-${event.logIndex}`,
     chainId: context.network.chainId,
     blockNumber: event.block.number,
-    blockHash: event.block.hash,
-    transactionHash: event.transaction.hash,
-    logIndex: event.logIndex,
     registry: "reputation",
     eventType: "NewFeedback",
     agentId: BigInt(agentId),
@@ -994,42 +646,6 @@ ponder.on("ReputationRegistry:NewFeedback", async ({ event, context }) => {
     fileHash,
     timestamp: event.block.timestamp,
   });
-});
-```
-
-**Configuration**:
-```typescript
-import { createConfig } from "@ponder/core";
-import { http } from "viem";
-
-export default createConfig({
-  networks: {
-    baseSepolia: {
-      chainId: 84532,
-      transport: http(process.env.BASE_SEPOLIA_RPC_URL),
-    },
-    sepolia: {
-      chainId: 11155111,
-      transport: http(process.env.SEPOLIA_RPC_URL),
-    },
-    // ... other networks
-  },
-  contracts: {
-    ReputationRegistry: {
-      network: {
-        baseSepolia: {
-          address: "0x...",
-          startBlock: 1234567,
-        },
-        sepolia: {
-          address: "0x...",
-          startBlock: 7654321,
-        },
-      },
-      abi: "./abis/ReputationRegistry.json",
-    },
-    // ... other contracts
-  },
 });
 ```
 
@@ -1046,55 +662,33 @@ export default createConfig({
 **Example Migration**:
 ```sql
 -- migrations/20250123_create_triggers_table.up.sql
-
--- Create triggers table with full audit trail
 CREATE TABLE triggers (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     user_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    description TEXT,
     chain_id INTEGER NOT NULL,
     registry TEXT NOT NULL CHECK (registry IN ('identity', 'reputation', 'validation')),
     enabled BOOLEAN DEFAULT true,
-    is_stateful BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create index for common query patterns
 CREATE INDEX idx_triggers_user_id ON triggers(user_id);
-CREATE INDEX idx_triggers_chain_registry_enabled
-    ON triggers(chain_id, registry, enabled)
-    WHERE enabled = true;
-
--- Create updated_at trigger
-CREATE TRIGGER update_triggers_updated_at
-    BEFORE UPDATE ON triggers
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_triggers_chain_registry_enabled ON triggers(chain_id, registry, enabled) WHERE enabled = true;
 
 -- migrations/20250123_create_triggers_table.down.sql
-DROP TRIGGER IF EXISTS update_triggers_updated_at ON triggers;
-DROP INDEX IF EXISTS idx_triggers_chain_registry_enabled;
-DROP INDEX IF EXISTS idx_triggers_user_id;
 DROP TABLE IF EXISTS triggers;
 ```
 
-#### Indexing Patterns
+#### Indexing & Partitioning Patterns
 
 - Index foreign keys for JOIN performance
 - Use partial indexes for filtered queries (e.g., `WHERE enabled = true`)
 - Create covering indexes for frequently accessed columns
 - Use GIN indexes for JSONB columns with frequent queries
-- Monitor query performance with `EXPLAIN ANALYZE`
-
-#### Partitioning Strategy
-
 - Use TimescaleDB hypertables for time-series data (events table)
 - Partition by time with appropriate chunk intervals (7 days for events)
-- Consider declarative partitioning for large lookup tables
-- Implement retention policies for old data
+- Monitor query performance with `EXPLAIN ANALYZE`
 
 ### API Design
 
@@ -1146,10 +740,7 @@ DROP TABLE IF EXISTS triggers;
   "error": {
     "code": "INVALID_TRIGGER_CONFIG",
     "message": "Score threshold must be between 0 and 100",
-    "details": {
-      "field": "conditions[0].value",
-      "value": "150"
-    }
+    "details": { "field": "conditions[0].value", "value": "150" }
   }
 }
 ```
@@ -1167,84 +758,71 @@ DROP TABLE IF EXISTS triggers;
 }
 ```
 
-## Testing Strategy
+## Development Workflow
 
-### Unit Tests
+### Local Testing Scripts
 
-- Test individual functions and modules in isolation
-- Mock external dependencies (database, HTTP clients)
-- Aim for >80% code coverage
-- Run fast (<1s per test suite)
+The project includes comprehensive local testing scripts that replicate GitHub Actions workflows:
 
-**Rust Example**:
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mockall::predicate::*;
+**Daily Development** (`./scripts/local-ci.sh`):
+- Database tests (schema, TimescaleDB, integrity, notifications, performance)
+- Rust tests (formatting, Clippy, build, unit tests)
+- TypeScript tests (type-check, linting, tests)
+- Runtime: 2-5 minutes
 
-    #[test]
-    fn test_parse_score_threshold() {
-        let condition = Condition {
-            condition_type: "score_threshold".to_string(),
-            operator: "<".to_string(),
-            value: "60".to_string(),
-            ..Default::default()
-        };
+**Pre-PR Quality Checks** (`./scripts/local-lint.sh`):
+- SQL linting (style, trailing whitespace)
+- Rust linting (formatting, Clippy, unsafe code, TODOs)
+- TypeScript linting (formatting, ESLint, type checking)
+- Documentation checks (required files, broken links)
+- Docker Compose validation
+- Shell script linting (ShellCheck)
+- Runtime: 3-5 minutes
 
-        let threshold = parse_threshold(&condition).unwrap();
-        assert_eq!(threshold, 60);
-    }
-}
+**Security Audit** (`./scripts/local-security.sh`):
+- Dependency vulnerability scanning (cargo-audit, npm audit)
+- Docker image security (Trivy)
+- Secrets detection (Gitleaks)
+- Dockerfile linting (hadolint)
+- Configuration security checks
+- Runtime: 5-10 minutes
+
+**Complete CI Replication** (`./scripts/local-all.sh`):
+- Runs all three scripts in sequence
+- Comprehensive summary with timing
+- Use `--yes` or `-y` to skip confirmation
+- Runtime: 10-15 minutes
+
+### Code Quality Tools
+
+**Required**:
+- Rust: cargo, rustfmt, clippy
+- Node.js: node, pnpm, typescript, eslint
+- Database: psql, docker
+
+**Optional** (for complete coverage):
+- ShellCheck (shell script linting)
+- cargo-audit (Rust dependency auditing)
+- Trivy (container security scanning)
+- Gitleaks (secrets detection)
+- hadolint (Dockerfile linting)
+
+Install on macOS:
+```bash
+brew install shellcheck trivy gitleaks hadolint
+cargo install cargo-audit
 ```
 
-### Integration Tests
-
-- Test component interactions (API → Database, Event Processor → Queue)
-- Use test database with migrations applied
-- Reset state between tests
-- Test error conditions and edge cases
-
-**Rust Example**:
-```rust
-#[sqlx::test]
-async fn test_create_trigger(pool: PgPool) -> sqlx::Result<()> {
-    let trigger = CreateTriggerRequest {
-        name: "Test Trigger".to_string(),
-        chain_id: 84532,
-        registry: "reputation".to_string(),
-        conditions: vec![...],
-        actions: vec![...],
-    };
-
-    let created = create_trigger(&pool, "user_123", trigger).await?;
-
-    assert!(created.id.len() > 0);
-    assert_eq!(created.name, "Test Trigger");
-
-    Ok(())
-}
+Install on Ubuntu/Debian:
+```bash
+apt install shellcheck
+cargo install cargo-audit
+# (trivy, gitleaks, hadolint: see official installation docs)
 ```
-
-### End-to-End Tests
-
-- Test complete workflows (blockchain event → notification sent)
-- Use testnet or local blockchain (Anvil/Hardhat)
-- Verify final outcomes in external systems
-- Run as part of pre-deployment checks
-
-### Load Testing
-
-- Use k6 or Artillery for HTTP load testing
-- Simulate high event throughput (1000+ events/sec)
-- Test queue backpressure handling
-- Identify bottlenecks and optimization opportunities
 
 ## Deployment
 
 ### Environment Configuration
-
-Separate configurations for development, staging, and production:
 
 **Development**:
 - Local PostgreSQL and Redis (Docker Compose)
@@ -1312,11 +890,7 @@ The Model Context Protocol (MCP) enables standardized communication between AI a
 
 **Architecture**:
 ```
-Rust Action Worker
-  ↓ HTTP/IPC
-TypeScript MCP Bridge Service
-  ↓ MCP Protocol
-Agent's MCP Server
+Rust Action Worker → TypeScript MCP Bridge Service → Agent's MCP Server
 ```
 
 **MCP Bridge Service** (TypeScript):
@@ -1337,20 +911,11 @@ export async function sendFeedbackToAgent(
   const client = new Client({
     name: "erc8004-backend",
     version: "1.0.0",
-  }, {
-    capabilities: {},
-  });
+  }, { capabilities: {} });
 
   await client.connect(transport);
-
-  // Call the agent's feedback tool
-  const result = await client.callTool({
-    name: toolName,
-    arguments: payload,
-  });
-
+  const result = await client.callTool({ name: toolName, arguments: payload });
   await client.close();
-
   return result;
 }
 ```
@@ -1381,20 +946,18 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
   "capabilities": {
     "mcp": {
       "endpoint": "https://agent.example.com/mcp",
-      "tools": [
-        {
-          "name": "agent.receiveFeedback",
-          "description": "Receive reputation feedback from ERC-8004 backend",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "score": { "type": "integer" },
-              "clientAddress": { "type": "string" },
-              "fileContent": { "type": "object" }
-            }
+      "tools": [{
+        "name": "agent.receiveFeedback",
+        "description": "Receive reputation feedback from ERC-8004 backend",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "integer" },
+            "clientAddress": { "type": "string" },
+            "fileContent": { "type": "object" }
           }
         }
-      ],
+      }],
       "authentication": {
         "type": "bearer",
         "tokenHeader": "X-Agent-Token"
@@ -1465,88 +1028,6 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 - Rust workspace structure with shared libraries
 - Basic API Gateway with health check endpoint
 
-**Subagents**:
-- database-administrator (schema design)
-- rust-engineer (workspace setup)
-- devops-engineer (Docker configuration)
-
-## Development Workflow
-
-### Local Testing Scripts
-
-The project includes comprehensive local testing scripts that replicate GitHub Actions workflows:
-
-**Daily Development** (`./scripts/local-ci.sh`):
-- Database tests (schema, TimescaleDB, integrity, notifications, performance)
-- Rust tests (formatting, Clippy, build, unit tests)
-- TypeScript tests (type-check, linting, tests)
-- Runtime: 2-5 minutes
-
-**Pre-PR Quality Checks** (`./scripts/local-lint.sh`):
-- SQL linting (style, trailing whitespace)
-- Rust linting (formatting, Clippy, unsafe code, TODOs)
-- TypeScript linting (formatting, ESLint, type checking)
-- Documentation checks (required files, broken links)
-- Docker Compose validation
-- Shell script linting (ShellCheck)
-- Runtime: 3-5 minutes
-
-**Security Audit** (`./scripts/local-security.sh`):
-- Dependency vulnerability scanning (cargo-audit, npm audit)
-- Docker image security (Trivy)
-- Secrets detection (Gitleaks)
-- Dockerfile linting (hadolint)
-- Configuration security checks
-- Runtime: 5-10 minutes
-
-**Complete CI Replication** (`./scripts/local-all.sh`):
-- Runs all three scripts in sequence
-- Comprehensive summary with timing
-- Use `--yes` or `-y` to skip confirmation
-- Runtime: 10-15 minutes
-
-**Usage**:
-```bash
-# Daily workflow validation
-./scripts/local-ci.sh
-
-# Before creating PR
-./scripts/local-lint.sh
-
-# Weekly/monthly security check
-./scripts/local-security.sh
-
-# Complete validation before pushing to main
-./scripts/local-all.sh
-```
-
-### Code Quality Tools
-
-**Required**:
-- Rust: cargo, rustfmt, clippy
-- Node.js: node, pnpm, typescript, eslint
-- Database: psql, docker
-
-**Optional** (for complete coverage):
-- ShellCheck (shell script linting)
-- cargo-audit (Rust dependency auditing)
-- Trivy (container security scanning)
-- Gitleaks (secrets detection)
-- hadolint (Dockerfile linting)
-
-Install on macOS:
-```bash
-brew install shellcheck trivy gitleaks hadolint
-cargo install cargo-audit
-```
-
-Install on Ubuntu/Debian:
-```bash
-apt install shellcheck
-# (trivy, gitleaks, hadolint: see official installation docs)
-cargo install cargo-audit
-```
-
 ### Phase 2: Event Ingestion (Weeks 4-6)
 
 **Deliverables**:
@@ -1554,10 +1035,6 @@ cargo install cargo-audit
 - Event Store with TimescaleDB
 - Checkpoint management and reorg handling
 - PostgreSQL NOTIFY/LISTEN implementation
-
-**Subagents**:
-- typescript-pro (Ponder indexers)
-- database-administrator (Event Store optimization)
 
 ### Phase 3: Core Backend (Weeks 7-10)
 
@@ -1570,11 +1047,6 @@ cargo install cargo-audit
 - ⏳ Redis job queueing
 - ⏳ Basic Telegram worker (simple triggers only)
 
-**Subagents**:
-- ✅ backend-architect (API design and implementation - Week 7)
-- ✅ rust-engineer (Code review and optimization - Week 7)
-- ⏳ backend-developer (Event Processor and workers)
-
 ### Phase 4: Advanced Triggers & Actions (Weeks 11-13)
 
 **Deliverables**:
@@ -1582,10 +1054,6 @@ cargo install cargo-audit
 - REST/HTTP action worker
 - Circuit breaker implementation
 - Result Logger with analytics views
-
-**Subagents**:
-- rust-engineer (stateful triggers)
-- backend-developer (action workers)
 
 ### Phase 5: MCP Integration (Weeks 14-16)
 
@@ -1595,11 +1063,6 @@ cargo install cargo-audit
 - IPFS file fetching and verification
 - OASF schema validation
 
-**Subagents**:
-- typescript-pro (MCP bridge)
-- mcp-developer (protocol implementation)
-- rust-engineer (Rust-TypeScript bridge)
-
 ### Phase 6: Testing & Observability (Weeks 17-19)
 
 **Deliverables**:
@@ -1608,11 +1071,6 @@ cargo install cargo-audit
 - Grafana dashboards
 - Structured logging with tracing
 - Load testing and performance optimization
-
-**Subagents**:
-- debugger (test implementation)
-- performance-engineer (optimization)
-- devops-engineer (observability stack)
 
 ### Phase 7: Production Deployment (Weeks 20-22)
 
@@ -1624,12 +1082,6 @@ cargo install cargo-audit
 - API documentation (OpenAPI/Swagger)
 - User guides and examples
 
-**Subagents**:
-- deployment-engineer (CI/CD)
-- security-engineer (security audit)
-- api-documenter (API docs)
-- documentation-engineer (user guides)
-
 ### Phase 8: AI Integration (Future)
 
 **Deliverables**:
@@ -1637,9 +1089,6 @@ cargo install cargo-audit
 - Event content interpretation and classification
 - Trend prediction and anomaly detection
 - Automated trigger optimization
-
-**Subagents**:
-- ai-engineer (AI integration)
 
 ## Additional Resources
 
@@ -1650,7 +1099,7 @@ cargo install cargo-audit
 
 ### OASF (Open Agentic Schema Framework)
 - **Repository**: https://github.com/agntcy/oasf
-- **Schema Validator**: https://oasf.agntcy.io (browser and validation server)
+- **Schema Validator**: https://oasf.agntcy.io
 - **Latest Version**: v0.8.0
 
 ### MCP (Model Context Protocol)
