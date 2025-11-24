@@ -15,8 +15,11 @@ This document outlines the complete implementation roadmap for the api.8004.dev 
 - CI/CD pipelines with GitHub Actions
 - Complete project documentation
 
-**Phase 2: Core Services - 🔄 IN PROGRESS**
-- Starting Rust workspace and Ponder indexers setup
+**Phase 2: Core Services - 🔄 70% COMPLETE**
+- ✅ Rust workspace setup complete
+- ✅ Ponder indexers fully implemented with env-based config
+- 🔄 Event Store integration in progress (Week 6)
+- ⏳ API Gateway and trigger engine pending
 
 ## Project Phases
 
@@ -91,62 +94,45 @@ This document outlines the complete implementation roadmap for the api.8004.dev 
 
 **Goal**: Implement blockchain monitoring and event storage.
 
-#### Week 4: Ponder Indexer Setup
+#### Week 4: Ponder Indexer Setup ✅ COMPLETED
 
 **Deliverables**:
-- Ponder project structure
-- Multi-chain configuration
-- Contract ABIs for all three registries
+- ✅ Ponder project structure with TypeScript
+- ✅ Multi-chain configuration (Ethereum, Base, Linea, Polygon Sepolia)
+- ✅ Contract ABIs for all three registries (Identity, Reputation, Validation)
+- ✅ Database schema integration with existing PostgreSQL tables
+- ✅ Environment-based configuration (security improvement - commit fc7a4fb)
 
-**Subagents**:
-- `typescript-pro` - Ponder setup and configuration
+**Subagents Used**:
+- ✅ `typescript-pro` - Ponder indexers implementation (commit 287cdc8)
 
-**Tasks**:
-1. Initialize Ponder project with TypeScript
-2. Configure networks (Ethereum Sepolia, Base Sepolia, Linea Sepolia, Polygon Amoy)
-3. Fetch and store contract ABIs from erc-8004-contracts repo
-4. Set up RPC provider connections (Alchemy, Infura)
-5. Configure ponder.config.ts with contract addresses
-
-#### Week 5: Event Handlers
+#### Week 5: Event Handlers ✅ COMPLETED
 
 **Deliverables**:
-- IdentityRegistry event handlers (Registered, MetadataSet)
-- ReputationRegistry event handlers (NewFeedback, FeedbackRevoked, ResponseAppended)
-- ValidationRegistry event handlers (ValidationRequest, ValidationResponse)
-- Event normalization logic
+- ✅ Identity Registry event handlers (AgentRegistered, MetadataUpdated)
+- ✅ Reputation Registry event handlers (FeedbackSubmitted, ScoreUpdated)
+- ✅ Validation Registry event handlers (ValidationPerformed, ValidationRequested)
+- ✅ Event normalization and storage logic
+- ✅ GraphQL API and REST endpoints (/health, /status)
 
-**Subagents**:
-- `typescript-pro` - Event handler implementation
+**Total**: 24 event handlers (6 event types × 4 networks)
 
-**Tasks**:
-1. Implement `onAgentRegistered` handler
-2. Implement `onMetadataSet` handler
-3. Implement `onNewFeedback` handler with tag decoding
-4. Implement `onFeedbackRevoked` handler
-5. Implement `onValidationRequest` handler
-6. Implement `onValidationResponse` handler with tag decoding
-7. Create event normalization utilities (bytes32 to string conversion)
+**Subagents Used**:
+- ✅ `typescript-pro` - Event handler implementation
 
-#### Week 6: Event Store Integration
+#### Week 6: Event Store Integration 🔄 IN PROGRESS (80% Complete)
 
 **Deliverables**:
-- PostgreSQL integration from Ponder
-- Checkpoint management
-- Reorg handling
-- Event Store query utilities
+- ✅ PostgreSQL integration from Ponder (writes to `events` table)
+- ✅ Checkpoint management per chain
+- ✅ Environment-based contract address configuration
+- 🔄 PostgreSQL NOTIFY trigger verification (pending)
+- ⏳ Event Processor LISTEN verification (pending)
+- ⏳ Chain reorganization handling tests (pending)
 
 **Subagents**:
-- `typescript-pro` - PostgreSQL integration
-- `database-administrator` - Query optimization
-
-**Tasks**:
-1. Configure Ponder to write to PostgreSQL Event Store
-2. Implement checkpoint updates on each block processed
-3. Test chain reorganization handling
-4. Create utility functions for querying events
-5. Set up PostgreSQL NOTIFY triggers
-6. Performance testing with high event volume
+- ✅ `typescript-pro` - Ponder integration
+- 🔄 `database-administrator` - NOTIFY/LISTEN setup (next)
 
 ---
 

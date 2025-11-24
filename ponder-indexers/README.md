@@ -260,6 +260,29 @@ pnpm format:check
 pnpm codegen
 ```
 
+## Recent Updates
+
+### November 2025: Security Enhancement - Environment-Based Configuration
+
+All contract addresses and start blocks moved to environment variables for enhanced security and flexibility.
+
+**What Changed**:
+- Previously: Contract addresses hardcoded in `ponder.config.ts`
+- Now: All addresses loaded from `.env` file
+- Impact: Secure production deployments, easy environment management
+
+**Details**: See commit `fc7a4fb` and [CONTRACTS.md](./CONTRACTS.md) for configuration instructions.
+
+**Environment Variables Added** (16 total):
+- 12 contract addresses (3 registries × 4 networks)
+- 4 start block numbers (1 per network)
+
+Example:
+```bash
+ETHEREUM_SEPOLIA_IDENTITY_ADDRESS=0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
+ETHEREUM_SEPOLIA_START_BLOCK=5000000
+```
+
 ## Configuration
 
 ### ponder.config.ts
