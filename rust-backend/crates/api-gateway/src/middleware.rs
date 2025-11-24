@@ -9,8 +9,7 @@ pub fn cors() -> Cors {
     // Get allowed origins from environment variable
     // Format: comma-separated list of origins
     // Example: ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
-    let allowed_origins = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| String::new());
+    let allowed_origins = env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| String::new());
 
     let origins: Vec<String> = allowed_origins
         .split(',')
@@ -24,12 +23,14 @@ pub fn cors() -> Cors {
 
             if cfg!(debug_assertions) {
                 // Development mode: Allow localhost
-                origin_str.starts_with("http://localhost") ||
-                origin_str.starts_with("http://127.0.0.1")
+                origin_str.starts_with("http://localhost")
+                    || origin_str.starts_with("http://127.0.0.1")
             } else {
                 // Production mode: Whitelist only
                 if origins.is_empty() {
-                    tracing::warn!("ALLOWED_ORIGINS not set. Denying all CORS requests in production.");
+                    tracing::warn!(
+                        "ALLOWED_ORIGINS not set. Denying all CORS requests in production."
+                    );
                     false
                 } else {
                     origins.iter().any(|allowed| origin_str == allowed)

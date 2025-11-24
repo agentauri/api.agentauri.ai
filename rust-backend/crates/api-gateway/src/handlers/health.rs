@@ -66,8 +66,9 @@ mod tests {
             version: "0.1.0".to_string(),
         };
 
-        let json = serde_json::to_string(&response)
-            .unwrap_or_else(|_| r#"{"status":"error","message":"Failed to serialize response"}"#.to_string());
+        let json = serde_json::to_string(&response).unwrap_or_else(|_| {
+            r#"{"status":"error","message":"Failed to serialize response"}"#.to_string()
+        });
         assert!(json.contains("healthy"));
         assert!(json.contains("connected"));
     }

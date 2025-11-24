@@ -124,11 +124,10 @@ impl Config {
                     .map_err(|e| Error::config(format!("Invalid SERVER_PORT: {}", e)))?,
                 jwt_secret: if cfg!(debug_assertions) {
                     // Development mode: Allow default
-                    env::var("JWT_SECRET")
-                        .unwrap_or_else(|_| {
-                            tracing::warn!("Using development JWT secret. DO NOT use in production!");
-                            "dev_secret_change_in_production".to_string()
-                        })
+                    env::var("JWT_SECRET").unwrap_or_else(|_| {
+                        tracing::warn!("Using development JWT secret. DO NOT use in production!");
+                        "dev_secret_change_in_production".to_string()
+                    })
                 } else {
                     // Production mode: JWT_SECRET is required
                     env::var("JWT_SECRET")
@@ -168,10 +167,7 @@ mod tests {
             password: Some("secret".to_string()),
         };
 
-        assert_eq!(
-            config.connection_url(),
-            "redis://:secret@localhost:6379"
-        );
+        assert_eq!(config.connection_url(), "redis://:secret@localhost:6379");
     }
 
     #[test]

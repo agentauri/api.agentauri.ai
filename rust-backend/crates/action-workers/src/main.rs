@@ -6,8 +6,8 @@ use anyhow::{Context, Result};
 use shared::{db, Config};
 use tokio::signal;
 
-mod telegram;
 mod rest;
+mod telegram;
 
 #[tokio::main]
 async fn main() -> Result<()> {

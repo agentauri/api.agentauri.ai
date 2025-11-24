@@ -174,9 +174,7 @@ pub struct CreateActionRequest {
 /// Custom validator for registry field
 fn validate_registry(registry: &str) -> Result<(), validator::ValidationError> {
     if !["identity", "reputation", "validation"].contains(&registry) {
-        return Err(validator::ValidationError::new(
-            "invalid_registry",
-        ));
+        return Err(validator::ValidationError::new("invalid_registry"));
     }
     Ok(())
 }
