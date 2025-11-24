@@ -2,8 +2,19 @@
 
 use anyhow::{Context, Result};
 use redis::aio::MultiplexedConnection;
+use serde::Deserialize;
 use shared::DbPool;
 use sqlx::postgres::PgListener;
+
+/// Event notification payload from PostgreSQL NOTIFY
+#[derive(Debug, Deserialize)]
+struct EventNotification {
+    event_id: String,
+    chain_id: i32,
+    block_number: i64,
+    event_type: String,
+    registry: String,
+}
 
 /// Start listening to PostgreSQL NOTIFY events
 ///
@@ -29,8 +40,27 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
         // Wait for a notification
         match listener.recv().await {
             Ok(notification) => {
-                let event_id = notification.payload().to_string();
-                tracing::debug!("Received notification for event: {}", event_id);
+                let payload = notification.payload();
+
+                // Try to parse the enhanced JSON payload, fall back to raw event_id
+                let event_id = match serde_json::from_str::<EventNotification>(payload) {
+                    Ok(event_notif) => {
+                        tracing::debug!(
+                            "Received event notification: {} (chain_id={}, block={}, type={}, registry={})",
+                            event_notif.event_id,
+                            event_notif.chain_id,
+                            event_notif.block_number,
+                            event_notif.event_type,
+                            event_notif.registry
+                        );
+                        event_notif.event_id
+                    }
+                    Err(_) => {
+                        // Fall back to treating payload as raw event_id for backward compatibility
+                        tracing::debug!("Received notification for event: {}", payload);
+                        payload.to_string()
+                    }
+                };
 
                 // Process the event in a separate task
                 let db_pool = db_pool.clone();

@@ -66,7 +66,7 @@ BEGIN
     SELECT EXISTS (
         SELECT 1 FROM pg_trigger t
         JOIN pg_class c ON t.tgrelid = c.oid
-        WHERE t.tgname = 'events_notify_trigger'
+        WHERE t.tgname IN ('events_notify_trigger', 'trigger_notify_new_event')
         AND c.relname = 'events'
     ) INTO trigger_exists;
 
@@ -93,7 +93,7 @@ BEGIN
     INTO trigger_timing, trigger_timing
     FROM pg_trigger t
     JOIN pg_class c ON t.tgrelid = c.oid
-    WHERE t.tgname = 'events_notify_trigger'
+    WHERE t.tgname IN ('events_notify_trigger', 'trigger_notify_new_event')
     AND c.relname = 'events';
 
     PERFORM record_test(

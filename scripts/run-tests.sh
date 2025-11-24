@@ -109,6 +109,10 @@ run_test_suite "PostgreSQL NOTIFY/LISTEN" \
 run_test_suite "Query Performance" \
     "docker exec -i $DB_CONTAINER psql -U $DB_USER -d $DB_NAME < database/tests/test-performance-simple.sql"
 
+# Test 6: Event Notifications
+run_test_suite "Event Notification System" \
+    "docker exec -i $DB_CONTAINER psql -U $DB_USER -d $DB_NAME < database/tests/test-event-notifications.sql"
+
 # ============================================================================
 # RUST TESTS (when available)
 # ============================================================================

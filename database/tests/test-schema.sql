@@ -622,13 +622,13 @@ DECLARE
 BEGIN
     SELECT EXISTS (
         SELECT 1 FROM pg_trigger
-        WHERE tgname = 'events_notify_trigger'
+        WHERE tgname IN ('events_notify_trigger', 'trigger_notify_new_event')
     ) INTO trigger_exists;
 
     PERFORM record_test(
         'T7.5: events has notify trigger',
         trigger_exists,
-        'events table should have events_notify_trigger'
+        'events table should have events notification trigger'
     );
 END $$;
 
