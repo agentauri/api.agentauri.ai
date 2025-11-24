@@ -113,7 +113,7 @@ See [CLAUDE.md](./CLAUDE.md) for comprehensive architecture documentation.
 - [docs/architecture/](./docs/architecture/) - System architecture and diagrams
 - [docs/protocols/](./docs/protocols/) - ERC-8004, MCP, OASF integration guides
 - [docs/database/](./docs/database/) - Database schema and migration strategy
-- [docs/api/](./docs/api/) - REST API specification
+- [API Documentation](./rust-backend/crates/api-gateway/API_DOCUMENTATION.md) - REST API specification
 
 ## Development
 
@@ -270,7 +270,7 @@ Content-Type: application/json
 }
 ```
 
-See [docs/api/](./docs/api/) for complete API documentation.
+See [API Documentation](./rust-backend/crates/api-gateway/API_DOCUMENTATION.md) for complete API documentation.
 
 ## Supported Networks
 

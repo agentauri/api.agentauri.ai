@@ -1667,6 +1667,6 @@ cargo install cargo-audit
 
 ---
 
-**Last Updated**: January 23, 2025
+**Last Updated**: November 24, 2024
 **Version**: 1.0.0
 **Maintainers**: Development Team
