@@ -1474,6 +1474,83 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 - rust-engineer (workspace setup)
 - devops-engineer (Docker configuration)
 
+## Development Workflow
+
+### Local Testing Scripts
+
+The project includes comprehensive local testing scripts that replicate GitHub Actions workflows:
+
+**Daily Development** (`./scripts/local-ci.sh`):
+- Database tests (schema, TimescaleDB, integrity, notifications, performance)
+- Rust tests (formatting, Clippy, build, unit tests)
+- TypeScript tests (type-check, linting, tests)
+- Runtime: 2-5 minutes
+
+**Pre-PR Quality Checks** (`./scripts/local-lint.sh`):
+- SQL linting (style, trailing whitespace)
+- Rust linting (formatting, Clippy, unsafe code, TODOs)
+- TypeScript linting (formatting, ESLint, type checking)
+- Documentation checks (required files, broken links)
+- Docker Compose validation
+- Shell script linting (ShellCheck)
+- Runtime: 3-5 minutes
+
+**Security Audit** (`./scripts/local-security.sh`):
+- Dependency vulnerability scanning (cargo-audit, npm audit)
+- Docker image security (Trivy)
+- Secrets detection (Gitleaks)
+- Dockerfile linting (hadolint)
+- Configuration security checks
+- Runtime: 5-10 minutes
+
+**Complete CI Replication** (`./scripts/local-all.sh`):
+- Runs all three scripts in sequence
+- Comprehensive summary with timing
+- Use `--yes` or `-y` to skip confirmation
+- Runtime: 10-15 minutes
+
+**Usage**:
+```bash
+# Daily workflow validation
+./scripts/local-ci.sh
+
+# Before creating PR
+./scripts/local-lint.sh
+
+# Weekly/monthly security check
+./scripts/local-security.sh
+
+# Complete validation before pushing to main
+./scripts/local-all.sh
+```
+
+### Code Quality Tools
+
+**Required**:
+- Rust: cargo, rustfmt, clippy
+- Node.js: node, pnpm, typescript, eslint
+- Database: psql, docker
+
+**Optional** (for complete coverage):
+- ShellCheck (shell script linting)
+- cargo-audit (Rust dependency auditing)
+- Trivy (container security scanning)
+- Gitleaks (secrets detection)
+- hadolint (Dockerfile linting)
+
+Install on macOS:
+```bash
+brew install shellcheck trivy gitleaks hadolint
+cargo install cargo-audit
+```
+
+Install on Ubuntu/Debian:
+```bash
+apt install shellcheck
+# (trivy, gitleaks, hadolint: see official installation docs)
+cargo install cargo-audit
+```
+
 ### Phase 2: Event Ingestion (Weeks 4-6)
 
 **Deliverables**:
