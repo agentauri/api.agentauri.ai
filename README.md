@@ -8,11 +8,18 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 
 ## Features
 
+**PUSH Layer** (event-driven):
 - **Multi-chain monitoring** of ERC-8004 registries across multiple networks
 - **Programmable triggers** with simple, complex, and stateful conditions
 - **Flexible actions**: Telegram notifications, REST webhooks, MCP server updates
 - **Event store** for complete audit trail and analytics
 - **Scalable architecture** with independent per-chain indexing
+
+**PULL Layer** (agent-initiated queries):
+- **A2A Protocol** (Google Agent-to-Agent) for async task-based queries
+- **MCP Query Tools** (4 tiers): raw queries, aggregations, analysis, AI-powered insights
+- **Payment System**: Stripe (fiat), x402 (crypto), Credits (prepaid)
+- **Multi-tenant Account Model** with organizations and role-based access
 
 ## Quick Start
 
@@ -335,65 +342,50 @@ See `.env.example` for configuration guidelines.
 
 See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and milestones.
 
-### Phase 1: Foundation (Completed)
+**Total Timeline**: 24 weeks (Phases 1-7)
+
+### Phase 1-2: Foundation & Event Ingestion (Weeks 1-7) - COMPLETED
 - ✅ Documentation and project structure (CLAUDE.md, README.md, docs/)
 - ✅ Database schema and migrations (PostgreSQL + TimescaleDB)
 - ✅ Comprehensive test suite (108 database tests, 100% coverage)
-- ✅ Security hardening (environment variables, authentication, localhost binding)
-- ✅ CI/CD pipelines (GitHub Actions for testing, security scanning, linting)
-- ✅ Docker infrastructure (PostgreSQL, Redis, Prometheus, Grafana)
-
-### Phase 2: Core Services (In Progress - 85% Complete)
-- ✅ Rust workspace setup (4 crates: shared, api-gateway, event-processor, action-workers)
-- ✅ Ponder indexers fully implemented (24 event handlers across 4 networks)
-- ✅ Environment-based configuration (security best practice)
-- ✅ Event Store integration (PostgreSQL NOTIFY/LISTEN - 100% complete)
+- ✅ Ponder indexers (24 event handlers across 4 networks)
 - ✅ API Gateway CRUD endpoints (15 endpoints, JWT auth - 100% complete)
-- ⏳ Trigger evaluation engine (skeleton implemented)
-- ⏳ Action workers implementation (Telegram, REST webhooks)
 
-### Recent Achievements (November 2025)
+### Phase 3: Core Backend (Weeks 8-10)
+- ⏳ Event Processor with trigger matching
+- ⏳ Telegram Worker
+- ⏳ Integration Testing
 
-**Local Testing Infrastructure**:
-- ✅ `local-ci.sh` - Daily development workflow replication (2-5 min runtime)
-- ✅ `local-lint.sh` - Pre-PR code quality checks (3-5 min runtime)
-- ✅ `local-security.sh` - Weekly security audit (5-10 min runtime)
-- ✅ `local-all.sh` - Complete CI replication (10-15 min runtime)
+### Phase 3.5: Payment Foundation (Weeks 11-12) - NEW
+- ⏳ Organizations & multi-tenant account model
+- ⏳ Credits system & Stripe integration
+- ⏳ Role-based access (admin, member, viewer)
 
-**Security Improvements**:
-- ✅ Security vulnerabilities fixed (validator, idna)
-- ✅ JWT_SECRET enforcement in production
-- ✅ CORS whitelist implementation
-- ✅ All ShellCheck warnings resolved
-- ✅ pnpm-lock.yaml committed for reproducible builds
+### Phase 4: Advanced Triggers & Actions (Weeks 13-15)
+- ⏳ Stateful triggers (EMA, counters, rate limiting)
+- ⏳ REST/HTTP action worker
+- ⏳ Discovery endpoint (`/.well-known/agent.json`)
+- ⏳ Circuit breaker implementation
 
-**Code Quality**:
-- ✅ 31 lint checks passing (SQL, Rust, TypeScript, Markdown, Docker, Shell)
-- ✅ All Clippy warnings resolved
-- ✅ Rust formatting verified
-- ✅ 108 database tests passing
-- ✅ Real-time event processing with 20-100ms latency
+### Phase 5: MCP + A2A Integration (Weeks 16-18)
+- ⏳ A2A Protocol (Google Agent-to-Agent)
+- ⏳ MCP Query Tools (Tier 0-3)
+- ⏳ x402 crypto payment integration
+- ⏳ Query caching and usage metering
 
-**API Gateway Implementation (Week 7)**:
-- ✅ Authentication: 2 endpoints (register, login with JWT)
-- ✅ Triggers: 5 endpoints (CRUD with pagination)
-- ✅ Conditions: 4 endpoints (full CRUD)
-- ✅ Actions: 4 endpoints (full CRUD)
-- ✅ Security: Argon2 hashing, JWT middleware, ownership validation
-- ✅ Architecture: 3-layer design (handlers → repositories → database)
-- ✅ Documentation: Comprehensive 17KB API reference guide
+### Phase 6: Testing & Observability (Weeks 19-21)
+- ⏳ Comprehensive test suite (unit, integration, e2e)
+- ⏳ Payment integration tests
+- ⏳ Prometheus metrics & Grafana dashboards
 
-### Phase 3: Advanced Features
-- ⏳ Stateful triggers (EMA, rate limits)
-- ⏳ MCP integration for agent feedback
-- ⏳ WebSocket support for real-time updates
-- ⏳ Advanced monitoring and alerting
+### Phase 7: Production Deployment (Weeks 22-24)
+- ⏳ CI/CD pipelines
+- ⏳ Security audit and hardening
+- ⏳ API documentation (OpenAPI/Swagger)
 
-### Phase 4: Production Ready
-- ⏳ Load testing and performance optimization
-- ⏳ Production deployment documentation
-- ⏳ External security audit
-- ⏳ Multi-region support
+### Phase 8: AI Integration (Week 25+)
+- ⏳ Natural language trigger creation
+- ⏳ Trend prediction and anomaly detection
 
 Legend: ✅ Complete | 🔄 In Progress | ⏳ Planned
 

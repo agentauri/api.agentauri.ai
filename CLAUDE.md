@@ -27,13 +27,28 @@ psql < database/seeds/test_data.sql   # Load test data
 ### Key Endpoints (API Gateway)
 
 ```
+# Authentication
 POST   /api/v1/auth/register          # Create user account
 POST   /api/v1/auth/login             # Get JWT token
+
+# Triggers (PUSH Layer)
 GET    /api/v1/triggers               # List user triggers (paginated)
 POST   /api/v1/triggers               # Create new trigger
 GET    /api/v1/triggers/{id}          # Get trigger details
 PUT    /api/v1/triggers/{id}          # Update trigger
 DELETE /api/v1/triggers/{id}          # Delete trigger
+
+# Organizations & Billing (Pull Layer - Phase 3.5)
+POST   /api/v1/organizations          # Create organization
+GET    /api/v1/billing/credits        # Get credit balance
+POST   /api/v1/billing/credits/purchase  # Purchase credits (Stripe)
+
+# A2A Protocol (Pull Layer - Phase 5)
+POST   /api/v1/a2a/rpc                # JSON-RPC 2.0 endpoint
+GET    /api/v1/a2a/tasks/:id/stream   # SSE progress updates
+
+# Discovery
+GET    /.well-known/agent.json        # Agent Card (public)
 GET    /api/v1/health                 # System health status
 ```
 
@@ -54,6 +69,7 @@ This backend transforms these raw blockchain signals into intelligent actions: n
 
 ### Key Capabilities
 
+**PUSH Layer** (event-driven notifications):
 - **Multi-chain monitoring** of all three ERC-8004 registries
 - **Programmable trigger engine** supporting:
   - Simple event-driven conditions (score thresholds, tag filters, agent ID matching)
@@ -65,6 +81,19 @@ This backend transforms these raw blockchain signals into intelligent actions: n
   - MCP server updates (agent feedback push)
 - **Event store** for auditability, analytics, replay, and resilience
 - **Native scalability** with independent per-chain indexing and async action execution
+
+**PULL Layer** (agent-initiated queries):
+- **A2A Protocol** (Google Agent-to-Agent) for async queries with task lifecycle
+- **MCP Query Tools** (4 tiers):
+  - Tier 0: Raw queries (feedbacks, validations, agent profile)
+  - Tier 1: Aggregated queries (reputation summary, trends)
+  - Tier 2: Analysis queries (client analysis, baseline comparison)
+  - Tier 3: AI-powered queries (reputation reports, dispute analysis)
+- **Payment System**:
+  - Stripe integration (fiat)
+  - x402 protocol (crypto)
+  - Credits system (prepaid)
+- **Multi-tenant Account Model** with organizations and role-based access
 
 ### ERC-8004 Protocol Reference
 
@@ -1036,43 +1065,83 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 - Checkpoint management and reorg handling
 - PostgreSQL NOTIFY/LISTEN implementation
 
-### Phase 3: Core Backend (Weeks 7-10)
+### Phase 3: Core Backend (Weeks 8-10)
 
 **Status**: Week 7 Complete (✅ API Gateway CRUD - 100%)
 
 **Deliverables**:
 - ✅ API Gateway with full CRUD for triggers (Week 7 - 100%)
 - ✅ JWT authentication and user management (Week 7 - 100%)
-- ⏳ Event Processor with trigger matching
-- ⏳ Redis job queueing
-- ⏳ Basic Telegram worker (simple triggers only)
+- ⏳ Event Processor with trigger matching (Week 8)
+- ⏳ Telegram Worker (Week 9)
+- ⏳ Integration Testing (Week 10)
 
-### Phase 4: Advanced Triggers & Actions (Weeks 11-13)
+### Phase 3.5: Payment Foundation (Weeks 11-12) - NEW
 
-**Deliverables**:
-- Stateful trigger support (EMA, counters, rate limiting)
+**Goal**: Establish multi-tenant account model and payment infrastructure (critical path for Pull Layer).
+
+**Week 11: Account Model + Organizations**
+- Database migrations: `organizations`, `organization_members`
+- Organization CRUD endpoints
+- Role-based access (admin, member, viewer)
+- User-organization linking
+
+**Week 12: Credits System + Stripe Basics**
+- Database migrations: `credits`, `credit_transactions`, `subscriptions`
+- Credit balance and transaction endpoints
+- Stripe webhook integration
+- Basic subscription management
+
+### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - SHIFTED +2
+
+**Week 13: Stateful Triggers + Rate Limiting**
+- Stateful trigger support (EMA, counters)
+- API rate limiting infrastructure
+- Per-trigger execution limits
+
+**Week 14: REST Worker + Discovery**
 - REST/HTTP action worker
+- Discovery endpoint (`/.well-known/agent.json`)
+- Agent Card generation
+
+**Week 15: Circuit Breaker + Payment Nonces**
 - Circuit breaker implementation
+- Payment nonces table for idempotency
 - Result Logger with analytics views
 
-### Phase 5: MCP Integration (Weeks 14-16)
+### Phase 5: MCP + A2A Integration (Weeks 16-18) - EXTENDED
 
-**Deliverables**:
+**Week 16: MCP Bridge + A2A Protocol**
 - TypeScript MCP bridge service
+- A2A Protocol JSON-RPC endpoint (`/api/v1/a2a/rpc`)
+- Task lifecycle management (submitted → working → completed)
+- SSE streaming for progress updates
+
+**Week 17: MCP Worker + Query Tools Tier 0-2**
 - MCP worker with endpoint discovery
 - IPFS file fetching and verification
-- OASF schema validation
+- Tier 0 tools: `getMyFeedbacks`, `getValidationHistory`, `getAgentProfile`
+- Tier 1 tools: `getReputationSummary`, `getReputationTrend`
+- Tier 2 tools: `getClientAnalysis`, `compareToBaseline`
 
-### Phase 6: Testing & Observability (Weeks 17-19)
+**Week 18: Query Tools Tier 3 + Full Payment**
+- Tier 3 AI-powered tools: `getReputationReport`, `analyzeDispute`, `getRootCauseAnalysis`
+- x402 crypto payment integration
+- Query caching with Redis
+- Usage logging and metering
+
+### Phase 6: Testing & Observability (Weeks 19-21) - SHIFTED +2
 
 **Deliverables**:
 - Comprehensive test suite (unit, integration, e2e)
+- Payment integration tests
 - Prometheus metrics implementation
 - Grafana dashboards
+- Payment monitoring and analytics
 - Structured logging with tracing
-- Load testing and performance optimization
+- Load testing and query performance optimization
 
-### Phase 7: Production Deployment (Weeks 20-22)
+### Phase 7: Production Deployment (Weeks 22-24) - SHIFTED +2
 
 **Deliverables**:
 - CI/CD pipelines (GitHub Actions)
@@ -1082,7 +1151,7 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 - API documentation (OpenAPI/Swagger)
 - User guides and examples
 
-### Phase 8: AI Integration (Future)
+### Phase 8: AI Integration (Week 25+)
 
 **Deliverables**:
 - Natural language trigger creation

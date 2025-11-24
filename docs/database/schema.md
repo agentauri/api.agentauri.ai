@@ -290,6 +290,247 @@ CREATE TRIGGER update_agent_mcp_tokens_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 ```
 
+## Pull Layer Tables (Phase 3.5 - Phase 5)
+
+The following tables support the Pull Layer features including organizations, payments, A2A protocol, and query tools.
+
+### organizations
+
+Multi-tenant account model for billing and access control.
+
+```sql
+CREATE TABLE organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    owner_id TEXT NOT NULL REFERENCES users(id),
+    stripe_customer_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_organizations_owner ON organizations(owner_id);
+CREATE INDEX idx_organizations_slug ON organizations(slug);
+CREATE INDEX idx_organizations_stripe ON organizations(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+
+CREATE TRIGGER update_organizations_updated_at
+    BEFORE UPDATE ON organizations
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+```
+
+### organization_members
+
+Organization membership with role-based access.
+
+```sql
+CREATE TABLE organization_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'member', 'viewer')),
+    invited_by TEXT REFERENCES users(id),
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (organization_id, user_id)
+);
+
+CREATE INDEX idx_org_members_org ON organization_members(organization_id);
+CREATE INDEX idx_org_members_user ON organization_members(user_id);
+
+-- Roles:
+-- 'admin': Full access, can manage members and billing
+-- 'member': Can create triggers and use queries
+-- 'viewer': Read-only access
+```
+
+### credits
+
+Credit balance per organization.
+
+```sql
+CREATE TABLE credits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    balance DECIMAL(20, 8) NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'USDC',
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (organization_id, currency)
+);
+
+CREATE INDEX idx_credits_org ON credits(organization_id);
+```
+
+### credit_transactions
+
+Audit trail of all credit changes.
+
+```sql
+CREATE TABLE credit_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    amount DECIMAL(20, 8) NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('purchase', 'usage', 'refund', 'bonus')),
+    description TEXT,
+    reference_id TEXT,  -- Payment ID, query ID, etc.
+    balance_after DECIMAL(20, 8) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_credit_tx_org ON credit_transactions(organization_id);
+CREATE INDEX idx_credit_tx_created ON credit_transactions(created_at DESC);
+CREATE INDEX idx_credit_tx_type ON credit_transactions(type);
+```
+
+### subscriptions
+
+Stripe subscription tracking.
+
+```sql
+CREATE TABLE subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    stripe_subscription_id TEXT NOT NULL,
+    plan TEXT NOT NULL,  -- 'starter', 'pro', 'enterprise'
+    status TEXT NOT NULL CHECK (status IN ('active', 'canceled', 'past_due', 'trialing')),
+    current_period_start TIMESTAMPTZ NOT NULL,
+    current_period_end TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_subscriptions_org ON subscriptions(organization_id);
+CREATE INDEX idx_subscriptions_stripe ON subscriptions(stripe_subscription_id);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status) WHERE status = 'active';
+```
+
+### payment_nonces
+
+Idempotent payment processing.
+
+```sql
+CREATE TABLE payment_nonces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    nonce TEXT UNIQUE NOT NULL,
+    amount DECIMAL(20, 8) NOT NULL,
+    currency TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'expired', 'failed')),
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('stripe', 'x402', 'credits')),
+    expires_at TIMESTAMPTZ NOT NULL,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_payment_nonces_nonce ON payment_nonces(nonce);
+CREATE INDEX idx_payment_nonces_status ON payment_nonces(status) WHERE status = 'pending';
+CREATE INDEX idx_payment_nonces_org ON payment_nonces(organization_id);
+```
+
+### a2a_tasks
+
+A2A Protocol task tracking.
+
+```sql
+CREATE TABLE a2a_tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    tool TEXT NOT NULL,
+    arguments JSONB NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('submitted', 'working', 'completed', 'failed', 'cancelled')),
+    progress DECIMAL(3, 2) DEFAULT 0,
+    result JSONB,
+    error TEXT,
+    cost DECIMAL(20, 8),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_a2a_tasks_org ON a2a_tasks(organization_id);
+CREATE INDEX idx_a2a_tasks_status ON a2a_tasks(status) WHERE status IN ('submitted', 'working');
+CREATE INDEX idx_a2a_tasks_created ON a2a_tasks(created_at DESC);
+CREATE INDEX idx_a2a_tasks_tool ON a2a_tasks(tool);
+
+-- Task lifecycle: submitted → working → completed/failed/cancelled
+```
+
+### api_keys
+
+API key authentication for external agents.
+
+```sql
+CREATE TABLE api_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    key_hash TEXT NOT NULL,  -- bcrypt hash of API key
+    name TEXT NOT NULL,
+    prefix TEXT NOT NULL,    -- First 8 chars for identification (e.g., "ak_8004_")
+    permissions JSONB NOT NULL DEFAULT '["read"]',
+    last_used_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (prefix)
+);
+
+CREATE INDEX idx_api_keys_prefix ON api_keys(prefix);
+CREATE INDEX idx_api_keys_org ON api_keys(organization_id);
+
+-- API keys are prefixed with 'ak_8004_' for easy identification
+-- Full key is shown once at creation, then only prefix is stored
+```
+
+### query_cache
+
+Cache for MCP Query Tool responses.
+
+```sql
+CREATE TABLE query_cache (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cache_key TEXT UNIQUE NOT NULL,
+    tier INTEGER NOT NULL,
+    tool TEXT NOT NULL,
+    arguments JSONB NOT NULL,
+    result JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_query_cache_key ON query_cache(cache_key);
+CREATE INDEX idx_query_cache_expires ON query_cache(expires_at);
+
+-- Cache key format: t{tier}:{tool}:{agentId}:{params_hash}
+-- Cache durations: Tier 0: 5min, Tier 1: 1h, Tier 2: 6h, Tier 3: 24h
+```
+
+### usage_logs
+
+Query usage tracking for billing and analytics.
+
+```sql
+CREATE TABLE usage_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    tool TEXT NOT NULL,
+    tier INTEGER NOT NULL,
+    arguments JSONB NOT NULL,
+    cost DECIMAL(20, 8) NOT NULL,
+    cached BOOLEAN DEFAULT false,
+    response_time_ms INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_usage_logs_org ON usage_logs(organization_id);
+CREATE INDEX idx_usage_logs_created ON usage_logs(created_at DESC);
+CREATE INDEX idx_usage_logs_tool ON usage_logs(tool);
+CREATE INDEX idx_usage_logs_tier ON usage_logs(tier);
+
+-- Usage logs are used for:
+-- - Billing calculations
+-- - Analytics dashboards
+-- - Rate limiting decisions
+```
+
 ## Materialized Views
 
 ### events_hourly
