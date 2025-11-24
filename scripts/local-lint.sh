@@ -143,8 +143,13 @@ if [ "$RUST_EXISTS" = true ]; then
 
     # Run Clippy
     echo "Running Clippy..."
-    if cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt | grep -q "0 warnings"; then
-        print_success "No Clippy warnings found"
+    if cargo clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt; then
+        if grep -q "warning:" /tmp/clippy-output.txt; then
+            print_error "Clippy found warnings or errors"
+            cat /tmp/clippy-output.txt
+        else
+            print_success "No Clippy warnings found"
+        fi
     else
         print_error "Clippy found warnings or errors"
         cat /tmp/clippy-output.txt
@@ -250,7 +255,7 @@ fi
 
 # Check for broken links in markdown
 echo "Checking for empty links in markdown files..."
-if grep -r "\[.*\](\s*)" --include="*.md" . 2>/dev/null | grep -q .; then
+if grep -r "\[.*\](\s*)" --include="*.md" --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git . 2>/dev/null | grep -q .; then
     print_warning "Empty links found in markdown files"
 else
     print_success "No obvious broken links detected"

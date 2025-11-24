@@ -102,7 +102,10 @@ print_header "Database Tests"
 
 # Load environment variables
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    # shellcheck source=/dev/null
+    source .env
+    set +a
     print_success "Loaded environment variables from .env"
 else
     print_warning ".env file not found, using defaults"
