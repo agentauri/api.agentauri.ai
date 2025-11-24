@@ -7,9 +7,9 @@ use validator::Validate;
 use crate::{
     middleware::get_user_id,
     models::{
-        ActionResponse, ConditionResponse, CreateTriggerRequest, ErrorResponse,
-        PaginatedResponse, PaginationMeta, PaginationParams, SuccessResponse, TriggerDetailResponse,
-        TriggerResponse, UpdateTriggerRequest,
+        ActionResponse, ConditionResponse, CreateTriggerRequest, ErrorResponse, PaginatedResponse,
+        PaginationMeta, PaginationParams, SuccessResponse, TriggerDetailResponse, TriggerResponse,
+        UpdateTriggerRequest,
     },
     repositories::{ActionRepository, ConditionRepository, TriggerRepository},
 };
@@ -25,7 +25,12 @@ pub async fn create_trigger(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate request
@@ -52,8 +57,10 @@ pub async fn create_trigger(
         Ok(trigger) => trigger,
         Err(e) => {
             tracing::error!("Failed to create trigger: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to create trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create trigger",
+            ));
         }
     };
 
@@ -72,13 +79,20 @@ pub async fn list_triggers(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate pagination
     if let Err(e) = query.validate() {
-        return HttpResponse::BadRequest()
-            .json(ErrorResponse::new("validation_error", format!("Invalid pagination: {}", e)));
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "validation_error",
+            format!("Invalid pagination: {}", e),
+        ));
     }
 
     // Get total count
@@ -86,22 +100,25 @@ pub async fn list_triggers(
         Ok(count) => count,
         Err(e) => {
             tracing::error!("Failed to count triggers: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch triggers"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch triggers",
+            ));
         }
     };
 
     // Get triggers
-    let triggers = match TriggerRepository::list_by_user(&pool, &user_id, query.limit, query.offset)
-        .await
-    {
-        Ok(triggers) => triggers,
-        Err(e) => {
-            tracing::error!("Failed to list triggers: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch triggers"));
-        }
-    };
+    let triggers =
+        match TriggerRepository::list_by_user(&pool, &user_id, query.limit, query.offset).await {
+            Ok(triggers) => triggers,
+            Err(e) => {
+                tracing::error!("Failed to list triggers: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to fetch triggers",
+                ));
+            }
+        };
 
     let response = PaginatedResponse {
         data: triggers.into_iter().map(TriggerResponse::from).collect(),
@@ -124,7 +141,12 @@ pub async fn get_trigger(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Check if trigger belongs to user
@@ -132,14 +154,15 @@ pub async fn get_trigger(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch trigger",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Get trigger
@@ -151,8 +174,10 @@ pub async fn get_trigger(
         }
         Err(e) => {
             tracing::error!("Failed to fetch trigger: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch trigger",
+            ));
         }
     };
 
@@ -161,8 +186,10 @@ pub async fn get_trigger(
         Ok(conditions) => conditions,
         Err(e) => {
             tracing::error!("Failed to fetch conditions: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch trigger details"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch trigger details",
+            ));
         }
     };
 
@@ -171,14 +198,19 @@ pub async fn get_trigger(
         Ok(actions) => actions,
         Err(e) => {
             tracing::error!("Failed to fetch actions: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch trigger details"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch trigger details",
+            ));
         }
     };
 
     let response = TriggerDetailResponse {
         trigger: TriggerResponse::from(trigger),
-        conditions: conditions.into_iter().map(ConditionResponse::from).collect(),
+        conditions: conditions
+            .into_iter()
+            .map(ConditionResponse::from)
+            .collect(),
         actions: actions.into_iter().map(ActionResponse::from).collect(),
     };
 
@@ -199,7 +231,12 @@ pub async fn update_trigger(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate request
@@ -215,14 +252,15 @@ pub async fn update_trigger(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update trigger",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Update trigger
@@ -241,8 +279,10 @@ pub async fn update_trigger(
         Ok(trigger) => trigger,
         Err(e) => {
             tracing::error!("Failed to update trigger: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update trigger",
+            ));
         }
     };
 
@@ -263,7 +303,12 @@ pub async fn delete_trigger(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Check if trigger belongs to user
@@ -271,14 +316,15 @@ pub async fn delete_trigger(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete trigger",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Delete trigger
@@ -286,14 +332,15 @@ pub async fn delete_trigger(
         Ok(deleted) => deleted,
         Err(e) => {
             tracing::error!("Failed to delete trigger: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete trigger"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete trigger",
+            ));
         }
     };
 
     if !deleted {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     HttpResponse::NoContent().finish()

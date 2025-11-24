@@ -33,8 +33,10 @@ pub async fn register(
     // Check if username already exists
     match UserRepository::username_exists(&pool, &req.username).await {
         Ok(true) => {
-            return HttpResponse::Conflict()
-                .json(ErrorResponse::new("username_exists", "Username already taken"));
+            return HttpResponse::Conflict().json(ErrorResponse::new(
+                "username_exists",
+                "Username already taken",
+            ));
         }
         Err(e) => {
             tracing::error!("Failed to check username existence: {}", e);
@@ -49,8 +51,10 @@ pub async fn register(
     // Check if email already exists
     match UserRepository::email_exists(&pool, &req.email).await {
         Ok(true) => {
-            return HttpResponse::Conflict()
-                .json(ErrorResponse::new("email_exists", "Email already registered"));
+            return HttpResponse::Conflict().json(ErrorResponse::new(
+                "email_exists",
+                "Email already registered",
+            ));
         }
         Err(e) => {
             tracing::error!("Failed to check email existence: {}", e);
@@ -82,8 +86,10 @@ pub async fn register(
         Ok(user) => user,
         Err(e) => {
             tracing::error!("Failed to create user: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to create user"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create user",
+            ));
         }
     };
 
@@ -138,20 +144,26 @@ pub async fn login(
     let user = match user {
         Ok(Some(user)) => user,
         Ok(None) => {
-            return HttpResponse::Unauthorized()
-                .json(ErrorResponse::new("invalid_credentials", "Invalid credentials"));
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "invalid_credentials",
+                "Invalid credentials",
+            ));
         }
         Err(e) => {
             tracing::error!("Failed to find user: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to process login"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to process login",
+            ));
         }
     };
 
     // Check if user is active
     if !user.is_active {
-        return HttpResponse::Forbidden()
-            .json(ErrorResponse::new("account_disabled", "Account is disabled"));
+        return HttpResponse::Forbidden().json(ErrorResponse::new(
+            "account_disabled",
+            "Account is disabled",
+        ));
     }
 
     // Verify password
@@ -159,8 +171,10 @@ pub async fn login(
         Ok(hash) => hash,
         Err(e) => {
             tracing::error!("Failed to parse password hash: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to process login"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to process login",
+            ));
         }
     };
 
@@ -169,8 +183,10 @@ pub async fn login(
         .verify_password(req.password.as_bytes(), &parsed_hash)
         .is_err()
     {
-        return HttpResponse::Unauthorized()
-            .json(ErrorResponse::new("invalid_credentials", "Invalid credentials"));
+        return HttpResponse::Unauthorized().json(ErrorResponse::new(
+            "invalid_credentials",
+            "Invalid credentials",
+        ));
     }
 
     // Update last login timestamp

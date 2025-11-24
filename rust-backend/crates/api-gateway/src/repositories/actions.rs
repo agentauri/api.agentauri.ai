@@ -37,6 +37,7 @@ impl ActionRepository {
     }
 
     /// Find action by ID
+    #[allow(dead_code)]
     pub async fn find_by_id(pool: &DbPool, action_id: i32) -> Result<Option<TriggerAction>> {
         let action = sqlx::query_as::<_, TriggerAction>(
             r#"
@@ -111,10 +112,7 @@ impl ActionRepository {
 
         q = q.bind(action_id);
 
-        let action = q
-            .fetch_one(pool)
-            .await
-            .context("Failed to update action")?;
+        let action = q.fetch_one(pool).await.context("Failed to update action")?;
 
         Ok(action)
     }

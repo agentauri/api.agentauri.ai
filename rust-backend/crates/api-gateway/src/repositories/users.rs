@@ -71,6 +71,7 @@ impl UserRepository {
     }
 
     /// Find user by ID
+    #[allow(dead_code)]
     pub async fn find_by_id(pool: &DbPool, user_id: &str) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"

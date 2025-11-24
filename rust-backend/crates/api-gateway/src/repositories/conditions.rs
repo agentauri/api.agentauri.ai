@@ -41,6 +41,7 @@ impl ConditionRepository {
     }
 
     /// Find condition by ID
+    #[allow(dead_code)]
     pub async fn find_by_id(pool: &DbPool, condition_id: i32) -> Result<Option<TriggerCondition>> {
         let condition = sqlx::query_as::<_, TriggerCondition>(
             r#"

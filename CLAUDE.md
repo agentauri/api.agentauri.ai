@@ -102,36 +102,32 @@ The system consists of 9 core components organized into distinct layers:
 
 #### 1. API Gateway (Rust/Actix-web)
 
-**Responsibility**: User-facing REST API for trigger management and system queries.
+**Status**: ✅ Week 7 Complete (100%)
 
-**Technology Stack**:
-- Actix-web (async web framework)
-- SQLx (compile-time verified SQL queries)
-- JWT for authentication
-- Serde for JSON serialization
-- Validator for input validation
+REST API server providing trigger management and system queries.
 
-**Key Endpoints**:
-```
-POST   /api/v1/auth/register      - User registration
-POST   /api/v1/auth/login         - User login (returns JWT)
-POST   /api/v1/triggers            - Create new trigger
-GET    /api/v1/triggers            - List user's triggers
-GET    /api/v1/triggers/:id        - Get trigger details
-PUT    /api/v1/triggers/:id        - Update trigger
-DELETE /api/v1/triggers/:id        - Delete trigger
-PATCH  /api/v1/triggers/:id/toggle - Enable/disable trigger
-GET    /api/v1/events              - Query historical events
-GET    /api/v1/stats               - System statistics
-GET    /api/v1/health              - Health check
-```
+**Implemented Endpoints**:
+- Authentication: `/api/v1/auth/register`, `/api/v1/auth/login`
+- Triggers: `/api/v1/triggers` (CRUD with pagination)
+- Conditions: `/api/v1/triggers/{id}/conditions` (CRUD)
+- Actions: `/api/v1/triggers/{id}/actions` (CRUD)
+- Health: `/api/v1/health` (system status)
 
-**Modules**:
-- `routes/` - Endpoint definitions
-- `handlers/` - Business logic for each endpoint
-- `middleware/` - Auth, CORS, logging, rate limiting
-- `models/` - Request/response DTOs
-- `validation/` - Input validation schemas
+**Security Features**:
+- JWT authentication middleware (jsonwebtoken crate)
+- Argon2 password hashing (secure, modern algorithm)
+- User ownership validation on all trigger operations
+- CORS whitelist with environment configuration
+- Input validation with validator crate
+
+**Architecture**:
+- 3-layer design: Handlers → Repositories → Database
+- Repository pattern for clean database access
+- DTO pattern for request/response serialization
+- Compile-time SQL verification with SQLx
+- Pagination support (limit/offset parameters)
+
+**Documentation**: See `rust-backend/crates/api-gateway/API_DOCUMENTATION.md` for complete API reference with examples.
 
 #### 2. RPC Nodes (External Services)
 
@@ -1565,17 +1561,19 @@ cargo install cargo-audit
 
 ### Phase 3: Core Backend (Weeks 7-10)
 
+**Status**: Week 7 Complete (✅ API Gateway CRUD - 100%)
+
 **Deliverables**:
-- API Gateway with full CRUD for triggers
-- JWT authentication and user management
-- Event Processor with trigger matching
-- Redis job queueing
-- Basic Telegram worker (simple triggers only)
+- ✅ API Gateway with full CRUD for triggers (Week 7 - 100%)
+- ✅ JWT authentication and user management (Week 7 - 100%)
+- ⏳ Event Processor with trigger matching
+- ⏳ Redis job queueing
+- ⏳ Basic Telegram worker (simple triggers only)
 
 **Subagents**:
-- backend-architect (API design)
-- rust-engineer (Event Processor)
-- backend-developer (API Gateway)
+- ✅ backend-architect (API design and implementation - Week 7)
+- ✅ rust-engineer (Code review and optimization - Week 7)
+- ⏳ backend-developer (Event Processor and workers)
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 11-13)
 

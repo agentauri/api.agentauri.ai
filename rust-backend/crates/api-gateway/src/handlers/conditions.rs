@@ -27,7 +27,12 @@ pub async fn create_condition(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate request
@@ -43,14 +48,15 @@ pub async fn create_condition(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to create condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create condition",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Create condition
@@ -68,8 +74,10 @@ pub async fn create_condition(
         Ok(condition) => condition,
         Err(e) => {
             tracing::error!("Failed to create condition: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to create condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create condition",
+            ));
         }
     };
 
@@ -90,7 +98,12 @@ pub async fn list_conditions(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Check if trigger belongs to user
@@ -98,14 +111,15 @@ pub async fn list_conditions(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch conditions"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch conditions",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Get conditions
@@ -113,13 +127,17 @@ pub async fn list_conditions(
         Ok(conditions) => conditions,
         Err(e) => {
             tracing::error!("Failed to list conditions: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch conditions"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch conditions",
+            ));
         }
     };
 
-    let response: Vec<ConditionResponse> =
-        conditions.into_iter().map(ConditionResponse::from).collect();
+    let response: Vec<ConditionResponse> = conditions
+        .into_iter()
+        .map(ConditionResponse::from)
+        .collect();
 
     HttpResponse::Ok().json(SuccessResponse::new(response))
 }
@@ -138,7 +156,12 @@ pub async fn update_condition(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate request
@@ -154,14 +177,15 @@ pub async fn update_condition(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update condition",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Verify condition belongs to trigger
@@ -174,8 +198,10 @@ pub async fn update_condition(
         }
         Err(e) => {
             tracing::error!("Failed to get condition trigger_id: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update condition",
+            ));
         }
     };
 
@@ -192,15 +218,17 @@ pub async fn update_condition(
         req.field.as_deref(),
         req.operator.as_deref(),
         req.value.as_deref(),
-        req.config.as_ref().map(|c| Some(c)),
+        req.config.as_ref().map(Some),
     )
     .await
     {
         Ok(condition) => condition,
         Err(e) => {
             tracing::error!("Failed to update condition: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update condition",
+            ));
         }
     };
 
@@ -221,7 +249,12 @@ pub async fn delete_condition(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Check if trigger belongs to user
@@ -229,14 +262,15 @@ pub async fn delete_condition(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete condition",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Verify condition belongs to trigger
@@ -249,8 +283,10 @@ pub async fn delete_condition(
         }
         Err(e) => {
             tracing::error!("Failed to get condition trigger_id: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete condition",
+            ));
         }
     };
 
@@ -264,8 +300,10 @@ pub async fn delete_condition(
         Ok(deleted) => deleted,
         Err(e) => {
             tracing::error!("Failed to delete condition: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete condition"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete condition",
+            ));
         }
     };
 

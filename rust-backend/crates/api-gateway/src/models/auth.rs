@@ -60,10 +60,10 @@ impl From<shared::models::User> for UserResponse {
 /// JWT claims
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,        // Subject (user_id)
-    pub username: String,   // Username for convenience
-    pub exp: i64,          // Expiration time (as UTC timestamp)
-    pub iat: i64,          // Issued at (as UTC timestamp)
+    pub sub: String,      // Subject (user_id)
+    pub username: String, // Username for convenience
+    pub exp: i64,         // Expiration time (as UTC timestamp)
+    pub iat: i64,         // Issued at (as UTC timestamp)
 }
 
 impl Claims {

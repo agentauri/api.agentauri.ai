@@ -1,6 +1,6 @@
 //! Trigger Condition DTOs
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use validator::Validate;
 
 /// Request to create a new condition

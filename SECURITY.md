@@ -166,6 +166,7 @@ This project follows security guidelines from:
 
 ## Update History
 
+- **2025-11-24**: Week 7 API Gateway CRUD completed with JWT auth and Argon2 password hashing
 - **2025-11-24**: Security vulnerabilities fixed (validator 0.18→0.20, idna RUSTSEC-2024-0421)
 - **2025-11-24**: Medium severity issues resolved (JWT_SECRET enforcement, CORS whitelist)
 - **2025-11-24**: All ShellCheck warnings resolved (SC2046, SC2034)

@@ -26,7 +26,12 @@ pub async fn create_action(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate request
@@ -42,14 +47,15 @@ pub async fn create_action(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to create action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create action",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Create action
@@ -65,8 +71,10 @@ pub async fn create_action(
         Ok(action) => action,
         Err(e) => {
             tracing::error!("Failed to create action: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to create action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create action",
+            ));
         }
     };
 
@@ -87,7 +95,12 @@ pub async fn list_actions(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Check if trigger belongs to user
@@ -95,14 +108,15 @@ pub async fn list_actions(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch actions"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch actions",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Get actions
@@ -110,8 +124,10 @@ pub async fn list_actions(
         Ok(actions) => actions,
         Err(e) => {
             tracing::error!("Failed to list actions: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to fetch actions"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch actions",
+            ));
         }
     };
 
@@ -134,7 +150,12 @@ pub async fn update_action(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Validate request
@@ -150,14 +171,15 @@ pub async fn update_action(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update action",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Verify action belongs to trigger
@@ -169,14 +191,15 @@ pub async fn update_action(
         }
         Err(e) => {
             tracing::error!("Failed to get action trigger_id: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update action",
+            ));
         }
     };
 
     if action_trigger_id != trigger_id {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Action not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Action not found"));
     }
 
     // Update action
@@ -192,8 +215,10 @@ pub async fn update_action(
         Ok(action) => action,
         Err(e) => {
             tracing::error!("Failed to update action: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to update action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update action",
+            ));
         }
     };
 
@@ -214,7 +239,12 @@ pub async fn delete_action(
     // Get authenticated user_id
     let user_id = match get_user_id(&req_http) {
         Ok(id) => id,
-        Err(_) => return HttpResponse::Unauthorized().json(ErrorResponse::new("unauthorized", "Authentication required")),
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required",
+            ))
+        }
     };
 
     // Check if trigger belongs to user
@@ -222,14 +252,15 @@ pub async fn delete_action(
         Ok(belongs) => belongs,
         Err(e) => {
             tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete action",
+            ));
         }
     };
 
     if !belongs {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Trigger not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
     }
 
     // Verify action belongs to trigger
@@ -241,14 +272,15 @@ pub async fn delete_action(
         }
         Err(e) => {
             tracing::error!("Failed to get action trigger_id: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete action",
+            ));
         }
     };
 
     if action_trigger_id != trigger_id {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Action not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Action not found"));
     }
 
     // Delete action
@@ -256,14 +288,15 @@ pub async fn delete_action(
         Ok(deleted) => deleted,
         Err(e) => {
             tracing::error!("Failed to delete action: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to delete action"));
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete action",
+            ));
         }
     };
 
     if !deleted {
-        return HttpResponse::NotFound()
-            .json(ErrorResponse::new("not_found", "Action not found"));
+        return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Action not found"));
     }
 
     HttpResponse::NoContent().finish()

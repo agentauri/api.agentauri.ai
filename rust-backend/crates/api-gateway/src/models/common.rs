@@ -20,6 +20,7 @@ impl ErrorResponse {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_details(
         error: impl Into<String>,
         message: impl Into<String>,

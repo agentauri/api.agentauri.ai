@@ -343,12 +343,12 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 - ✅ CI/CD pipelines (GitHub Actions for testing, security scanning, linting)
 - ✅ Docker infrastructure (PostgreSQL, Redis, Prometheus, Grafana)
 
-### Phase 2: Core Services (In Progress - 75% Complete)
+### Phase 2: Core Services (In Progress - 85% Complete)
 - ✅ Rust workspace setup (4 crates: shared, api-gateway, event-processor, action-workers)
 - ✅ Ponder indexers fully implemented (24 event handlers across 4 networks)
 - ✅ Environment-based configuration (security best practice)
 - ✅ Event Store integration (PostgreSQL NOTIFY/LISTEN - 100% complete)
-- 🔄 API Gateway CRUD endpoints (basic health check working - 30% complete)
+- ✅ API Gateway CRUD endpoints (15 endpoints, JWT auth - 100% complete)
 - ⏳ Trigger evaluation engine (skeleton implemented)
 - ⏳ Action workers implementation (Telegram, REST webhooks)
 
@@ -373,6 +373,15 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 - ✅ Rust formatting verified
 - ✅ 108 database tests passing
 - ✅ Real-time event processing with 20-100ms latency
+
+**API Gateway Implementation (Week 7)**:
+- ✅ Authentication: 2 endpoints (register, login with JWT)
+- ✅ Triggers: 5 endpoints (CRUD with pagination)
+- ✅ Conditions: 4 endpoints (full CRUD)
+- ✅ Actions: 4 endpoints (full CRUD)
+- ✅ Security: Argon2 hashing, JWT middleware, ownership validation
+- ✅ Architecture: 3-layer design (handlers → repositories → database)
+- ✅ Documentation: Comprehensive 17KB API reference guide
 
 ### Phase 3: Advanced Features
 - ⏳ Stateful triggers (EMA, rate limits)

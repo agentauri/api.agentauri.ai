@@ -9,6 +9,7 @@ pub struct TriggerRepository;
 
 impl TriggerRepository {
     /// Create a new trigger
+    #[allow(clippy::too_many_arguments)]
     pub async fn create(
         pool: &DbPool,
         user_id: &str,
@@ -104,6 +105,7 @@ impl TriggerRepository {
     }
 
     /// Update trigger
+    #[allow(clippy::too_many_arguments)]
     pub async fn update(
         pool: &DbPool,
         trigger_id: &str,

@@ -1,6 +1,6 @@
 //! Trigger Action DTOs
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use validator::Validate;
 
 /// Request to create a new action
