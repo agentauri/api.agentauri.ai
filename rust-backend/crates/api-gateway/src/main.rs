@@ -8,6 +8,8 @@ use shared::{db, Config};
 
 mod handlers;
 mod middleware;
+mod models;
+mod repositories;
 mod routes;
 
 #[actix_web::main]

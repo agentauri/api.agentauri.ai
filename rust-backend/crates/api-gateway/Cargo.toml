@@ -15,6 +15,7 @@ shared = { path = "../shared" }
 
 # Async runtime
 tokio = { workspace = true }
+futures-util = { workspace = true }
 
 # Web framework
 actix-web = { workspace = true }
