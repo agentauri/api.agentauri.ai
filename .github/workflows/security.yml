@@ -102,13 +102,26 @@ jobs:
   dockerfile-lint:
     name: Dockerfile Linting
     runs-on: ubuntu-latest
-    if: hashFiles('docker/**/*.Dockerfile') != '' || hashFiles('**/Dockerfile') != ''
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check for Dockerfiles
+        id: check_dockerfiles
+        run: |
+          if find . -name "Dockerfile" -o -name "*.Dockerfile" | grep -q .; then
+            echo "dockerfiles_exist=true" >> $GITHUB_OUTPUT
+            echo "Found Dockerfiles to lint" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "dockerfiles_exist=false" >> $GITHUB_OUTPUT
+            echo "## Dockerfile Linting Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No Dockerfiles found in repository - skipping Hadolint scan." >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Run Hadolint
+        if: steps.check_dockerfiles.outputs.dockerfiles_exist == 'true'
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: docker/*.Dockerfile
@@ -116,7 +129,7 @@ jobs:
           ignore: DL3008,DL3009
 
       - name: Generate Dockerfile lint summary
-        if: always()
+        if: steps.check_dockerfiles.outputs.dockerfiles_exist == 'true' && always()
         run: |
           echo "## Dockerfile Linting Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
