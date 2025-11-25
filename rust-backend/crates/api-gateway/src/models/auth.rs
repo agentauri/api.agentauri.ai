@@ -79,3 +79,195 @@ impl Claims {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use validator::Validate;
+
+    // ========================================================================
+    // RegisterRequest validation tests
+    // ========================================================================
+
+    #[test]
+    fn test_register_request_valid() {
+        let req = RegisterRequest {
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password: "securepassword123".to_string(),
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_register_request_username_too_short() {
+        let req = RegisterRequest {
+            username: "ab".to_string(), // min 3 chars
+            email: "test@example.com".to_string(),
+            password: "securepassword123".to_string(),
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("username"));
+    }
+
+    #[test]
+    fn test_register_request_username_too_long() {
+        let req = RegisterRequest {
+            username: "a".repeat(51), // max 50 chars
+            email: "test@example.com".to_string(),
+            password: "securepassword123".to_string(),
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("username"));
+    }
+
+    #[test]
+    fn test_register_request_invalid_email() {
+        let req = RegisterRequest {
+            username: "testuser".to_string(),
+            email: "not-an-email".to_string(),
+            password: "securepassword123".to_string(),
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("email"));
+    }
+
+    #[test]
+    fn test_register_request_password_too_short() {
+        let req = RegisterRequest {
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password: "short".to_string(), // min 8 chars
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("password"));
+    }
+
+    #[test]
+    fn test_register_request_password_too_long() {
+        let req = RegisterRequest {
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            password: "a".repeat(101), // max 100 chars
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("password"));
+    }
+
+    // ========================================================================
+    // LoginRequest validation tests
+    // ========================================================================
+
+    #[test]
+    fn test_login_request_valid_username() {
+        let req = LoginRequest {
+            username_or_email: "testuser".to_string(),
+            password: "password123".to_string(),
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_login_request_valid_email() {
+        let req = LoginRequest {
+            username_or_email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_login_request_empty_username() {
+        let req = LoginRequest {
+            username_or_email: "".to_string(),
+            password: "password123".to_string(),
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("username_or_email"));
+    }
+
+    #[test]
+    fn test_login_request_empty_password() {
+        let req = LoginRequest {
+            username_or_email: "testuser".to_string(),
+            password: "".to_string(),
+        };
+        let result = req.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.field_errors().contains_key("password"));
+    }
+
+    // ========================================================================
+    // Claims tests
+    // ========================================================================
+
+    #[test]
+    fn test_claims_new_creates_valid_claims() {
+        let claims = Claims::new("user-123".to_string(), "testuser".to_string(), 1);
+
+        assert_eq!(claims.sub, "user-123");
+        assert_eq!(claims.username, "testuser");
+        assert!(claims.exp > claims.iat);
+        assert_eq!(claims.exp - claims.iat, 3600); // 1 hour in seconds
+    }
+
+    #[test]
+    fn test_claims_new_different_expiration() {
+        let claims = Claims::new("user-123".to_string(), "testuser".to_string(), 24);
+
+        assert_eq!(claims.exp - claims.iat, 86400); // 24 hours in seconds
+    }
+
+    // ========================================================================
+    // Serialization tests
+    // ========================================================================
+
+    #[test]
+    fn test_auth_response_serialization() {
+        let response = AuthResponse {
+            token: "test-token".to_string(),
+            user: UserResponse {
+                id: "user-123".to_string(),
+                username: "testuser".to_string(),
+                email: "test@example.com".to_string(),
+                created_at: chrono::Utc::now(),
+                last_login_at: None,
+                is_active: true,
+            },
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("test-token"));
+        assert!(json.contains("user-123"));
+        assert!(json.contains("testuser"));
+    }
+
+    #[test]
+    fn test_user_response_serialization() {
+        let user = UserResponse {
+            id: "user-123".to_string(),
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            created_at: chrono::Utc::now(),
+            last_login_at: Some(chrono::Utc::now()),
+            is_active: true,
+        };
+
+        let json = serde_json::to_string(&user).unwrap();
+        assert!(json.contains("user-123"));
+        assert!(json.contains("is_active"));
+    }
+}
