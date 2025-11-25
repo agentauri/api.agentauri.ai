@@ -80,6 +80,16 @@ teloxide = { version = "0.13", features = ["macros"] }
 # Testing
 mockall = "0.13"
 
+# Rate limiting
+governor = "0.6"
+
+# Metrics
+prometheus = "0.13"
+lazy_static = "1.4"
+
+# Template parsing
+regex = "1"
+
 [profile.dev]
 opt-level = 0
 debug = true

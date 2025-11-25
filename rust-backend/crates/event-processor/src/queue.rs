@@ -6,11 +6,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use redis::aio::MultiplexedConnection;
 use redis::AsyncCommands;
-
-use crate::jobs::ActionJob;
-
-/// Queue name for action jobs
-pub const ACTION_JOBS_QUEUE: &str = "action_jobs";
+use shared::{ActionJob, ACTION_JOBS_QUEUE};
 
 /// Abstract job queue interface for testability
 #[async_trait]
@@ -70,6 +66,7 @@ mod tests {
     use super::*;
     use mockall::mock;
     use serde_json::json;
+    use shared::ActionType;
 
     // Mock implementation of JobQueue for testing
     mock! {
@@ -90,7 +87,7 @@ mod tests {
         let job = ActionJob::new(
             "trigger-1",
             "event-1",
-            crate::jobs::ActionType::Telegram,
+            ActionType::Telegram,
             1,
             json!({"chat_id": "123"}),
         );

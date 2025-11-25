@@ -6,7 +6,6 @@ use anyhow::{Context, Result};
 use shared::{db, Config};
 use tokio::signal;
 
-mod jobs;
 mod listener;
 mod queue;
 mod trigger_engine;

@@ -6,11 +6,10 @@ use anyhow::{Context, Result};
 use redis::aio::MultiplexedConnection;
 use serde::Deserialize;
 use shared::models::{Event, Trigger, TriggerAction, TriggerCondition};
-use shared::DbPool;
+use shared::{ActionJob, ActionType, DbPool};
 use sqlx::postgres::PgListener;
 use std::str::FromStr;
 
-use crate::jobs::{ActionJob, ActionType};
 use crate::queue::{JobQueue, RedisJobQueue};
 use crate::trigger_engine;
 
