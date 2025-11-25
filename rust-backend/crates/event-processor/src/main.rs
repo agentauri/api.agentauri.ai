@@ -6,7 +6,9 @@ use anyhow::{Context, Result};
 use shared::{db, Config};
 use tokio::signal;
 
+mod jobs;
 mod listener;
+mod queue;
 mod trigger_engine;
 
 #[tokio::main]
@@ -44,22 +46,31 @@ async fn main() -> Result<()> {
     let listener_handle = tokio::spawn({
         let db_pool = db_pool.clone();
         let redis_conn = redis_conn.clone();
-        async move {
-            if let Err(e) = listener::start_listening(db_pool, redis_conn).await {
-                tracing::error!("Listener error: {}", e);
-            }
-        }
+        async move { listener::start_listening(db_pool, redis_conn).await }
     });
 
-    // Wait for shutdown signal
-    signal::ctrl_c()
-        .await
-        .context("Failed to listen for shutdown signal")?;
-
-    tracing::info!("Shutdown signal received, stopping Event Processor...");
-
-    // Abort the listener task
-    listener_handle.abort();
+    // Wait for either shutdown signal OR listener failure
+    tokio::select! {
+        result = signal::ctrl_c() => {
+            result.context("Failed to listen for shutdown signal")?;
+            tracing::info!("Shutdown signal received, stopping Event Processor...");
+        }
+        result = listener_handle => {
+            match result {
+                Ok(Ok(())) => {
+                    tracing::warn!("Listener exited cleanly (unexpected)");
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("Listener failed: {:#}", e);
+                    return Err(e.context("Event listener failed"));
+                }
+                Err(e) => {
+                    tracing::error!("Listener task panicked: {}", e);
+                    anyhow::bail!("Event listener task panicked: {}", e);
+                }
+            }
+        }
+    }
 
     Ok(())
 }

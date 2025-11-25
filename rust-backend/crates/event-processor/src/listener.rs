@@ -1,10 +1,18 @@
 //! PostgreSQL NOTIFY/LISTEN implementation
+//!
+//! Listens for new events and processes them through the trigger matching engine.
 
 use anyhow::{Context, Result};
 use redis::aio::MultiplexedConnection;
 use serde::Deserialize;
+use shared::models::{Event, Trigger, TriggerAction, TriggerCondition};
 use shared::DbPool;
 use sqlx::postgres::PgListener;
+use std::str::FromStr;
+
+use crate::jobs::{ActionJob, ActionType};
+use crate::queue::{JobQueue, RedisJobQueue};
+use crate::trigger_engine;
 
 /// Event notification payload from PostgreSQL NOTIFY
 #[derive(Debug, Deserialize)]
@@ -36,10 +44,20 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
 
     tracing::info!("Listening for PostgreSQL NOTIFY events on channel 'new_event'");
 
+    // Create job queue
+    let job_queue = RedisJobQueue::new(redis_conn);
+
+    // Track consecutive errors for exponential backoff
+    let mut consecutive_errors = 0u32;
+    const MAX_CONSECUTIVE_ERRORS: u32 = 10;
+
     loop {
         // Wait for a notification
         match listener.recv().await {
             Ok(notification) => {
+                // Reset error counter on success
+                consecutive_errors = 0;
+
                 let payload = notification.payload();
 
                 // Try to parse the enhanced JSON payload, fall back to raw event_id
@@ -55,26 +73,49 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
                         );
                         event_notif.event_id
                     }
-                    Err(_) => {
+                    Err(parse_err) => {
                         // Fall back to treating payload as raw event_id for backward compatibility
-                        tracing::debug!("Received notification for event: {}", payload);
+                        tracing::warn!(
+                            error = %parse_err,
+                            payload = %payload,
+                            "Failed to parse EventNotification JSON, treating as raw event_id"
+                        );
                         payload.to_string()
                     }
                 };
 
                 // Process the event in a separate task
                 let db_pool = db_pool.clone();
-                let redis_conn = redis_conn.clone();
+                let job_queue = job_queue.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = process_event(&event_id, db_pool, redis_conn).await {
+                    if let Err(e) = process_event(&event_id, &db_pool, &job_queue).await {
                         tracing::error!("Error processing event {}: {}", event_id, e);
                     }
                 });
             }
             Err(e) => {
-                tracing::error!("Error receiving notification: {}", e);
-                // Wait a bit before continuing to avoid tight loop on persistent errors
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                consecutive_errors += 1;
+
+                // Calculate exponential backoff: min(2^errors, 60) seconds
+                let backoff_secs = std::cmp::min(2u64.pow(consecutive_errors), 60);
+
+                tracing::error!(
+                    error = %e,
+                    consecutive_errors = consecutive_errors,
+                    backoff_secs = backoff_secs,
+                    "Error receiving notification"
+                );
+
+                // After too many consecutive errors, exit to trigger app restart
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                    anyhow::bail!(
+                        "Listener exceeded {} consecutive errors, exiting for restart",
+                        MAX_CONSECUTIVE_ERRORS
+                    );
+                }
+
+                // Exponential backoff before retry
+                tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
             }
         }
     }
@@ -86,14 +127,97 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
 ///
 /// * `event_id` - The ID of the event to process
 /// * `db_pool` - Database connection pool
-/// * `redis_conn` - Redis connection for job queueing
-async fn process_event(
-    event_id: &str,
-    db_pool: DbPool,
-    _redis_conn: MultiplexedConnection,
-) -> Result<()> {
+/// * `job_queue` - Job queue for enqueueing actions
+async fn process_event<Q: JobQueue>(event_id: &str, db_pool: &DbPool, job_queue: &Q) -> Result<()> {
     // Fetch event from database
-    let event = sqlx::query_as::<_, shared::models::Event>(
+    let event = fetch_event(event_id, db_pool).await?;
+
+    tracing::info!(
+        "Processing event: {} (chain_id={}, registry={}, event_type={})",
+        event.id,
+        event.chain_id,
+        event.registry,
+        event.event_type
+    );
+
+    // Fetch matching triggers for this chain_id and registry
+    let triggers = fetch_triggers(event.chain_id, &event.registry, db_pool).await?;
+
+    if triggers.is_empty() {
+        tracing::debug!(
+            "No enabled triggers found for chain_id={}, registry={}",
+            event.chain_id,
+            event.registry
+        );
+        return Ok(());
+    }
+
+    tracing::debug!("Found {} triggers to evaluate", triggers.len());
+
+    // Evaluate each trigger
+    let mut matched_count = 0;
+    let trigger_count = triggers.len();
+    for trigger in &triggers {
+        // Fetch conditions for this trigger
+        let conditions = fetch_conditions(&trigger.id, db_pool).await?;
+
+        // Evaluate conditions against the event
+        let matches = trigger_engine::evaluate_trigger(&conditions, &event)?;
+
+        if matches {
+            matched_count += 1;
+            tracing::info!(
+                trigger_id = %trigger.id,
+                trigger_name = %trigger.name,
+                "Trigger matched"
+            );
+
+            // Fetch actions for this trigger and enqueue jobs
+            let actions = fetch_actions(&trigger.id, db_pool).await?;
+
+            for action in actions {
+                // Parse action_type string to ActionType enum
+                let action_type = ActionType::from_str(&action.action_type)
+                    .context("Failed to parse action_type")?;
+
+                let job = ActionJob::new(
+                    &trigger.id,
+                    &event.id,
+                    action_type,
+                    action.priority,
+                    action.config.clone(),
+                );
+
+                job_queue.enqueue(&job).await?;
+
+                tracing::debug!(
+                    job_id = %job.id,
+                    action_type = %job.action_type,
+                    "Enqueued action job"
+                );
+            }
+        } else {
+            tracing::debug!(
+                trigger_id = %trigger.id,
+                trigger_name = %trigger.name,
+                "Trigger did not match"
+            );
+        }
+    }
+
+    tracing::info!(
+        event_id = %event_id,
+        triggers_evaluated = trigger_count,
+        triggers_matched = matched_count,
+        "Event processing complete"
+    );
+
+    Ok(())
+}
+
+/// Fetch an event from the database
+async fn fetch_event(event_id: &str, db_pool: &DbPool) -> Result<Event> {
+    sqlx::query_as::<_, Event>(
         r#"
         SELECT
             id, chain_id, block_number, block_hash, transaction_hash, log_index,
@@ -106,20 +230,126 @@ async fn process_event(
         "#,
     )
     .bind(event_id)
-    .fetch_one(&db_pool)
+    .fetch_one(db_pool)
     .await
-    .context("Failed to fetch event from database")?;
+    .context("Failed to fetch event from database")
+}
 
-    tracing::info!(
-        "Processing event: {} (chain_id={}, registry={}, event_type={})",
-        event.id,
-        event.chain_id,
-        event.registry,
-        event.event_type
-    );
+/// Fetch enabled triggers matching chain_id and registry
+async fn fetch_triggers(chain_id: i32, registry: &str, db_pool: &DbPool) -> Result<Vec<Trigger>> {
+    sqlx::query_as::<_, Trigger>(
+        r#"
+        SELECT id, user_id, name, description, chain_id, registry, enabled, is_stateful, created_at, updated_at
+        FROM triggers
+        WHERE chain_id = $1 AND registry = $2 AND enabled = true
+        "#,
+    )
+    .bind(chain_id)
+    .bind(registry)
+    .fetch_all(db_pool)
+    .await
+    .context("Failed to fetch triggers from database")
+}
 
-    // TODO: Implement trigger matching logic
-    // TODO: Enqueue jobs to Redis for matched triggers
+/// Fetch conditions for a trigger
+async fn fetch_conditions(trigger_id: &str, db_pool: &DbPool) -> Result<Vec<TriggerCondition>> {
+    sqlx::query_as::<_, TriggerCondition>(
+        r#"
+        SELECT id, trigger_id, condition_type, field, operator, value, config, created_at
+        FROM trigger_conditions
+        WHERE trigger_id = $1
+        ORDER BY id
+        "#,
+    )
+    .bind(trigger_id)
+    .fetch_all(db_pool)
+    .await
+    .context("Failed to fetch trigger conditions from database")
+}
 
-    Ok(())
+/// Fetch actions for a trigger
+async fn fetch_actions(trigger_id: &str, db_pool: &DbPool) -> Result<Vec<TriggerAction>> {
+    sqlx::query_as::<_, TriggerAction>(
+        r#"
+        SELECT id, trigger_id, action_type, priority, config, created_at
+        FROM trigger_actions
+        WHERE trigger_id = $1
+        ORDER BY priority DESC, id
+        "#,
+    )
+    .bind(trigger_id)
+    .fetch_all(db_pool)
+    .await
+    .context("Failed to fetch trigger actions from database")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+
+    /// Mock job queue for testing
+    struct MockJobQueue {
+        jobs: Arc<Mutex<Vec<ActionJob>>>,
+    }
+
+    impl MockJobQueue {
+        fn new() -> Self {
+            Self {
+                jobs: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn get_jobs(&self) -> Vec<ActionJob> {
+            self.jobs.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl JobQueue for MockJobQueue {
+        async fn enqueue(&self, job: &ActionJob) -> Result<()> {
+            self.jobs.lock().unwrap().push(job.clone());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_event_notification_parsing() {
+        let json = r#"{
+            "event_id": "test-123",
+            "chain_id": 84532,
+            "block_number": 1000,
+            "event_type": "NewFeedback",
+            "registry": "reputation"
+        }"#;
+
+        let notif: EventNotification = serde_json::from_str(json).unwrap();
+
+        assert_eq!(notif.event_id, "test-123");
+        assert_eq!(notif.chain_id, 84532);
+        assert_eq!(notif.block_number, 1000);
+        assert_eq!(notif.event_type, "NewFeedback");
+        assert_eq!(notif.registry, "reputation");
+    }
+
+    #[tokio::test]
+    async fn test_mock_job_queue() {
+        let queue = MockJobQueue::new();
+
+        let job = ActionJob::new(
+            "trigger-1",
+            "event-1",
+            ActionType::Telegram,
+            1,
+            serde_json::json!({"chat_id": "123"}),
+        );
+
+        queue.enqueue(&job).await.unwrap();
+
+        let jobs = queue.get_jobs();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].trigger_id, "trigger-1");
+        assert_eq!(jobs[0].event_id, "event-1");
+    }
 }
