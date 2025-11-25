@@ -24,6 +24,28 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("")
                     .wrap(middleware::JwtAuth::new(jwt_secret))
+                    // Organization endpoints
+                    .service(
+                        web::scope("/organizations")
+                            .route("", web::post().to(handlers::create_organization))
+                            .route("", web::get().to(handlers::list_organizations))
+                            .route("/{id}", web::get().to(handlers::get_organization))
+                            .route("/{id}", web::put().to(handlers::update_organization))
+                            .route("/{id}", web::delete().to(handlers::delete_organization))
+                            // Ownership transfer endpoint
+                            .route("/{id}/transfer", web::post().to(handlers::transfer_ownership))
+                            // Member endpoints
+                            .route("/{id}/members", web::post().to(handlers::add_member))
+                            .route("/{id}/members", web::get().to(handlers::list_members))
+                            .route(
+                                "/{id}/members/{user_id}",
+                                web::put().to(handlers::update_member_role),
+                            )
+                            .route(
+                                "/{id}/members/{user_id}",
+                                web::delete().to(handlers::remove_member),
+                            ),
+                    )
                     // Trigger endpoints
                     .service(
                         web::scope("/triggers")

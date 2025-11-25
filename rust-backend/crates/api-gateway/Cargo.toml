@@ -51,5 +51,8 @@ chrono = { workspace = true }
 # UUID
 uuid = { workspace = true }
 
+# Regex for slug validation
+regex = { workspace = true }
+
 [dev-dependencies]
 mockall = { workspace = true }
