@@ -5,9 +5,9 @@ use shared::DbPool;
 use validator::Validate;
 
 use crate::{
-    middleware::get_user_id,
+    middleware::{get_user_id, get_verified_organization_id, get_verified_organization_id_with_role},
     models::{
-        ConditionResponse, CreateConditionRequest, ErrorResponse, SuccessResponse,
+        can_write, ConditionResponse, CreateConditionRequest, ErrorResponse, SuccessResponse,
         UpdateConditionRequest,
     },
     repositories::{ConditionRepository, TriggerRepository},
@@ -16,6 +16,7 @@ use crate::{
 /// Create a new condition for a trigger
 ///
 /// POST /api/v1/triggers/{trigger_id}/conditions
+/// Requires X-Organization-ID header
 pub async fn create_condition(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -35,6 +36,21 @@ pub async fn create_condition(
         }
     };
 
+    // Get and verify organization_id from header (also gets role)
+    let (organization_id, role) =
+        match get_verified_organization_id_with_role(&req_http, &pool, &user_id).await {
+            Ok(result) => result,
+            Err(response) => return response,
+        };
+
+    // Check user has write access
+    if !can_write(&role) {
+        return HttpResponse::Forbidden().json(ErrorResponse::new(
+            "forbidden",
+            "Insufficient permissions to create conditions",
+        ));
+    }
+
     // Validate request
     if let Err(e) = req.validate() {
         return HttpResponse::BadRequest().json(ErrorResponse::new(
@@ -43,17 +59,20 @@ pub async fn create_condition(
         ));
     }
 
-    // Check if trigger belongs to user
-    let belongs = match TriggerRepository::belongs_to_user(&pool, &trigger_id, &user_id).await {
-        Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to create condition",
-            ));
-        }
-    };
+    // Check if trigger belongs to the organization
+    let belongs =
+        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
+            .await
+        {
+            Ok(belongs) => belongs,
+            Err(e) => {
+                tracing::error!("Failed to check trigger organization: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to create condition",
+                ));
+            }
+        };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -88,6 +107,7 @@ pub async fn create_condition(
 /// List conditions for a trigger
 ///
 /// GET /api/v1/triggers/{trigger_id}/conditions
+/// Requires X-Organization-ID header
 pub async fn list_conditions(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -106,17 +126,26 @@ pub async fn list_conditions(
         }
     };
 
-    // Check if trigger belongs to user
-    let belongs = match TriggerRepository::belongs_to_user(&pool, &trigger_id, &user_id).await {
-        Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch conditions",
-            ));
-        }
+    // Get and verify organization_id from header (any role can view)
+    let organization_id = match get_verified_organization_id(&req_http, &pool, &user_id).await {
+        Ok(id) => id,
+        Err(response) => return response,
     };
+
+    // Check if trigger belongs to the organization
+    let belongs =
+        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
+            .await
+        {
+            Ok(belongs) => belongs,
+            Err(e) => {
+                tracing::error!("Failed to check trigger organization: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to fetch conditions",
+                ));
+            }
+        };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -145,6 +174,7 @@ pub async fn list_conditions(
 /// Update a condition
 ///
 /// PUT /api/v1/triggers/{trigger_id}/conditions/{id}
+/// Requires X-Organization-ID header
 pub async fn update_condition(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -164,6 +194,21 @@ pub async fn update_condition(
         }
     };
 
+    // Get and verify organization_id from header (also gets role)
+    let (organization_id, role) =
+        match get_verified_organization_id_with_role(&req_http, &pool, &user_id).await {
+            Ok(result) => result,
+            Err(response) => return response,
+        };
+
+    // Check user has write access
+    if !can_write(&role) {
+        return HttpResponse::Forbidden().json(ErrorResponse::new(
+            "forbidden",
+            "Insufficient permissions to update conditions",
+        ));
+    }
+
     // Validate request
     if let Err(e) = req.validate() {
         return HttpResponse::BadRequest().json(ErrorResponse::new(
@@ -172,17 +217,20 @@ pub async fn update_condition(
         ));
     }
 
-    // Check if trigger belongs to user
-    let belongs = match TriggerRepository::belongs_to_user(&pool, &trigger_id, &user_id).await {
-        Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update condition",
-            ));
-        }
-    };
+    // Check if trigger belongs to the organization
+    let belongs =
+        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
+            .await
+        {
+            Ok(belongs) => belongs,
+            Err(e) => {
+                tracing::error!("Failed to check trigger organization: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to update condition",
+                ));
+            }
+        };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -239,6 +287,7 @@ pub async fn update_condition(
 /// Delete a condition
 ///
 /// DELETE /api/v1/triggers/{trigger_id}/conditions/{id}
+/// Requires X-Organization-ID header
 pub async fn delete_condition(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -257,17 +306,35 @@ pub async fn delete_condition(
         }
     };
 
-    // Check if trigger belongs to user
-    let belongs = match TriggerRepository::belongs_to_user(&pool, &trigger_id, &user_id).await {
-        Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger ownership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete condition",
-            ));
-        }
-    };
+    // Get and verify organization_id from header (also gets role)
+    let (organization_id, role) =
+        match get_verified_organization_id_with_role(&req_http, &pool, &user_id).await {
+            Ok(result) => result,
+            Err(response) => return response,
+        };
+
+    // Check user has write access
+    if !can_write(&role) {
+        return HttpResponse::Forbidden().json(ErrorResponse::new(
+            "forbidden",
+            "Insufficient permissions to delete conditions",
+        ));
+    }
+
+    // Check if trigger belongs to the organization
+    let belongs =
+        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
+            .await
+        {
+            Ok(belongs) => belongs,
+            Err(e) => {
+                tracing::error!("Failed to check trigger organization: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to delete condition",
+                ));
+            }
+        };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));

@@ -10,8 +10,8 @@ use shared::{Config, DbPool};
 use validator::Validate;
 
 use crate::{
-    models::{AuthResponse, Claims, ErrorResponse, LoginRequest, RegisterRequest, UserResponse},
-    repositories::UserRepository,
+    models::{AuthResponse, Claims, ErrorResponse, LoginRequest, RegisterRequest, UserResponse, ROLE_OWNER},
+    repositories::{MemberRepository, OrganizationRepository, UserRepository},
 };
 
 /// Register a new user
@@ -80,18 +80,105 @@ pub async fn register(
         }
     };
 
-    // Create user
-    let user = match UserRepository::create(&pool, &req.username, &req.email, &password_hash).await
+    // Start a transaction for atomic user+organization+member creation
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to process registration",
+            ));
+        }
+    };
+
+    // Create user within transaction
+    let user = match UserRepository::create_with_executor(&mut *tx, &req.username, &req.email, &password_hash).await
     {
         Ok(user) => user,
         Err(e) => {
             tracing::error!("Failed to create user: {}", e);
+            // Transaction will be rolled back automatically when dropped
             return HttpResponse::InternalServerError().json(ErrorResponse::new(
                 "internal_error",
                 "Failed to create user",
             ));
         }
     };
+
+    // Create personal organization for the user within transaction
+    // Try the base slug first, then add numeric suffix if collision occurs
+    let base_slug = generate_personal_slug(&req.username);
+    let mut slug_attempt = 0;
+    let personal_org = loop {
+        let slug = if slug_attempt == 0 {
+            base_slug.clone()
+        } else {
+            format!("{}-{}", base_slug, slug_attempt)
+        };
+
+        match OrganizationRepository::create_with_executor(
+            &mut *tx,
+            &format!("{}'s Personal", req.username),
+            &slug,
+            None,
+            &user.id,
+            true, // is_personal
+        )
+        .await
+        {
+            Ok(org) => {
+                // Log if we had to retry due to slug collision
+                if slug_attempt > 0 {
+                    tracing::warn!(
+                        "Personal organization slug collision resolved for user {}, used slug: {}",
+                        req.username,
+                        org.slug
+                    );
+                }
+                break org;
+            }
+            Err(e) => {
+                let error_string = e.to_string();
+                // Check if it's a slug collision (unique constraint violation)
+                if (error_string.contains("duplicate key")
+                    || error_string.contains("unique constraint")
+                    || error_string.contains("organizations_slug_key"))
+                    && slug_attempt < 3
+                {
+                    slug_attempt += 1;
+                    continue;
+                }
+                // Not a slug collision or too many retries
+                tracing::error!("Failed to create personal organization: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to complete registration",
+                ));
+            }
+        }
+    };
+
+    // Add user as owner of personal organization within transaction
+    if let Err(e) =
+        MemberRepository::add_with_executor(&mut *tx, &personal_org.id, &user.id, ROLE_OWNER, None).await
+    {
+        tracing::error!("Failed to add user as org owner: {}", e);
+        // Transaction will be rolled back automatically when dropped
+        return HttpResponse::InternalServerError().json(ErrorResponse::new(
+            "internal_error",
+            "Failed to complete registration",
+        ));
+    }
+
+    // Commit the transaction
+    if let Err(e) = tx.commit().await {
+        tracing::error!("Failed to commit transaction: {}", e);
+        return HttpResponse::InternalServerError().json(ErrorResponse::new(
+            "internal_error",
+            "Failed to complete registration",
+        ));
+    }
 
     // Generate JWT token
     let claims = Claims::new(user.id.clone(), user.username.clone(), 1); // 1 hour
@@ -217,4 +304,39 @@ pub async fn login(
     };
 
     HttpResponse::Ok().json(response)
+}
+
+/// Generate a slug for a personal organization from a username
+fn generate_personal_slug(username: &str) -> String {
+    // Convert to lowercase and replace non-alphanumeric characters with hyphens
+    let slug: String = username
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+
+    // Remove consecutive hyphens and trim hyphens from ends
+    let mut result = String::new();
+    let mut prev_was_hyphen = false;
+
+    for c in slug.chars() {
+        if c == '-' {
+            if !prev_was_hyphen && !result.is_empty() {
+                result.push(c);
+                prev_was_hyphen = true;
+            }
+        } else {
+            result.push(c);
+            prev_was_hyphen = false;
+        }
+    }
+
+    // Trim trailing hyphen and add "-personal" suffix
+    let trimmed = result.trim_end_matches('-');
+    format!("{}-personal", trimmed)
 }

@@ -71,6 +71,9 @@ impl ActionRepository {
     }
 
     /// Update action
+    ///
+    /// Uses a safe COALESCE pattern instead of dynamic SQL.
+    /// `None` = keep existing value, `Some(value)` = update to new value.
     pub async fn update(
         pool: &DbPool,
         action_id: i32,
@@ -78,41 +81,24 @@ impl ActionRepository {
         priority: Option<i32>,
         config: Option<&serde_json::Value>,
     ) -> Result<TriggerAction> {
-        // Build dynamic update query
-        let mut query = String::from("UPDATE trigger_actions SET id = id");
-        let mut param_count = 1;
-
-        if action_type.is_some() {
-            query.push_str(&format!(", action_type = ${}", param_count));
-            param_count += 1;
-        }
-        if priority.is_some() {
-            query.push_str(&format!(", priority = ${}", param_count));
-            param_count += 1;
-        }
-        if config.is_some() {
-            query.push_str(&format!(", config = ${}", param_count));
-            param_count += 1;
-        }
-
-        query.push_str(&format!(" WHERE id = ${} RETURNING *", param_count));
-
-        // Execute query with bindings
-        let mut q = sqlx::query_as::<_, TriggerAction>(&query);
-
-        if let Some(v) = action_type {
-            q = q.bind(v);
-        }
-        if let Some(v) = priority {
-            q = q.bind(v);
-        }
-        if let Some(v) = config {
-            q = q.bind(v);
-        }
-
-        q = q.bind(action_id);
-
-        let action = q.fetch_one(pool).await.context("Failed to update action")?;
+        // Use a static query with COALESCE for safe updates
+        let action = sqlx::query_as::<_, TriggerAction>(
+            r#"
+            UPDATE trigger_actions SET
+                action_type = COALESCE($1, action_type),
+                priority = COALESCE($2, priority),
+                config = COALESCE($3, config)
+            WHERE id = $4
+            RETURNING *
+            "#,
+        )
+        .bind(action_type)
+        .bind(priority)
+        .bind(config)
+        .bind(action_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to update action")?;
 
         Ok(action)
     }

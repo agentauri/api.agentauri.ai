@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use shared::models::User;
 use shared::DbPool;
+use sqlx::{Executor, Postgres};
 use uuid::Uuid;
 
 pub struct UserRepository;
@@ -15,6 +16,19 @@ impl UserRepository {
         email: &str,
         password_hash: &str,
     ) -> Result<User> {
+        Self::create_with_executor(pool, username, email, password_hash).await
+    }
+
+    /// Create a new user with a generic executor (supports transactions)
+    pub async fn create_with_executor<'e, E>(
+        executor: E,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<User>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
         let user_id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now();
 
@@ -31,7 +45,7 @@ impl UserRepository {
         .bind(password_hash)
         .bind(now)
         .bind(now)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
         .context("Failed to create user")?;
 

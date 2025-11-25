@@ -75,6 +75,10 @@ impl ConditionRepository {
     }
 
     /// Update condition
+    ///
+    /// Uses a safe COALESCE/CASE pattern instead of dynamic SQL.
+    /// - Simple fields: `None` = keep existing, `Some(value)` = update
+    /// - `config`: `None` = keep existing, `Some(None)` = set to NULL, `Some(Some(value))` = update
     pub async fn update(
         pool: &DbPool,
         condition_id: i32,
@@ -84,58 +88,30 @@ impl ConditionRepository {
         value: Option<&str>,
         config: Option<Option<&serde_json::Value>>,
     ) -> Result<TriggerCondition> {
-        // Build dynamic update query
-        let mut query = String::from("UPDATE trigger_conditions SET id = id");
-        let mut param_count = 1;
-
-        if condition_type.is_some() {
-            query.push_str(&format!(", condition_type = ${}", param_count));
-            param_count += 1;
-        }
-        if field.is_some() {
-            query.push_str(&format!(", field = ${}", param_count));
-            param_count += 1;
-        }
-        if operator.is_some() {
-            query.push_str(&format!(", operator = ${}", param_count));
-            param_count += 1;
-        }
-        if value.is_some() {
-            query.push_str(&format!(", value = ${}", param_count));
-            param_count += 1;
-        }
-        if config.is_some() {
-            query.push_str(&format!(", config = ${}", param_count));
-            param_count += 1;
-        }
-
-        query.push_str(&format!(" WHERE id = ${} RETURNING *", param_count));
-
-        // Execute query with bindings
-        let mut q = sqlx::query_as::<_, TriggerCondition>(&query);
-
-        if let Some(v) = condition_type {
-            q = q.bind(v);
-        }
-        if let Some(v) = field {
-            q = q.bind(v);
-        }
-        if let Some(v) = operator {
-            q = q.bind(v);
-        }
-        if let Some(v) = value {
-            q = q.bind(v);
-        }
-        if let Some(v) = config {
-            q = q.bind(v);
-        }
-
-        q = q.bind(condition_id);
-
-        let condition = q
-            .fetch_one(pool)
-            .await
-            .context("Failed to update condition")?;
+        // Use a static query with COALESCE/CASE for safe updates
+        // $1-$4 = simple fields, $5 = should_update_config flag, $6 = config value, $7 = condition_id
+        let condition = sqlx::query_as::<_, TriggerCondition>(
+            r#"
+            UPDATE trigger_conditions SET
+                condition_type = COALESCE($1, condition_type),
+                field = COALESCE($2, field),
+                operator = COALESCE($3, operator),
+                value = COALESCE($4, value),
+                config = CASE WHEN $5 THEN $6 ELSE config END
+            WHERE id = $7
+            RETURNING *
+            "#,
+        )
+        .bind(condition_type)
+        .bind(field)
+        .bind(operator)
+        .bind(value)
+        .bind(config.is_some())
+        .bind(config.flatten())
+        .bind(condition_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to update condition")?;
 
         Ok(condition)
     }
