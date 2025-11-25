@@ -6,16 +6,19 @@
 //! - Error handling types
 //! - Configuration management
 //! - Logging infrastructure
+//! - Job definitions for event processor and action workers
 
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod jobs;
 pub mod models;
 
 // Re-export commonly used types
 pub use config::Config;
 pub use db::DbPool;
 pub use error::{Error, Result};
+pub use jobs::{ActionJob, ActionType, ACTION_JOBS_DLQ, ACTION_JOBS_QUEUE};
 
 /// Initialize tracing subscriber for structured logging
 pub fn init_tracing() {

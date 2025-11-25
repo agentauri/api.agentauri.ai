@@ -19,11 +19,37 @@ pub struct User {
     pub is_active: bool,
 }
 
+/// Organization for multi-tenant account model
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Organization {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub owner_id: String,
+    pub plan: String,
+    pub is_personal: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Organization member with role-based access
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct OrganizationMember {
+    pub id: String,
+    pub organization_id: String,
+    pub user_id: String,
+    pub role: String,
+    pub invited_by: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 /// Trigger configuration
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Trigger {
     pub id: String,
     pub user_id: String,
+    pub organization_id: String,
     pub name: String,
     pub description: Option<String>,
     pub chain_id: i32,
