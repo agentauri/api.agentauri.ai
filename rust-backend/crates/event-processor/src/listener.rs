@@ -238,7 +238,7 @@ async fn fetch_event(event_id: &str, db_pool: &DbPool) -> Result<Event> {
 async fn fetch_triggers(chain_id: i32, registry: &str, db_pool: &DbPool) -> Result<Vec<Trigger>> {
     sqlx::query_as::<_, Trigger>(
         r#"
-        SELECT id, user_id, name, description, chain_id, registry, enabled, is_stateful, created_at, updated_at
+        SELECT id, user_id, organization_id, name, description, chain_id, registry, enabled, is_stateful, created_at, updated_at
         FROM triggers
         WHERE chain_id = $1 AND registry = $2 AND enabled = true
         "#,
