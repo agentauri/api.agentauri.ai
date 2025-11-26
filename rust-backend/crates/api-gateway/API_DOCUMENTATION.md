@@ -10,12 +10,31 @@ The API Gateway provides a RESTful API for managing triggers, conditions, and ac
 
 ### Authentication
 
-The API uses JWT (JSON Web Tokens) for authentication. All endpoints except `/auth/register` and `/auth/login` require a valid JWT token in the Authorization header.
+The API implements a **3-layer authentication system**:
+
+| Layer | Method | Use Case | Rate Limits |
+|-------|--------|----------|-------------|
+| **Layer 0** | Anonymous | Public data, x402 payments | 10 calls/hour per IP |
+| **Layer 1** | API Key | Account-based access | Per-plan (100-2000/hr) |
+| **Layer 2** | JWT + Wallet Signature | Full user/agent access | Per-account limits |
+
+#### JWT Authentication (Layer 2)
+
+Most endpoints require a valid JWT token in the Authorization header:
 
 **Token Configuration**:
 - Algorithm: HS256 (explicitly configured)
 - Lifetime: 1 hour
 - Format: `Authorization: Bearer <token>`
+
+#### API Key Authentication (Layer 1)
+
+For programmatic access, use API keys:
+- Format: `sk_live_xxx` (production) or `sk_test_xxx` (testing)
+- Header: `X-API-Key: sk_live_xxxxxxxxxxxxx`
+- Created via `/api/v1/api-keys` endpoint
+
+See [Authentication Documentation](../../../docs/auth/AUTHENTICATION.md) for complete details.
 
 **Security Features**:
 - Argon2 password hashing (memory-hard, side-channel resistant)
@@ -25,10 +44,10 @@ The API uses JWT (JSON Web Tokens) for authentication. All endpoints except `/au
 - Input validation on all endpoints
 - JSON payload size limit: 1MB
 
-**Rate Limiting** (Infrastructure Level):
-- Authentication endpoints: 3 requests/minute per IP
-- General API endpoints: 10 requests/second per IP
-- Configured via nginx reverse proxy
+**Rate Limiting**:
+- Layer 0: 10 requests/hour per IP
+- Layer 1: Per-plan limits (Starter: 100/hr, Pro: 500/hr, Enterprise: 2000/hr)
+- Layer 2: Per-account limits based on subscription
 
 ### Common Security Errors
 
@@ -146,7 +165,7 @@ Currently, JWT tokens expire after 1 hour. Users must login again to get a new t
 
 #### Create Trigger
 
-Create a new trigger for the authenticated user.
+Create a new trigger within an organization. Triggers are organization-scoped resources.
 
 **Endpoint**: `POST /api/v1/triggers`
 
@@ -157,6 +176,7 @@ Create a new trigger for the authenticated user.
 {
   "name": "High Value Identity Mints",
   "description": "Alert when identity NFTs are minted",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440002",
   "chain_id": 1,
   "registry": "identity",
   "enabled": true,
@@ -167,6 +187,7 @@ Create a new trigger for the authenticated user.
 **Validation**:
 - `name`: 1-255 characters (required)
 - `description`: Max 1000 characters (optional)
+- `organization_id`: Valid organization UUID (required, user must be member)
 - `chain_id`: Integer (required)
 - `registry`: Must be one of: `identity`, `reputation`, `validation` (required)
 - `enabled`: Boolean (default: true)
@@ -178,6 +199,7 @@ Create a new trigger for the authenticated user.
   "data": {
     "id": "550e8400-e29b-41d4-a716-446655440001",
     "user_id": "550e8400-e29b-41d4-a716-446655440000",
+    "organization_id": "550e8400-e29b-41d4-a716-446655440002",
     "name": "High Value Identity Mints",
     "description": "Alert when identity NFTs are minted",
     "chain_id": 1,

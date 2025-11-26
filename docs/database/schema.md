@@ -66,12 +66,13 @@ CREATE TRIGGER update_users_updated_at
 
 ### triggers
 
-Stores user-defined trigger configurations.
+Stores user-defined trigger configurations. Triggers belong to organizations (multi-tenant model).
 
 ```sql
 CREATE TABLE triggers (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    user_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,              -- Creator of the trigger
+    organization_id TEXT NOT NULL,      -- Organization that owns the trigger
     name TEXT NOT NULL,
     description TEXT,
     chain_id INTEGER NOT NULL,
@@ -80,13 +81,15 @@ CREATE TABLE triggers (
     is_stateful BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 -- Indexes for common queries
 CREATE INDEX idx_triggers_user_id ON triggers(user_id);
-CREATE INDEX idx_triggers_chain_registry_enabled
-    ON triggers(chain_id, registry, enabled)
+CREATE INDEX idx_triggers_organization_id ON triggers(organization_id);
+CREATE INDEX idx_triggers_org_chain_registry_enabled
+    ON triggers(organization_id, chain_id, registry, enabled)
     WHERE enabled = true;
 
 CREATE TRIGGER update_triggers_updated_at
@@ -304,17 +307,22 @@ Multi-tenant account model for billing and access control.
 
 ```sql
 CREATE TABLE organizations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
-    owner_id TEXT NOT NULL REFERENCES users(id),
+    owner_id TEXT NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'starter', 'pro', 'enterprise')),
+    is_personal BOOLEAN NOT NULL DEFAULT false,
     stripe_customer_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    -- ON DELETE RESTRICT: Cannot delete user while they own an organization
+    CONSTRAINT fk_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_organizations_owner ON organizations(owner_id);
 CREATE INDEX idx_organizations_slug ON organizations(slug);
+CREATE INDEX idx_organizations_plan ON organizations(plan);
 CREATE INDEX idx_organizations_stripe ON organizations(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
 
 CREATE TRIGGER update_organizations_updated_at

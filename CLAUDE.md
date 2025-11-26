@@ -47,15 +47,27 @@ POST   /api/v1/agents/link            # Link agent to organization
 GET    /api/v1/agents/linked          # List linked agents
 DELETE /api/v1/agents/:agent_id/link  # Unlink agent
 
-# Triggers (PUSH Layer)
-GET    /api/v1/triggers               # List user triggers (paginated)
+# Triggers (PUSH Layer) - Organization-scoped
+GET    /api/v1/triggers               # List organization triggers (paginated)
 POST   /api/v1/triggers               # Create new trigger
 GET    /api/v1/triggers/{id}          # Get trigger details
 PUT    /api/v1/triggers/{id}          # Update trigger
 DELETE /api/v1/triggers/{id}          # Delete trigger
 
-# Organizations & Billing (Pull Layer - Phase 3.5)
+# Organizations (Phase 3.5)
 POST   /api/v1/organizations          # Create organization
+GET    /api/v1/organizations          # List user's organizations
+GET    /api/v1/organizations/:id      # Get organization details
+PUT    /api/v1/organizations/:id      # Update organization
+DELETE /api/v1/organizations/:id      # Delete organization
+
+# Organization Members
+GET    /api/v1/organizations/:id/members      # List members
+POST   /api/v1/organizations/:id/members      # Add member
+PUT    /api/v1/organizations/:id/members/:uid # Update member role
+DELETE /api/v1/organizations/:id/members/:uid # Remove member
+
+# Billing (Pull Layer - Phase 3.5, planned)
 GET    /api/v1/billing/credits        # Get credit balance
 POST   /api/v1/billing/credits/purchase  # Purchase credits (Stripe)
 
@@ -283,10 +295,12 @@ onValidationResponse(validatorAddress, agentId, requestHash, response, responseU
 
 #### 4. Trigger Store (PostgreSQL)
 
-**Responsibility**: Persistent storage of user-defined trigger configurations.
+**Responsibility**: Persistent storage of user-defined trigger configurations with multi-tenant organization support.
 
 **Key Tables**:
-- `triggers` - Trigger definitions (user_id, name, chain_id, registry, enabled, is_stateful)
+- `organizations` - Multi-tenant organizations (name, slug, owner_id, plan, is_personal)
+- `organization_members` - User membership in organizations (role: admin, member, viewer)
+- `triggers` - Trigger definitions (organization_id, user_id, name, chain_id, registry, enabled, is_stateful)
 - `trigger_conditions` - Matching conditions (condition_type, field, operator, value, config JSONB)
 - `trigger_actions` - Actions to execute (action_type, priority, config JSONB)
 - `trigger_state` - State for stateful triggers (state_data JSONB)
@@ -294,9 +308,14 @@ onValidationResponse(validatorAddress, agentId, requestHash, response, responseU
 See `database/migrations/` for complete schema definitions.
 
 **Key Indexes**:
-- `idx_triggers_user_id` - User trigger lookups
-- `idx_triggers_chain_registry_enabled` - Fast trigger matching (partial index on enabled=true)
+- `idx_triggers_organization_id` - Organization trigger lookups
+- `idx_triggers_org_chain_registry_enabled` - Fast trigger matching (partial index on enabled=true)
+- `idx_org_members_org`, `idx_org_members_user` - Organization membership lookups
 - Foreign key indexes for joins
+
+**Foreign Key Constraints**:
+- `organizations.owner_id` → `users.id` (ON DELETE RESTRICT)
+- `triggers.organization_id` → `organizations.id` (ON DELETE CASCADE)
 
 #### 5. Event Store (PostgreSQL + TimescaleDB)
 
@@ -728,25 +747,31 @@ ponder.on("ReputationRegistry:NewFeedback", async ({ event, context }) => {
 - Include descriptive comments in migration files
 - Test migrations on local database before committing
 
-**Example Migration**:
+**Example Migration** (multi-tenant pattern):
 ```sql
--- migrations/20250123_create_triggers_table.up.sql
-CREATE TABLE triggers (
+-- migrations/20250125_create_organizations_table.up.sql
+CREATE TABLE organizations (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    user_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    chain_id INTEGER NOT NULL,
-    registry TEXT NOT NULL CHECK (registry IN ('identity', 'reputation', 'validation')),
-    enabled BOOLEAN DEFAULT true,
+    slug TEXT UNIQUE NOT NULL,
+    owner_id TEXT NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'free',
+    is_personal BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_triggers_user_id ON triggers(user_id);
-CREATE INDEX idx_triggers_chain_registry_enabled ON triggers(chain_id, registry, enabled) WHERE enabled = true;
+CREATE INDEX idx_organizations_owner ON organizations(owner_id);
+CREATE INDEX idx_organizations_slug ON organizations(slug);
 
--- migrations/20250123_create_triggers_table.down.sql
-DROP TABLE IF EXISTS triggers;
+-- migrations/20250125_add_organization_to_triggers.up.sql
+ALTER TABLE triggers ADD COLUMN organization_id TEXT NOT NULL;
+ALTER TABLE triggers ADD CONSTRAINT fk_organization
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+
+CREATE INDEX idx_triggers_organization_id ON triggers(organization_id);
+CREATE INDEX idx_triggers_org_chain_registry_enabled
+    ON triggers(organization_id, chain_id, registry, enabled) WHERE enabled = true;
 ```
 
 #### Indexing & Partitioning Patterns

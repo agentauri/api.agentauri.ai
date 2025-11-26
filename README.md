@@ -62,13 +62,13 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
    # All services should show "Up" and "healthy" status
    ```
 
-5. **Run database tests** (optional, to verify setup):
+5. **Run tests** (optional, to verify setup):
    ```bash
    ./scripts/run-tests.sh
-   # Should show: All 108 tests passing
+   # Should show: All 7 test suites passing (206+ tests)
    ```
 
-**Note**: Phase 2 is substantially complete. Rust services have basic functionality, Ponder indexers are fully implemented. See roadmap for details.
+**Note**: Phase 3 is complete. Phase 3.5 (Organizations & Payments) is in progress. See roadmap for details.
 
 ### 6. Run Rust Services (optional)
 
@@ -155,7 +155,7 @@ cd ponder-indexers
 pnpm test
 ```
 
-**Current Status**: ✅ 108 database tests passing (100% coverage)
+**Current Status**: ✅ 206+ tests passing (108 database, 98+ Rust across all crates)
 
 ### Local Testing
 
@@ -255,6 +255,7 @@ Content-Type: application/json
 
 {
   "name": "Low Score Alert",
+  "organization_id": "org_xxxxx",
   "chain_id": 84532,
   "registry": "reputation",
   "conditions": [
@@ -351,22 +352,22 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 
 **Total Timeline**: 24 weeks (Phases 1-7)
 
-### Phase 1-2: Foundation & Event Ingestion (Weeks 1-7) - COMPLETED
+### Phase 1-2: Foundation & Event Ingestion (Weeks 1-7) - ✅ COMPLETE
 - ✅ Documentation and project structure (CLAUDE.md, README.md, docs/)
 - ✅ Database schema and migrations (PostgreSQL + TimescaleDB)
 - ✅ Comprehensive test suite (108 database tests, 100% coverage)
 - ✅ Ponder indexers (24 event handlers across 4 networks)
-- ✅ API Gateway CRUD endpoints (15 endpoints, JWT auth - 100% complete)
+- ✅ API Gateway CRUD endpoints (15 endpoints, JWT auth)
 
-### Phase 3: Core Backend (Weeks 8-10)
-- ⏳ Event Processor with trigger matching
-- ⏳ Telegram Worker
-- ⏳ Integration Testing
+### Phase 3: Core Backend (Weeks 8-10) - ✅ COMPLETE
+- ✅ Event Processor with trigger matching
+- ✅ Telegram Worker with security hardening
+- ✅ Integration Testing (206 total tests across workspace)
 
-### Phase 3.5: Payment Foundation (Weeks 11-12) - NEW
-- ⏳ Organizations & multi-tenant account model
-- ⏳ Credits system & Stripe integration
-- ⏳ Role-based access (admin, member, viewer)
+### Phase 3.5: Payment Foundation (Weeks 11-12) - 🔄 IN PROGRESS
+- ✅ Organizations & multi-tenant account model (database + API)
+- 🔄 Credits system & Stripe integration
+- ✅ Role-based access (admin, member, viewer)
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 13-15)
 - ⏳ Stateful triggers (EMA, counters, rate limiting)
