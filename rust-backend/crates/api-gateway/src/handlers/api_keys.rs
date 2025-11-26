@@ -31,10 +31,12 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::Utc;
 use shared::DbPool;
-use validator::Validate;
 
 use crate::{
-    middleware::get_user_id,
+    handlers::helpers::{
+        bad_request, extract_request_context, extract_user_id_or_unauthorized, forbidden,
+        handle_db_error, handle_error, require_found, validate_request,
+    },
     models::{
         can_manage_org, ApiKeyListResponse, ApiKeyResponse, CreateApiKeyRequest,
         CreateApiKeyResponse, ErrorResponse, PaginationParams, RevokeApiKeyRequest,
@@ -60,22 +62,14 @@ pub async fn create_api_key(
     req: web::Json<CreateApiKeyRequest>,
 ) -> impl Responder {
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Get organization_id from query param or request body
@@ -97,40 +91,31 @@ pub async fn create_api_key(
     };
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to create API key",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Check if user can manage org (owner or admin)
     if !can_manage_org(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to create API keys",
-        ));
+        return forbidden("Insufficient permissions to create API keys");
     }
 
     // Generate the API key
     let api_key_service = ApiKeyService::new();
-    let generated = match api_key_service.generate_key(&req.environment) {
+    let generated = match handle_error(
+        api_key_service.generate_key(&req.environment),
+        "generate API key",
+    ) {
         Ok(g) => g,
-        Err(e) => {
-            tracing::error!("Failed to generate API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to create API key",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Store the key in database
@@ -170,24 +155,15 @@ pub async fn create_api_key(
     };
 
     // Log the creation event
-    let ip_address = req_http
-        .connection_info()
-        .realip_remote_addr()
-        .map(|s| s.to_string());
-    let user_agent = req_http
-        .headers()
-        .get("User-Agent")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-
+    let ctx = extract_request_context(&req_http);
     if let Err(e) = ApiKeyAuditRepository::log(
         &pool,
         Some(&key.id),
         &org_id,
         "created",
-        ip_address.as_deref(),
-        user_agent.as_deref(),
-        Some("/api/v1/api-keys"),
+        ctx.ip_str(),
+        ctx.user_agent_str(),
+        Some(ctx.endpoint_str()),
         Some(&user_id),
         Some(serde_json::json!({
             "name": req.name,
@@ -226,14 +202,9 @@ pub async fn list_api_keys(
     query: web::Query<ApiKeyListQuery>,
 ) -> impl Responder {
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate pagination
@@ -249,19 +220,16 @@ pub async fn list_api_keys(
     }
 
     // Check membership
-    let role = match MemberRepository::get_role(&pool, &query.organization_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &query.organization_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to list API keys",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // All members can view keys (masked)
@@ -269,41 +237,29 @@ pub async fn list_api_keys(
 
     // Get total count
     let include_revoked = query.include_revoked.unwrap_or(false);
-    let total = match ApiKeyRepository::count_by_organization(
-        &pool,
-        &query.organization_id,
-        include_revoked,
-    )
-    .await
-    {
+    let total = match handle_db_error(
+        ApiKeyRepository::count_by_organization(&pool, &query.organization_id, include_revoked)
+            .await,
+        "count API keys",
+    ) {
         Ok(count) => count,
-        Err(e) => {
-            tracing::error!("Failed to count API keys: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to list API keys",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get keys
-    let keys = match ApiKeyRepository::list_by_organization(
-        &pool,
-        &query.organization_id,
-        include_revoked,
-        pagination.limit,
-        pagination.offset,
-    )
-    .await
-    {
+    let keys = match handle_db_error(
+        ApiKeyRepository::list_by_organization(
+            &pool,
+            &query.organization_id,
+            include_revoked,
+            pagination.limit,
+            pagination.offset,
+        )
+        .await,
+        "list API keys",
+    ) {
         Ok(k) => k,
-        Err(e) => {
-            tracing::error!("Failed to list API keys: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to list API keys",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Convert to response (masked - no key_hash exposed)
@@ -331,46 +287,29 @@ pub async fn get_api_key(
     let key_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get the key first to determine org_id
-    let key = match ApiKeyRepository::find_by_id(&pool, &key_id).await {
+    let key = match handle_db_error(
+        ApiKeyRepository::find_by_id(&pool, &key_id).await,
+        "fetch API key",
+    ) {
         Ok(Some(k)) => k,
-        Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "API key not found"))
-        }
-        Err(e) => {
-            tracing::error!("Failed to fetch API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch API key",
-            ));
-        }
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
     };
 
     // Check membership
-    match MemberRepository::get_role(&pool, &key.organization_id, &user_id).await {
+    match handle_db_error(
+        MemberRepository::get_role(&pool, &key.organization_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(_)) => {} // Any member can view
-        Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "API key not found"))
-        }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch API key",
-            ));
-        }
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
     }
 
     let response = ApiKeyResponse::from(key);
@@ -389,72 +328,46 @@ pub async fn revoke_api_key(
     let key_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get the key first to determine org_id
-    let key = match ApiKeyRepository::find_by_id(&pool, &key_id).await {
+    let key = match handle_db_error(
+        ApiKeyRepository::find_by_id(&pool, &key_id).await,
+        "fetch API key",
+    ) {
         Ok(Some(k)) => k,
-        Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "API key not found"))
-        }
-        Err(e) => {
-            tracing::error!("Failed to fetch API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to revoke API key",
-            ));
-        }
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
     };
 
     // Check if already revoked
     if key.revoked_at.is_some() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "API key is already revoked",
-        ));
+        return bad_request("API key is already revoked");
     }
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &key.organization_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &key.organization_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
-        Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "API key not found"))
-        }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to revoke API key",
-            ));
-        }
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
     };
 
     // Check if user can manage org (owner or admin)
     if !can_manage_org(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to revoke API keys",
-        ));
+        return forbidden("Insufficient permissions to revoke API keys");
     }
 
     // Validate reason if provided
     let reason = match &req {
         Some(r) => {
-            if let Err(e) = r.validate() {
-                return HttpResponse::BadRequest().json(ErrorResponse::new(
-                    "validation_error",
-                    format!("Validation failed: {}", e),
-                ));
+            if let Err(resp) = validate_request(&**r) {
+                return resp;
             }
             r.reason.as_deref()
         }
@@ -462,31 +375,24 @@ pub async fn revoke_api_key(
     };
 
     // Revoke the key
-    let revoked_key = match ApiKeyRepository::revoke(&pool, &key_id, &user_id, reason).await {
+    let revoked_key = match handle_db_error(
+        ApiKeyRepository::revoke(&pool, &key_id, &user_id, reason).await,
+        "revoke API key",
+    ) {
         Ok(k) => k,
-        Err(e) => {
-            tracing::error!("Failed to revoke API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to revoke API key",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Log the revocation event
-    let ip_address = req_http
-        .connection_info()
-        .realip_remote_addr()
-        .map(|s| s.to_string());
-
+    let ctx = extract_request_context(&req_http);
     if let Err(e) = ApiKeyAuditRepository::log(
         &pool,
         Some(&key_id),
         &key.organization_id,
         "revoked",
-        ip_address.as_deref(),
-        None,
-        Some("/api/v1/api-keys/{id}"),
+        ctx.ip_str(),
+        ctx.user_agent_str(),
+        Some(ctx.endpoint_str()),
         Some(&user_id),
         Some(serde_json::json!({
             "reason": reason,
@@ -513,85 +419,56 @@ pub async fn rotate_api_key(
     let old_key_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request if provided
     if let Some(ref r) = req {
-        if let Err(e) = r.validate() {
-            return HttpResponse::BadRequest().json(ErrorResponse::new(
-                "validation_error",
-                format!("Validation failed: {}", e),
-            ));
+        if let Err(resp) = validate_request(&**r) {
+            return resp;
         }
     }
 
     // Get the old key
-    let old_key = match ApiKeyRepository::find_by_id(&pool, &old_key_id).await {
+    let old_key = match handle_db_error(
+        ApiKeyRepository::find_by_id(&pool, &old_key_id).await,
+        "fetch API key",
+    ) {
         Ok(Some(k)) => k,
-        Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "API key not found"))
-        }
-        Err(e) => {
-            tracing::error!("Failed to fetch API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to rotate API key",
-            ));
-        }
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
     };
 
     // Check if already revoked
     if old_key.revoked_at.is_some() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Cannot rotate a revoked API key",
-        ));
+        return bad_request("Cannot rotate a revoked API key");
     }
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &old_key.organization_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &old_key.organization_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
-        Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "API key not found"))
-        }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to rotate API key",
-            ));
-        }
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
     };
 
     // Check if user can manage org (owner or admin)
     if !can_manage_org(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to rotate API keys",
-        ));
+        return forbidden("Insufficient permissions to rotate API keys");
     }
 
     // Generate new key
     let api_key_service = ApiKeyService::new();
-    let generated = match api_key_service.generate_key(&old_key.environment) {
+    let generated = match handle_error(
+        api_key_service.generate_key(&old_key.environment),
+        "generate API key",
+    ) {
         Ok(g) => g,
-        Err(e) => {
-            tracing::error!("Failed to generate new API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to rotate API key",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get permissions from old key
@@ -611,69 +488,52 @@ pub async fn rotate_api_key(
     };
 
     // Use a transaction for atomicity
-    let mut tx = match pool.begin().await {
+    let mut tx = match handle_db_error(pool.begin().await, "start transaction") {
         Ok(tx) => tx,
-        Err(e) => {
-            tracing::error!("Failed to start transaction: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to rotate API key",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Revoke old key
-    if let Err(e) =
+    if let Err(resp) = handle_db_error(
         ApiKeyRepository::revoke_with_executor(&mut *tx, &old_key_id, &user_id, Some("rotated"))
-            .await
-    {
-        tracing::error!("Failed to revoke old API key: {}", e);
-        return HttpResponse::InternalServerError().json(ErrorResponse::new(
-            "internal_error",
-            "Failed to rotate API key",
-        ));
+            .await,
+        "revoke old API key",
+    ) {
+        return resp;
     }
 
     // Create new key
-    let new_key = match ApiKeyRepository::create_with_executor(
-        &mut *tx,
-        &old_key.organization_id,
-        &generated.hash,
-        &new_name,
-        &generated.prefix,
-        &old_key.environment,
-        &old_key.key_type,
-        &permissions,
-        old_key.rate_limit_override,
-        new_expires_at,
-        &user_id,
-    )
-    .await
-    {
+    let new_key = match handle_db_error(
+        ApiKeyRepository::create_with_executor(
+            &mut *tx,
+            &old_key.organization_id,
+            &generated.hash,
+            &new_name,
+            &generated.prefix,
+            &old_key.environment,
+            &old_key.key_type,
+            &permissions,
+            old_key.rate_limit_override,
+            new_expires_at,
+            &user_id,
+        )
+        .await,
+        "create new API key",
+    ) {
         Ok(k) => k,
-        Err(e) => {
-            tracing::error!("Failed to create new API key: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to rotate API key",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Log the rotation event
-    let ip_address = req_http
-        .connection_info()
-        .realip_remote_addr()
-        .map(|s| s.to_string());
-
+    let ctx = extract_request_context(&req_http);
     if let Err(e) = ApiKeyAuditRepository::log_with_executor(
         &mut *tx,
         Some(&new_key.id),
         &old_key.organization_id,
         "rotated",
-        ip_address.as_deref(),
-        None,
-        Some("/api/v1/api-keys/{id}/rotate"),
+        ctx.ip_str(),
+        ctx.user_agent_str(),
+        Some(ctx.endpoint_str()),
         Some(&user_id),
         Some(serde_json::json!({
             "old_key_id": old_key_id,
@@ -687,12 +547,8 @@ pub async fn rotate_api_key(
     }
 
     // Commit transaction
-    if let Err(e) = tx.commit().await {
-        tracing::error!("Failed to commit transaction: {}", e);
-        return HttpResponse::InternalServerError().json(ErrorResponse::new(
-            "internal_error",
-            "Failed to rotate API key",
-        ));
+    if let Err(resp) = handle_db_error(tx.commit().await, "commit transaction") {
+        return resp;
     }
 
     // Return the new key

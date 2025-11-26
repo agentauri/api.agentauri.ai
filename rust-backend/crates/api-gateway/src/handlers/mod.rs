@@ -5,6 +5,7 @@ pub mod api_keys;
 pub mod auth;
 pub mod conditions;
 pub mod health;
+pub mod helpers;
 pub mod organizations;
 pub mod triggers;
 
@@ -16,3 +17,6 @@ pub use conditions::*;
 pub use health::*;
 pub use organizations::*;
 pub use triggers::*;
+
+// Note: helpers module is not re-exported to avoid polluting the namespace
+// Import helpers directly: use crate::handlers::helpers::{...}
