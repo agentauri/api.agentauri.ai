@@ -458,9 +458,12 @@ mod tests {
     fn test_key_entropy() {
         let service = ApiKeyService::new();
 
-        // Generate many keys and check they're all different
+        // Generate keys and check they're all different
+        // 10 iterations is sufficient - with 256 bits of entropy, collision probability
+        // is astronomically low (~1 in 2^256). More iterations would slow down CI
+        // due to Argon2id hashing cost (~0.6s per key).
         let mut keys: Vec<String> = Vec::new();
-        for _ in 0..100 {
+        for _ in 0..10 {
             let generated = service.generate_key("live").unwrap();
             assert!(!keys.contains(&generated.key), "Key collision detected!");
             keys.push(generated.key);
