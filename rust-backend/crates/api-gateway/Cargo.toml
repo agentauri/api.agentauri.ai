@@ -54,5 +54,12 @@ uuid = { workspace = true }
 # Regex for slug validation
 regex = { workspace = true }
 
+# Cryptographic utilities for API key generation
+base64 = { workspace = true }
+rand = { workspace = true }
+
+# Rate limiting for authentication
+governor = { workspace = true }
+
 [dev-dependencies]
 mockall = { workspace = true }

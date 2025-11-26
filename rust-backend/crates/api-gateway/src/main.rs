@@ -11,6 +11,7 @@ mod middleware;
 mod models;
 mod repositories;
 mod routes;
+mod services;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {

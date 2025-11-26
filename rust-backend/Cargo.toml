@@ -90,6 +90,10 @@ lazy_static = "1.4"
 # Template parsing
 regex = "1"
 
+# Cryptographic utilities
+base64 = "0.22"
+rand = "0.8"
+
 [profile.dev]
 opt-level = 0
 debug = true

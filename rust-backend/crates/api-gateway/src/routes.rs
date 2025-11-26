@@ -20,10 +20,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/register", web::post().to(handlers::register))
                     .route("/login", web::post().to(handlers::login)),
             )
-            // Protected routes (JWT auth required)
+            // Protected routes (JWT or API Key auth)
             .service(
                 web::scope("")
-                    .wrap(middleware::JwtAuth::new(jwt_secret))
+                    .wrap(middleware::DualAuth::new(jwt_secret.clone()))
                     // Organization endpoints
                     .service(
                         web::scope("/organizations")
@@ -48,6 +48,15 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                                 "/{id}/members/{user_id}",
                                 web::delete().to(handlers::remove_member),
                             ),
+                    )
+                    // API Key endpoints
+                    .service(
+                        web::scope("/api-keys")
+                            .route("", web::post().to(handlers::create_api_key))
+                            .route("", web::get().to(handlers::list_api_keys))
+                            .route("/{id}", web::get().to(handlers::get_api_key))
+                            .route("/{id}", web::delete().to(handlers::revoke_api_key))
+                            .route("/{id}/rotate", web::post().to(handlers::rotate_api_key)),
                     )
                     // Trigger endpoints
                     .service(

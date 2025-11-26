@@ -157,6 +157,178 @@ pub struct ActionResult {
     pub retry_count: i32,
 }
 
+/// API Key for Layer 1 authentication
+/// Note: key_hash is intentionally excluded from serialization for security
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ApiKey {
+    pub id: String,
+    pub organization_id: String,
+    #[serde(skip_serializing)]
+    pub key_hash: String,
+    pub name: String,
+    pub prefix: String,
+    pub environment: String,
+    pub key_type: String,
+    #[sqlx(json)]
+    pub permissions: serde_json::Value,
+    pub rate_limit_override: Option<i32>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub last_used_ip: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_by: String,
+    pub created_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+    pub revoked_by: Option<String>,
+    pub revocation_reason: Option<String>,
+}
+
+/// API Key environment type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiKeyEnvironment {
+    Live,
+    Test,
+}
+
+impl ApiKeyEnvironment {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ApiKeyEnvironment::Live => "live",
+            ApiKeyEnvironment::Test => "test",
+        }
+    }
+
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            ApiKeyEnvironment::Live => "sk_live_",
+            ApiKeyEnvironment::Test => "sk_test_",
+        }
+    }
+}
+
+impl std::str::FromStr for ApiKeyEnvironment {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "live" => Ok(ApiKeyEnvironment::Live),
+            "test" => Ok(ApiKeyEnvironment::Test),
+            _ => Err(format!("Invalid environment: {}", s)),
+        }
+    }
+}
+
+/// API Key type (permission level)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiKeyType {
+    Standard,
+    Restricted,
+    Admin,
+}
+
+impl ApiKeyType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ApiKeyType::Standard => "standard",
+            ApiKeyType::Restricted => "restricted",
+            ApiKeyType::Admin => "admin",
+        }
+    }
+}
+
+impl std::str::FromStr for ApiKeyType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "standard" => Ok(ApiKeyType::Standard),
+            "restricted" => Ok(ApiKeyType::Restricted),
+            "admin" => Ok(ApiKeyType::Admin),
+            _ => Err(format!("Invalid key type: {}", s)),
+        }
+    }
+}
+
+/// API Key audit log entry
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ApiKeyAuditLog {
+    pub id: i64,
+    pub api_key_id: Option<String>,
+    pub organization_id: String,
+    pub event_type: String,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub endpoint: Option<String>,
+    pub actor_user_id: Option<String>,
+    #[sqlx(json)]
+    pub details: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// API Key audit event type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiKeyAuditEventType {
+    Created,
+    Used,
+    Rotated,
+    Revoked,
+    AuthFailed,
+    RateLimited,
+}
+
+impl ApiKeyAuditEventType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ApiKeyAuditEventType::Created => "created",
+            ApiKeyAuditEventType::Used => "used",
+            ApiKeyAuditEventType::Rotated => "rotated",
+            ApiKeyAuditEventType::Revoked => "revoked",
+            ApiKeyAuditEventType::AuthFailed => "auth_failed",
+            ApiKeyAuditEventType::RateLimited => "rate_limited",
+        }
+    }
+}
+
+/// Authentication failure log entry (without organization context)
+///
+/// Used for logging authentication failures where we cannot determine
+/// the organization, such as invalid key formats or unknown prefixes.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AuthFailure {
+    pub id: i64,
+    pub failure_type: String,
+    pub key_prefix: Option<String>,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub endpoint: Option<String>,
+    #[sqlx(json)]
+    pub details: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Authentication failure type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthFailureType {
+    InvalidFormat,
+    PrefixNotFound,
+    RateLimited,
+    InvalidKey,
+}
+
+impl AuthFailureType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AuthFailureType::InvalidFormat => "invalid_format",
+            AuthFailureType::PrefixNotFound => "prefix_not_found",
+            AuthFailureType::RateLimited => "rate_limited",
+            AuthFailureType::InvalidKey => "invalid_key",
+        }
+    }
+}
+
 // ============================================================================
 // Request/Response DTOs for API
 // ============================================================================
