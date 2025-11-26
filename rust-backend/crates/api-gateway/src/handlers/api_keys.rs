@@ -725,3 +725,595 @@ pub struct ApiKeyListQuery {
     pub offset: Option<i64>,
     pub include_revoked: Option<bool>,
 }
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{
+        ApiKeyListResponse, ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse,
+        RevokeApiKeyRequest, RotateApiKeyRequest, RotateApiKeyResponse,
+    };
+    use chrono::Utc;
+
+    // ========================================================================
+    // Query Parameter Tests
+    // ========================================================================
+
+    #[test]
+    fn test_org_id_query_deserialize() {
+        let query_string = "organization_id=org_123";
+        let query: OrgIdQuery = serde_urlencoded::from_str(query_string).unwrap();
+        assert_eq!(query.organization_id, "org_123");
+    }
+
+    #[test]
+    fn test_api_key_list_query_deserialize_minimal() {
+        let query_string = "organization_id=org_123";
+        let query: ApiKeyListQuery = serde_urlencoded::from_str(query_string).unwrap();
+        assert_eq!(query.organization_id, "org_123");
+        assert!(query.limit.is_none());
+        assert!(query.offset.is_none());
+        assert!(query.include_revoked.is_none());
+    }
+
+    #[test]
+    fn test_api_key_list_query_deserialize_full() {
+        let query_string = "organization_id=org_456&limit=50&offset=100&include_revoked=true";
+        let query: ApiKeyListQuery = serde_urlencoded::from_str(query_string).unwrap();
+        assert_eq!(query.organization_id, "org_456");
+        assert_eq!(query.limit, Some(50));
+        assert_eq!(query.offset, Some(100));
+        assert_eq!(query.include_revoked, Some(true));
+    }
+
+    #[test]
+    fn test_api_key_list_query_deserialize_partial() {
+        let query_string = "organization_id=org_789&limit=25";
+        let query: ApiKeyListQuery = serde_urlencoded::from_str(query_string).unwrap();
+        assert_eq!(query.organization_id, "org_789");
+        assert_eq!(query.limit, Some(25));
+        assert!(query.offset.is_none());
+        assert!(query.include_revoked.is_none());
+    }
+
+    // ========================================================================
+    // Response Serialization Tests
+    // ========================================================================
+
+    #[test]
+    fn test_create_api_key_response_serialize() {
+        let response = CreateApiKeyResponse {
+            id: "key_123".to_string(),
+            key: "sk_live_abc123xyz456".to_string(),
+            name: "Production Key".to_string(),
+            prefix: "sk_live_abc123".to_string(),
+            environment: "live".to_string(),
+            key_type: "standard".to_string(),
+            permissions: vec!["read".to_string(), "write".to_string()],
+            created_at: Utc::now(),
+            expires_at: None,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"id\":\"key_123\""));
+        assert!(json.contains("\"key\":\"sk_live_abc123xyz456\""));
+        assert!(json.contains("\"environment\":\"live\""));
+        assert!(json.contains("\"permissions\":[\"read\",\"write\"]"));
+    }
+
+    #[test]
+    fn test_api_key_response_serialize() {
+        let response = ApiKeyResponse {
+            id: "key_456".to_string(),
+            name: "Test Key".to_string(),
+            prefix: "sk_test_xyz789".to_string(),
+            environment: "test".to_string(),
+            key_type: "restricted".to_string(),
+            permissions: vec!["read".to_string()],
+            rate_limit_override: Some(500),
+            last_used_at: None,
+            expires_at: None,
+            created_at: Utc::now(),
+            created_by: "user_123".to_string(),
+            is_revoked: false,
+            revoked_at: None,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"id\":\"key_456\""));
+        assert!(json.contains("\"prefix\":\"sk_test_xyz789\""));
+        assert!(json.contains("\"rate_limit_override\":500"));
+        assert!(json.contains("\"is_revoked\":false"));
+        // Ensure the full key is NOT in the response (security check)
+        assert!(!json.contains("\"key\":"));
+    }
+
+    #[test]
+    fn test_api_key_response_revoked_serialize() {
+        let now = Utc::now();
+        let response = ApiKeyResponse {
+            id: "key_revoked".to_string(),
+            name: "Revoked Key".to_string(),
+            prefix: "sk_live_revoked".to_string(),
+            environment: "live".to_string(),
+            key_type: "standard".to_string(),
+            permissions: vec!["read".to_string()],
+            rate_limit_override: None,
+            last_used_at: Some(now),
+            expires_at: None,
+            created_at: now,
+            created_by: "user_456".to_string(),
+            is_revoked: true,
+            revoked_at: Some(now),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"is_revoked\":true"));
+        assert!(json.contains("\"revoked_at\":"));
+    }
+
+    #[test]
+    fn test_rotate_api_key_response_serialize() {
+        let response = RotateApiKeyResponse {
+            id: "new_key_id".to_string(),
+            key: "sk_live_new_secret_key".to_string(),
+            prefix: "sk_live_new_secr".to_string(),
+            old_key_id: "old_key_id".to_string(),
+            old_key_revoked_at: Utc::now(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"id\":\"new_key_id\""));
+        assert!(json.contains("\"key\":\"sk_live_new_secret_key\""));
+        assert!(json.contains("\"old_key_id\":\"old_key_id\""));
+    }
+
+    #[test]
+    fn test_api_key_list_response_serialize() {
+        let response = ApiKeyListResponse {
+            items: vec![
+                ApiKeyResponse {
+                    id: "key_1".to_string(),
+                    name: "Key 1".to_string(),
+                    prefix: "sk_live_key1pre".to_string(),
+                    environment: "live".to_string(),
+                    key_type: "standard".to_string(),
+                    permissions: vec!["read".to_string()],
+                    rate_limit_override: None,
+                    last_used_at: None,
+                    expires_at: None,
+                    created_at: Utc::now(),
+                    created_by: "user_1".to_string(),
+                    is_revoked: false,
+                    revoked_at: None,
+                },
+                ApiKeyResponse {
+                    id: "key_2".to_string(),
+                    name: "Key 2".to_string(),
+                    prefix: "sk_test_key2pre".to_string(),
+                    environment: "test".to_string(),
+                    key_type: "admin".to_string(),
+                    permissions: vec!["read".to_string(), "write".to_string(), "admin".to_string()],
+                    rate_limit_override: Some(1000),
+                    last_used_at: Some(Utc::now()),
+                    expires_at: None,
+                    created_at: Utc::now(),
+                    created_by: "user_2".to_string(),
+                    is_revoked: false,
+                    revoked_at: None,
+                },
+            ],
+            total: 2,
+            page: 1,
+            page_size: 20,
+            total_pages: 1,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"total\":2"));
+        assert!(json.contains("\"page\":1"));
+        assert!(json.contains("\"page_size\":20"));
+        assert!(json.contains("\"total_pages\":1"));
+        assert!(json.contains("\"key_1\""));
+        assert!(json.contains("\"key_2\""));
+    }
+
+    // ========================================================================
+    // Request Deserialization Tests
+    // ========================================================================
+
+    #[test]
+    fn test_create_api_key_request_deserialize() {
+        let json = r#"{
+            "name": "My API Key",
+            "environment": "live",
+            "key_type": "standard",
+            "permissions": ["read", "write"],
+            "rate_limit_override": 500
+        }"#;
+
+        let req: CreateApiKeyRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "My API Key");
+        assert_eq!(req.environment, "live");
+        assert_eq!(req.key_type, "standard");
+        assert_eq!(req.permissions, vec!["read", "write"]);
+        assert_eq!(req.rate_limit_override, Some(500));
+    }
+
+    #[test]
+    fn test_create_api_key_request_deserialize_with_expiry() {
+        let json = r#"{
+            "name": "Expiring Key",
+            "environment": "test",
+            "key_type": "restricted",
+            "permissions": ["read"],
+            "expires_at": "2025-12-31T23:59:59Z"
+        }"#;
+
+        let req: CreateApiKeyRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "Expiring Key");
+        assert!(req.expires_at.is_some());
+    }
+
+    #[test]
+    fn test_rotate_api_key_request_deserialize() {
+        let json = r#"{
+            "name": "Rotated Key Name",
+            "expires_at": "2026-01-01T00:00:00Z"
+        }"#;
+
+        let req: RotateApiKeyRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, Some("Rotated Key Name".to_string()));
+        assert!(req.expires_at.is_some());
+    }
+
+    #[test]
+    fn test_rotate_api_key_request_deserialize_empty() {
+        let json = r#"{}"#;
+
+        let req: RotateApiKeyRequest = serde_json::from_str(json).unwrap();
+        assert!(req.name.is_none());
+        assert!(req.expires_at.is_none());
+    }
+
+    #[test]
+    fn test_revoke_api_key_request_deserialize() {
+        let json = r#"{
+            "reason": "Compromised key"
+        }"#;
+
+        let req: RevokeApiKeyRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.reason, Some("Compromised key".to_string()));
+    }
+
+    #[test]
+    fn test_revoke_api_key_request_deserialize_empty() {
+        let json = r#"{}"#;
+
+        let req: RevokeApiKeyRequest = serde_json::from_str(json).unwrap();
+        assert!(req.reason.is_none());
+    }
+
+    // ========================================================================
+    // Permission Logic Tests
+    // ========================================================================
+
+    #[test]
+    fn test_can_manage_org_owner() {
+        assert!(can_manage_org("owner"));
+    }
+
+    #[test]
+    fn test_can_manage_org_admin() {
+        assert!(can_manage_org("admin"));
+    }
+
+    #[test]
+    fn test_can_manage_org_member() {
+        assert!(!can_manage_org("member"));
+    }
+
+    #[test]
+    fn test_can_manage_org_viewer() {
+        assert!(!can_manage_org("viewer"));
+    }
+
+    #[test]
+    fn test_can_manage_org_unknown_role() {
+        assert!(!can_manage_org("superuser"));
+        assert!(!can_manage_org(""));
+    }
+
+    // ========================================================================
+    // Pagination Tests
+    // ========================================================================
+
+    #[test]
+    fn test_pagination_calculation() {
+        // Test page calculation logic from list_api_keys
+        let offset = 0i64;
+        let limit = 20i64;
+        let page = (offset / limit) + 1;
+        assert_eq!(page, 1);
+
+        let offset = 20i64;
+        let page = (offset / limit) + 1;
+        assert_eq!(page, 2);
+
+        let offset = 40i64;
+        let page = (offset / limit) + 1;
+        assert_eq!(page, 3);
+    }
+
+    #[test]
+    fn test_total_pages_calculation() {
+        // Test total pages calculation logic from list_api_keys
+        let limit = 20i64;
+
+        // 0 items = 0 pages
+        let total = 0i64;
+        let total_pages = (total + limit - 1) / limit;
+        assert_eq!(total_pages, 0);
+
+        // 1 item = 1 page
+        let total = 1i64;
+        let total_pages = (total + limit - 1) / limit;
+        assert_eq!(total_pages, 1);
+
+        // 20 items = 1 page
+        let total = 20i64;
+        let total_pages = (total + limit - 1) / limit;
+        assert_eq!(total_pages, 1);
+
+        // 21 items = 2 pages
+        let total = 21i64;
+        let total_pages = (total + limit - 1) / limit;
+        assert_eq!(total_pages, 2);
+
+        // 100 items = 5 pages
+        let total = 100i64;
+        let total_pages = (total + limit - 1) / limit;
+        assert_eq!(total_pages, 5);
+    }
+
+    // ========================================================================
+    // Error Response Tests
+    // ========================================================================
+
+    #[test]
+    fn test_error_response_format() {
+        use crate::models::ErrorResponse;
+
+        let error = ErrorResponse::new("unauthorized", "Authentication required");
+        let json = serde_json::to_string(&error).unwrap();
+
+        assert!(json.contains("\"error\":\"unauthorized\""));
+        assert!(json.contains("\"message\":\"Authentication required\""));
+    }
+
+    #[test]
+    fn test_error_response_validation() {
+        use crate::models::ErrorResponse;
+
+        let error = ErrorResponse::new(
+            "validation_error",
+            "Validation failed: name must be at least 1 character",
+        );
+        let json = serde_json::to_string(&error).unwrap();
+
+        assert!(json.contains("\"error\":\"validation_error\""));
+        assert!(json.contains("Validation failed"));
+    }
+
+    #[test]
+    fn test_error_response_forbidden() {
+        use crate::models::ErrorResponse;
+
+        let error = ErrorResponse::new("forbidden", "Insufficient permissions to create API keys");
+        let json = serde_json::to_string(&error).unwrap();
+
+        assert!(json.contains("\"error\":\"forbidden\""));
+        assert!(json.contains("Insufficient permissions"));
+    }
+
+    // ========================================================================
+    // Success Response Tests
+    // ========================================================================
+
+    #[test]
+    fn test_success_response_format() {
+        use crate::models::SuccessResponse;
+
+        let response = SuccessResponse::new(ApiKeyResponse {
+            id: "test_key".to_string(),
+            name: "Test".to_string(),
+            prefix: "sk_test_prefix".to_string(),
+            environment: "test".to_string(),
+            key_type: "standard".to_string(),
+            permissions: vec!["read".to_string()],
+            rate_limit_override: None,
+            last_used_at: None,
+            expires_at: None,
+            created_at: Utc::now(),
+            created_by: "user".to_string(),
+            is_revoked: false,
+            revoked_at: None,
+        });
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"data\":{"));
+        assert!(json.contains("\"id\":\"test_key\""));
+    }
+
+    // ========================================================================
+    // API Key Service Integration Tests
+    // ========================================================================
+
+    #[test]
+    fn test_api_key_service_generate_live_key() {
+        let service = ApiKeyService::new();
+        let result = service.generate_key("live").unwrap();
+
+        assert!(result.key.starts_with("sk_live_"));
+        assert!(result.prefix.starts_with("sk_live_"));
+        assert_eq!(result.prefix.len(), 16);
+        assert!(!result.hash.is_empty());
+    }
+
+    #[test]
+    fn test_api_key_service_generate_test_key() {
+        let service = ApiKeyService::new();
+        let result = service.generate_key("test").unwrap();
+
+        assert!(result.key.starts_with("sk_test_"));
+        assert!(result.prefix.starts_with("sk_test_"));
+        assert_eq!(result.prefix.len(), 16);
+        assert!(!result.hash.is_empty());
+    }
+
+    #[test]
+    fn test_api_key_service_key_format() {
+        let service = ApiKeyService::new();
+        let result = service.generate_key("live").unwrap();
+
+        // Total length should be 8 (prefix) + 43 (base64) = 51
+        assert_eq!(result.key.len(), 51);
+    }
+
+    #[test]
+    fn test_api_key_service_key_uniqueness() {
+        let service = ApiKeyService::new();
+        let key1 = service.generate_key("live").unwrap();
+        let key2 = service.generate_key("live").unwrap();
+
+        // Keys should be unique
+        assert_ne!(key1.key, key2.key);
+        assert_ne!(key1.prefix, key2.prefix);
+        assert_ne!(key1.hash, key2.hash);
+    }
+
+    #[test]
+    fn test_api_key_service_verify_key() {
+        let service = ApiKeyService::new();
+        let generated = service.generate_key("live").unwrap();
+
+        // Verify correct key
+        assert!(service.verify_key(&generated.key, &generated.hash).unwrap());
+
+        // Verify wrong key
+        assert!(!service.verify_key("sk_live_wrongkey12345678901234567890123", &generated.hash).unwrap());
+    }
+
+    #[test]
+    fn test_api_key_service_invalid_environment() {
+        let service = ApiKeyService::new();
+        let result = service.generate_key("invalid");
+
+        // Invalid environment returns an error
+        assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // Edge Case Tests
+    // ========================================================================
+
+    #[test]
+    fn test_api_key_response_from_shared_model() {
+        use shared::models::ApiKey;
+
+        let api_key = ApiKey {
+            id: "key_from_db".to_string(),
+            organization_id: "org_123".to_string(),
+            key_hash: "hashed_key".to_string(),
+            name: "DB Key".to_string(),
+            prefix: "sk_live_dbprefi".to_string(),
+            environment: "live".to_string(),
+            key_type: "standard".to_string(),
+            permissions: serde_json::json!(["read", "write"]),
+            rate_limit_override: Some(100),
+            last_used_at: Some(Utc::now()),
+            last_used_ip: Some("192.168.1.1".to_string()),
+            expires_at: None,
+            created_by: "creator_user".to_string(),
+            created_at: Utc::now(),
+            revoked_at: None,
+            revoked_by: None,
+            revocation_reason: None,
+        };
+
+        let response = ApiKeyResponse::from(api_key);
+
+        assert_eq!(response.id, "key_from_db");
+        assert_eq!(response.name, "DB Key");
+        assert_eq!(response.prefix, "sk_live_dbprefi");
+        assert_eq!(response.environment, "live");
+        assert_eq!(response.permissions, vec!["read", "write"]);
+        assert_eq!(response.rate_limit_override, Some(100));
+        assert!(!response.is_revoked);
+    }
+
+    #[test]
+    fn test_api_key_response_from_revoked_model() {
+        use shared::models::ApiKey;
+
+        let now = Utc::now();
+        let api_key = ApiKey {
+            id: "revoked_key".to_string(),
+            organization_id: "org_123".to_string(),
+            key_hash: "hash".to_string(),
+            name: "Revoked Key".to_string(),
+            prefix: "sk_live_revoked".to_string(),
+            environment: "live".to_string(),
+            key_type: "standard".to_string(),
+            permissions: serde_json::json!(["read"]),
+            rate_limit_override: None,
+            last_used_at: None,
+            last_used_ip: None,
+            expires_at: None,
+            created_by: "user".to_string(),
+            created_at: now,
+            revoked_at: Some(now),
+            revoked_by: Some("admin_user".to_string()),
+            revocation_reason: Some("Security concern".to_string()),
+        };
+
+        let response = ApiKeyResponse::from(api_key);
+
+        assert!(response.is_revoked);
+        assert!(response.revoked_at.is_some());
+    }
+
+    #[test]
+    fn test_api_key_response_permissions_parsing_fallback() {
+        use shared::models::ApiKey;
+
+        let api_key = ApiKey {
+            id: "bad_perms_key".to_string(),
+            organization_id: "org_123".to_string(),
+            key_hash: "hash".to_string(),
+            name: "Bad Perms".to_string(),
+            prefix: "sk_test_badperm".to_string(),
+            environment: "test".to_string(),
+            key_type: "standard".to_string(),
+            permissions: serde_json::json!("invalid_not_array"), // Invalid format
+            rate_limit_override: None,
+            last_used_at: None,
+            last_used_ip: None,
+            expires_at: None,
+            created_by: "user".to_string(),
+            created_at: Utc::now(),
+            revoked_at: None,
+            revoked_by: None,
+            revocation_reason: None,
+        };
+
+        let response = ApiKeyResponse::from(api_key);
+
+        // Should default to ["read"] when parsing fails
+        assert_eq!(response.permissions, vec!["read"]);
+    }
+}
