@@ -69,7 +69,7 @@ pub struct TriggerCondition {
     pub field: String,
     pub operator: String,
     pub value: String,
-    #[sqlx(json)]
+    #[sqlx(json(nullable))]
     pub config: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
@@ -152,7 +152,7 @@ pub struct ActionResult {
     pub executed_at: DateTime<Utc>,
     pub duration_ms: Option<i32>,
     pub error_message: Option<String>,
-    #[sqlx(json)]
+    #[sqlx(json(nullable))]
     pub response_data: Option<serde_json::Value>,
     pub retry_count: i32,
 }
@@ -261,7 +261,7 @@ pub struct ApiKeyAuditLog {
     pub user_agent: Option<String>,
     pub endpoint: Option<String>,
     pub actor_user_id: Option<String>,
-    #[sqlx(json)]
+    #[sqlx(json(nullable))]
     pub details: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
@@ -303,7 +303,7 @@ pub struct AuthFailure {
     pub ip_address: Option<String>,
     pub user_agent: Option<String>,
     pub endpoint: Option<String>,
-    #[sqlx(json)]
+    #[sqlx(json(nullable))]
     pub details: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }

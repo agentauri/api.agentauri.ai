@@ -201,4 +201,141 @@ mod tests {
         };
         assert!(req.validate().is_ok());
     }
+
+    // ========================================================================
+    // JSON Deserialization tests - config field variations
+    // These tests verify that the config field correctly handles all JSON states
+    // ========================================================================
+
+    #[test]
+    fn test_create_condition_request_json_without_config_field() {
+        // Test: JSON body does not include the config field at all
+        let json = r#"{
+            "condition_type": "score_threshold",
+            "field": "score",
+            "operator": "<",
+            "value": "60"
+        }"#;
+
+        let req: Result<CreateConditionRequest, _> = serde_json::from_str(json);
+        assert!(
+            req.is_ok(),
+            "Should deserialize when config field is omitted"
+        );
+        let req = req.unwrap();
+        assert!(
+            req.config.is_none(),
+            "config should be None when field is omitted"
+        );
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_condition_request_json_with_null_config() {
+        // Test: JSON body has config: null explicitly
+        let json = r#"{
+            "condition_type": "score_threshold",
+            "field": "score",
+            "operator": "<",
+            "value": "60",
+            "config": null
+        }"#;
+
+        let req: Result<CreateConditionRequest, _> = serde_json::from_str(json);
+        assert!(req.is_ok(), "Should deserialize when config is null");
+        let req = req.unwrap();
+        assert!(
+            req.config.is_none(),
+            "config should be None when explicitly null"
+        );
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_condition_request_json_with_empty_object_config() {
+        // Test: JSON body has config: {}
+        let json = r#"{
+            "condition_type": "score_threshold",
+            "field": "score",
+            "operator": "<",
+            "value": "60",
+            "config": {}
+        }"#;
+
+        let req: Result<CreateConditionRequest, _> = serde_json::from_str(json);
+        assert!(
+            req.is_ok(),
+            "Should deserialize when config is empty object"
+        );
+        let req = req.unwrap();
+        assert!(req.validate().is_ok());
+        assert!(
+            req.config.is_some(),
+            "config should be Some when empty object"
+        );
+        assert_eq!(req.config.unwrap(), serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_create_condition_request_json_with_populated_config() {
+        // Test: JSON body has config with actual data
+        let json = r#"{
+            "condition_type": "ema_threshold",
+            "field": "score",
+            "operator": "<",
+            "value": "70",
+            "config": {"window_size": 10, "alpha": 0.2}
+        }"#;
+
+        let req: Result<CreateConditionRequest, _> = serde_json::from_str(json);
+        assert!(req.is_ok(), "Should deserialize when config has data");
+        let req = req.unwrap();
+        assert!(req.validate().is_ok());
+        assert!(req.config.is_some());
+        let config = req.config.unwrap();
+        assert_eq!(config["window_size"], 10);
+    }
+
+    #[test]
+    fn test_update_condition_request_json_without_config() {
+        // Test: config field omitted - should not update config
+        let json = r#"{
+            "value": "70"
+        }"#;
+
+        let req: Result<UpdateConditionRequest, _> = serde_json::from_str(json);
+        assert!(req.is_ok());
+        let req = req.unwrap();
+        assert!(req.config.is_none(), "config should be None when omitted");
+    }
+
+    #[test]
+    fn test_update_condition_request_json_with_null_config() {
+        // Test: config: null - serde deserializes JSON null to None
+        let json = r#"{
+            "value": "70",
+            "config": null
+        }"#;
+
+        let req: Result<UpdateConditionRequest, _> = serde_json::from_str(json);
+        assert!(req.is_ok());
+        let req = req.unwrap();
+        // JSON null becomes None for Option<Value>
+        assert!(req.config.is_none());
+    }
+
+    #[test]
+    fn test_update_condition_request_json_with_empty_config() {
+        // Test: config: {} - should update config to empty object
+        let json = r#"{
+            "value": "70",
+            "config": {}
+        }"#;
+
+        let req: Result<UpdateConditionRequest, _> = serde_json::from_str(json);
+        assert!(req.is_ok());
+        let req = req.unwrap();
+        assert!(req.config.is_some());
+        assert_eq!(req.config.unwrap(), serde_json::json!({}));
+    }
 }
