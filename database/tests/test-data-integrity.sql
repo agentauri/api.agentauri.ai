@@ -45,14 +45,14 @@ DECLARE
     fk_violated BOOLEAN := false;
 BEGIN
     BEGIN
-        INSERT INTO triggers (id, user_id, name, chain_id, registry)
-        VALUES ('test-fk-1', 'nonexistent-user', 'Test', 84532, 'reputation');
+        INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+        VALUES ('test-fk-1', 'nonexistent-user', 'Test', 84532, 'reputation', 'nonexistent-org');
     EXCEPTION WHEN foreign_key_violation THEN
         fk_violated := true;
     END;
 
     PERFORM record_test(
-        'T1.1: trigger without valid user fails',
+        'T1.1: trigger without valid user/org fails',
         fk_violated,
         'Foreign key constraint should prevent orphaned triggers'
     );
@@ -123,6 +123,7 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-cascade-user-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-cascade-org-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-cascade-trigger-' || gen_random_uuid()::TEXT;
     trigger_exists_after BOOLEAN;
 BEGIN
@@ -131,20 +132,28 @@ BEGIN
     VALUES (test_user_id, 'cascade_test_' || substring(test_user_id, 1, 8),
             'cascade_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
+    -- Create organization
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org', 'test-org-' || substring(test_org_id, 1, 8), test_user_id, true);
+
     -- Create trigger
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Cascade Test', 84532, 'reputation');
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Cascade Test', 84532, 'reputation', test_org_id);
 
-    -- Delete user
-    DELETE FROM users WHERE id = test_user_id;
+    -- Delete organization first (required due to ON DELETE RESTRICT on owner_id)
+    -- This will cascade delete the trigger via organization_id FK
+    DELETE FROM organizations WHERE id = test_org_id;
 
-    -- Check if trigger was deleted
+    -- Check if trigger was deleted (via organization cascade)
     SELECT EXISTS (SELECT 1 FROM triggers WHERE id = test_trigger_id) INTO trigger_exists_after;
 
+    -- Cleanup: delete user
+    DELETE FROM users WHERE id = test_user_id;
+
     PERFORM record_test(
-        'T2.1: delete user cascades to triggers',
+        'T2.1: delete organization cascades to triggers',
         NOT trigger_exists_after,
-        'Trigger should be deleted when user is deleted'
+        'Trigger should be deleted when organization is deleted'
     );
 END $$;
 
@@ -152,17 +161,21 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-cascade-user2-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-cascade-org2-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-cascade-trigger2-' || gen_random_uuid()::TEXT;
     condition_id INTEGER;
     condition_exists_after BOOLEAN;
 BEGIN
-    -- Create user and trigger
+    -- Create user, organization and trigger
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'cascade_test2_' || substring(test_user_id, 1, 8),
             'cascade2_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Cascade Test 2', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 2', 'test-org2-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Cascade Test 2', 84532, 'reputation', test_org_id);
 
     -- Create condition
     INSERT INTO trigger_conditions (trigger_id, condition_type, field, operator, value)
@@ -175,7 +188,8 @@ BEGIN
     -- Check if condition was deleted
     SELECT EXISTS (SELECT 1 FROM trigger_conditions WHERE id = condition_id) INTO condition_exists_after;
 
-    -- Clean up
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -189,17 +203,21 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-cascade-user3-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-cascade-org3-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-cascade-trigger3-' || gen_random_uuid()::TEXT;
     action_id INTEGER;
     action_exists_after BOOLEAN;
 BEGIN
-    -- Create user and trigger
+    -- Create user, organization and trigger
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'cascade_test3_' || substring(test_user_id, 1, 8),
             'cascade3_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Cascade Test 3', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 3', 'test-org3-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Cascade Test 3', 84532, 'reputation', test_org_id);
 
     -- Create action
     INSERT INTO trigger_actions (trigger_id, action_type, config)
@@ -212,7 +230,8 @@ BEGIN
     -- Check if action was deleted
     SELECT EXISTS (SELECT 1 FROM trigger_actions WHERE id = action_id) INTO action_exists_after;
 
-    -- Clean up
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -226,16 +245,20 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-cascade-user4-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-cascade-org4-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-cascade-trigger4-' || gen_random_uuid()::TEXT;
     state_exists_after BOOLEAN;
 BEGIN
-    -- Create user and trigger
+    -- Create user, organization and trigger
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'cascade_test4_' || substring(test_user_id, 1, 8),
             'cascade4_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Cascade Test 4', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 4', 'test-org4-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Cascade Test 4', 84532, 'reputation', test_org_id);
 
     -- Create state
     INSERT INTO trigger_state (trigger_id, state_data)
@@ -247,7 +270,8 @@ BEGIN
     -- Check if state was deleted
     SELECT EXISTS (SELECT 1 FROM trigger_state WHERE trigger_id = test_trigger_id) INTO state_exists_after;
 
-    -- Clean up
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -266,20 +290,25 @@ DO $$
 DECLARE
     check_violated BOOLEAN := false;
     test_user_id TEXT := 'test-check-user1-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-check-org1-' || gen_random_uuid()::TEXT;
 BEGIN
-    -- Create user
+    -- Create user and organization
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'check_test1_' || substring(test_user_id, 1, 8),
             'check1_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org', 'test-org-' || substring(test_org_id, 1, 8), test_user_id, true);
+
     BEGIN
-        INSERT INTO triggers (id, user_id, name, chain_id, registry)
-        VALUES ('test-check-1', test_user_id, 'Test', 84532, 'invalid_registry');
+        INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+        VALUES ('test-check-1', test_user_id, 'Test', 84532, 'invalid_registry', test_org_id);
     EXCEPTION WHEN check_violation THEN
         check_violated := true;
     END;
 
-    -- Clean up
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -294,15 +323,19 @@ DO $$
 DECLARE
     check_violated BOOLEAN := false;
     test_user_id TEXT := 'test-check-user2-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-check-org2-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-check-trigger2-' || gen_random_uuid()::TEXT;
 BEGIN
-    -- Create user and trigger
+    -- Create user, organization and trigger
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'check_test2_' || substring(test_user_id, 1, 8),
             'check2_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 2', 'test-org2-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation', test_org_id);
 
     BEGIN
         INSERT INTO trigger_actions (trigger_id, action_type, config)
@@ -311,7 +344,8 @@ BEGIN
         check_violated := true;
     END;
 
-    -- Clean up
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -344,23 +378,28 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-check-user4-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-check-org4-' || gen_random_uuid()::TEXT;
     insert_count INTEGER := 0;
 BEGIN
-    -- Create user
+    -- Create user and organization
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'check_test4_' || substring(test_user_id, 1, 8),
             'check4_' || substring(test_user_id, 1, 8) || '@test.com', 'hash123');
 
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 4', 'test-org4-' || substring(test_org_id, 1, 8), test_user_id, true);
+
     -- Try all valid registries
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
     VALUES
-        ('test-check-4-1', test_user_id, 'Test Identity', 84532, 'identity'),
-        ('test-check-4-2', test_user_id, 'Test Reputation', 84532, 'reputation'),
-        ('test-check-4-3', test_user_id, 'Test Validation', 84532, 'validation');
+        ('test-check-4-1', test_user_id, 'Test Identity', 84532, 'identity', test_org_id),
+        ('test-check-4-2', test_user_id, 'Test Reputation', 84532, 'reputation', test_org_id),
+        ('test-check-4-3', test_user_id, 'Test Validation', 84532, 'validation', test_org_id);
 
     SELECT COUNT(*) INTO insert_count FROM triggers WHERE user_id = test_user_id;
 
-    -- Clean up
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -510,17 +549,23 @@ DO $$
 DECLARE
     not_null_violated BOOLEAN := false;
     test_user_id TEXT := 'test-null-user3-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-null-org3-' || gen_random_uuid()::TEXT;
 BEGIN
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'testnull3', 'testnull3@test.com', 'hash123');
 
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org', 'test-org-' || substring(test_org_id, 1, 8), test_user_id, true);
+
     BEGIN
-        INSERT INTO triggers (id, user_id, name, chain_id, registry)
-        VALUES ('test-null-3', test_user_id, 'Test', 84532, NULL);
+        INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+        VALUES ('test-null-3', test_user_id, 'Test', 84532, NULL, test_org_id);
     EXCEPTION WHEN not_null_violation THEN
         not_null_violated := true;
     END;
 
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -535,13 +580,17 @@ DO $$
 DECLARE
     not_null_violated BOOLEAN := false;
     test_user_id TEXT := 'test-null-user4-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-null-org4-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-null-trigger4-' || gen_random_uuid()::TEXT;
 BEGIN
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'testnull4', 'testnull4@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 4', 'test-org4-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation', test_org_id);
 
     BEGIN
         INSERT INTO trigger_actions (trigger_id, action_type, config)
@@ -550,6 +599,8 @@ BEGIN
         not_null_violated := true;
     END;
 
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -567,14 +618,18 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-jsonb-user1-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-jsonb-org1-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-jsonb-trigger1-' || gen_random_uuid()::TEXT;
     jsonb_valid BOOLEAN := false;
 BEGIN
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'jsonb_test1', 'jsonb1@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org', 'test-org-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation', test_org_id);
 
     INSERT INTO trigger_conditions (trigger_id, condition_type, field, operator, value, config)
     VALUES (test_trigger_id, 'ema_threshold', 'score', '>', '75',
@@ -586,6 +641,8 @@ BEGIN
         AND config->>'window_size' = '10'
     ) INTO jsonb_valid;
 
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -599,14 +656,18 @@ END $$;
 DO $$
 DECLARE
     test_user_id TEXT := 'test-jsonb-user2-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-jsonb-org2-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-jsonb-trigger2-' || gen_random_uuid()::TEXT;
     jsonb_valid BOOLEAN := false;
 BEGIN
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'jsonb_test2', 'jsonb2@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 2', 'test-org2-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation', test_org_id);
 
     INSERT INTO trigger_actions (trigger_id, action_type, config)
     VALUES (test_trigger_id, 'rest',
@@ -618,6 +679,8 @@ BEGIN
         AND config->>'method' = 'POST'
     ) INTO jsonb_valid;
 
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(
@@ -632,13 +695,17 @@ DO $$
 DECLARE
     json_invalid BOOLEAN := false;
     test_user_id TEXT := 'test-jsonb-user3-' || gen_random_uuid()::TEXT;
+    test_org_id TEXT := 'test-jsonb-org3-' || gen_random_uuid()::TEXT;
     test_trigger_id TEXT := 'test-jsonb-trigger3-' || gen_random_uuid()::TEXT;
 BEGIN
     INSERT INTO users (id, username, email, password_hash)
     VALUES (test_user_id, 'jsonb_test3', 'jsonb3@test.com', 'hash123');
 
-    INSERT INTO triggers (id, user_id, name, chain_id, registry)
-    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation');
+    INSERT INTO organizations (id, name, slug, owner_id, is_personal)
+    VALUES (test_org_id, 'Test Org 3', 'test-org3-' || substring(test_org_id, 1, 8), test_user_id, true);
+
+    INSERT INTO triggers (id, user_id, name, chain_id, registry, organization_id)
+    VALUES (test_trigger_id, test_user_id, 'Test', 84532, 'reputation', test_org_id);
 
     BEGIN
         -- This should fail during string literal parsing
@@ -648,6 +715,8 @@ BEGIN
         json_invalid := true;
     END;
 
+    -- Clean up (organization first due to ON DELETE RESTRICT)
+    DELETE FROM organizations WHERE id = test_org_id;
     DELETE FROM users WHERE id = test_user_id;
 
     PERFORM record_test(

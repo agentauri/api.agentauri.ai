@@ -47,7 +47,7 @@ DECLARE
         'idx_users_email',
         'idx_users_username',
         'idx_triggers_user_id',
-        'idx_triggers_chain_registry_enabled',
+        'idx_triggers_org_chain_registry_enabled',
         'idx_trigger_conditions_trigger_id',
         'idx_trigger_actions_trigger_id',
         'idx_events_chain_id_created_at',
