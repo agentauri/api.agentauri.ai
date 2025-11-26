@@ -2,12 +2,12 @@
 
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use shared::DbPool;
-use validator::Validate;
 
 use crate::{
-    middleware::{
-        get_user_id, get_verified_organization_id, get_verified_organization_id_with_role,
+    handlers::helpers::{
+        extract_user_id_or_unauthorized, forbidden, handle_db_error, validate_request,
     },
+    middleware::{get_verified_organization_id, get_verified_organization_id_with_role},
     models::{
         can_write, ConditionResponse, CreateConditionRequest, ErrorResponse, SuccessResponse,
         UpdateConditionRequest,
@@ -28,14 +28,9 @@ pub async fn create_condition(
     let trigger_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (also gets role)
@@ -47,36 +42,21 @@ pub async fn create_condition(
 
     // Check user has write access
     if !can_write(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to create conditions",
-        ));
+        return forbidden("Insufficient permissions to create conditions");
     }
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to create condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -84,25 +64,21 @@ pub async fn create_condition(
     }
 
     // Create condition
-    let condition = match ConditionRepository::create(
-        &pool,
-        &trigger_id,
-        &req.condition_type,
-        &req.field,
-        &req.operator,
-        &req.value,
-        req.config.as_ref(),
-    )
-    .await
-    {
+    let condition = match handle_db_error(
+        ConditionRepository::create(
+            &pool,
+            &trigger_id,
+            &req.condition_type,
+            &req.field,
+            &req.operator,
+            &req.value,
+            req.config.as_ref(),
+        )
+        .await,
+        "create condition",
+    ) {
         Ok(condition) => condition,
-        Err(e) => {
-            tracing::error!("Failed to create condition: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to create condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = ConditionResponse::from(condition);
@@ -121,14 +97,9 @@ pub async fn list_conditions(
     let trigger_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (any role can view)
@@ -138,21 +109,12 @@ pub async fn list_conditions(
     };
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch conditions",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -160,15 +122,12 @@ pub async fn list_conditions(
     }
 
     // Get conditions
-    let conditions = match ConditionRepository::list_by_trigger(&pool, &trigger_id).await {
+    let conditions = match handle_db_error(
+        ConditionRepository::list_by_trigger(&pool, &trigger_id).await,
+        "list conditions",
+    ) {
         Ok(conditions) => conditions,
-        Err(e) => {
-            tracing::error!("Failed to list conditions: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch conditions",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response: Vec<ConditionResponse> = conditions
@@ -192,14 +151,9 @@ pub async fn update_condition(
     let (trigger_id, condition_id) = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (also gets role)
@@ -211,36 +165,21 @@ pub async fn update_condition(
 
     // Check user has write access
     if !can_write(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to update conditions",
-        ));
+        return forbidden("Insufficient permissions to update conditions");
     }
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -248,20 +187,16 @@ pub async fn update_condition(
     }
 
     // Verify condition belongs to trigger
-    let condition_trigger_id = match ConditionRepository::get_trigger_id(&pool, condition_id).await
-    {
+    let condition_trigger_id = match handle_db_error(
+        ConditionRepository::get_trigger_id(&pool, condition_id).await,
+        "get condition trigger_id",
+    ) {
         Ok(Some(id)) => id,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Condition not found"));
         }
-        Err(e) => {
-            tracing::error!("Failed to get condition trigger_id: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if condition_trigger_id != trigger_id {
@@ -270,25 +205,21 @@ pub async fn update_condition(
     }
 
     // Update condition
-    let condition = match ConditionRepository::update(
-        &pool,
-        condition_id,
-        req.condition_type.as_deref(),
-        req.field.as_deref(),
-        req.operator.as_deref(),
-        req.value.as_deref(),
-        req.config.as_ref().map(Some),
-    )
-    .await
-    {
+    let condition = match handle_db_error(
+        ConditionRepository::update(
+            &pool,
+            condition_id,
+            req.condition_type.as_deref(),
+            req.field.as_deref(),
+            req.operator.as_deref(),
+            req.value.as_deref(),
+            req.config.as_ref().map(Some),
+        )
+        .await,
+        "update condition",
+    ) {
         Ok(condition) => condition,
-        Err(e) => {
-            tracing::error!("Failed to update condition: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = ConditionResponse::from(condition);
@@ -307,14 +238,9 @@ pub async fn delete_condition(
     let (trigger_id, condition_id) = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (also gets role)
@@ -326,28 +252,16 @@ pub async fn delete_condition(
 
     // Check user has write access
     if !can_write(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to delete conditions",
-        ));
+        return forbidden("Insufficient permissions to delete conditions");
     }
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -355,20 +269,16 @@ pub async fn delete_condition(
     }
 
     // Verify condition belongs to trigger
-    let condition_trigger_id = match ConditionRepository::get_trigger_id(&pool, condition_id).await
-    {
+    let condition_trigger_id = match handle_db_error(
+        ConditionRepository::get_trigger_id(&pool, condition_id).await,
+        "get condition trigger_id",
+    ) {
         Ok(Some(id)) => id,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Condition not found"));
         }
-        Err(e) => {
-            tracing::error!("Failed to get condition trigger_id: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if condition_trigger_id != trigger_id {
@@ -377,15 +287,12 @@ pub async fn delete_condition(
     }
 
     // Delete condition
-    let deleted = match ConditionRepository::delete(&pool, condition_id).await {
+    let deleted = match handle_db_error(
+        ConditionRepository::delete(&pool, condition_id).await,
+        "delete condition",
+    ) {
         Ok(deleted) => deleted,
-        Err(e) => {
-            tracing::error!("Failed to delete condition: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete condition",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !deleted {

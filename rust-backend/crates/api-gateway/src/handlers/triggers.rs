@@ -2,12 +2,12 @@
 
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use shared::DbPool;
-use validator::Validate;
 
 use crate::{
-    middleware::{
-        get_user_id, get_verified_organization_id, get_verified_organization_id_with_role,
+    handlers::helpers::{
+        extract_user_id_or_unauthorized, forbidden, handle_db_error, validate_request,
     },
+    middleware::{get_verified_organization_id, get_verified_organization_id_with_role},
     models::{
         can_write, ActionResponse, ConditionResponse, CreateTriggerRequest, ErrorResponse,
         PaginatedResponse, PaginationMeta, PaginationParams, SuccessResponse,
@@ -26,14 +26,9 @@ pub async fn create_trigger(
     req: web::Json<CreateTriggerRequest>,
 ) -> impl Responder {
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (also gets role)
@@ -45,42 +40,32 @@ pub async fn create_trigger(
 
     // Check user has write access
     if !can_write(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to create triggers",
-        ));
+        return forbidden("Insufficient permissions to create triggers");
     }
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Create trigger
-    let trigger = match TriggerRepository::create(
-        &pool,
-        &user_id,
-        &organization_id,
-        &req.name,
-        req.description.as_deref(),
-        req.chain_id,
-        &req.registry,
-        req.enabled.unwrap_or(true),
-        req.is_stateful.unwrap_or(false),
-    )
-    .await
-    {
+    let trigger = match handle_db_error(
+        TriggerRepository::create(
+            &pool,
+            &user_id,
+            &organization_id,
+            &req.name,
+            req.description.as_deref(),
+            req.chain_id,
+            &req.registry,
+            req.enabled.unwrap_or(true),
+            req.is_stateful.unwrap_or(false),
+        )
+        .await,
+        "create trigger",
+    ) {
         Ok(trigger) => trigger,
-        Err(e) => {
-            tracing::error!("Failed to create trigger: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to create trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = TriggerResponse::from(trigger);
@@ -97,14 +82,9 @@ pub async fn list_triggers(
     query: web::Query<PaginationParams>,
 ) -> impl Responder {
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (any role can list)
@@ -122,34 +102,22 @@ pub async fn list_triggers(
     }
 
     // Get total count
-    let total = match TriggerRepository::count_by_organization(&pool, &organization_id).await {
+    let total = match handle_db_error(
+        TriggerRepository::count_by_organization(&pool, &organization_id).await,
+        "count triggers",
+    ) {
         Ok(count) => count,
-        Err(e) => {
-            tracing::error!("Failed to count triggers: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch triggers",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get triggers
-    let triggers = match TriggerRepository::list_by_organization(
-        &pool,
-        &organization_id,
-        query.limit,
-        query.offset,
-    )
-    .await
-    {
+    let triggers = match handle_db_error(
+        TriggerRepository::list_by_organization(&pool, &organization_id, query.limit, query.offset)
+            .await,
+        "list triggers",
+    ) {
         Ok(triggers) => triggers,
-        Err(e) => {
-            tracing::error!("Failed to list triggers: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch triggers",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = PaginatedResponse {
@@ -172,14 +140,9 @@ pub async fn get_trigger(
     let trigger_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (any role can view)
@@ -189,21 +152,12 @@ pub async fn get_trigger(
     };
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -211,43 +165,34 @@ pub async fn get_trigger(
     }
 
     // Get trigger
-    let trigger = match TriggerRepository::find_by_id(&pool, &trigger_id).await {
+    let trigger = match handle_db_error(
+        TriggerRepository::find_by_id(&pool, &trigger_id).await,
+        "fetch trigger",
+    ) {
         Ok(Some(trigger)) => trigger,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Trigger not found"));
         }
-        Err(e) => {
-            tracing::error!("Failed to fetch trigger: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get conditions
-    let conditions = match ConditionRepository::list_by_trigger(&pool, &trigger_id).await {
+    let conditions = match handle_db_error(
+        ConditionRepository::list_by_trigger(&pool, &trigger_id).await,
+        "fetch conditions",
+    ) {
         Ok(conditions) => conditions,
-        Err(e) => {
-            tracing::error!("Failed to fetch conditions: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch trigger details",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get actions
-    let actions = match ActionRepository::list_by_trigger(&pool, &trigger_id).await {
+    let actions = match handle_db_error(
+        ActionRepository::list_by_trigger(&pool, &trigger_id).await,
+        "fetch actions",
+    ) {
         Ok(actions) => actions,
-        Err(e) => {
-            tracing::error!("Failed to fetch actions: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch trigger details",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = TriggerDetailResponse {
@@ -275,14 +220,9 @@ pub async fn update_trigger(
     let trigger_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (also gets role)
@@ -294,36 +234,21 @@ pub async fn update_trigger(
 
     // Check user has write access
     if !can_write(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to update triggers",
-        ));
+        return forbidden("Insufficient permissions to update triggers");
     }
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -331,26 +256,22 @@ pub async fn update_trigger(
     }
 
     // Update trigger
-    let trigger = match TriggerRepository::update(
-        &pool,
-        &trigger_id,
-        req.name.as_deref(),
-        req.description.as_ref().map(|d| Some(d.as_str())),
-        req.chain_id,
-        req.registry.as_deref(),
-        req.enabled,
-        req.is_stateful,
-    )
-    .await
-    {
+    let trigger = match handle_db_error(
+        TriggerRepository::update(
+            &pool,
+            &trigger_id,
+            req.name.as_deref(),
+            req.description.as_ref().map(|d| Some(d.as_str())),
+            req.chain_id,
+            req.registry.as_deref(),
+            req.enabled,
+            req.is_stateful,
+        )
+        .await,
+        "update trigger",
+    ) {
         Ok(trigger) => trigger,
-        Err(e) => {
-            tracing::error!("Failed to update trigger: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = TriggerResponse::from(trigger);
@@ -369,14 +290,9 @@ pub async fn delete_trigger(
     let trigger_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Get and verify organization_id from header (also gets role)
@@ -388,28 +304,16 @@ pub async fn delete_trigger(
 
     // Check user has write access
     if !can_write(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to delete triggers",
-        ));
+        return forbidden("Insufficient permissions to delete triggers");
     }
 
     // Check if trigger belongs to the organization
-    let belongs = match TriggerRepository::belongs_to_organization(
-        &pool,
-        &trigger_id,
-        &organization_id,
-    )
-    .await
-    {
+    let belongs = match handle_db_error(
+        TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id).await,
+        "check trigger organization",
+    ) {
         Ok(belongs) => belongs,
-        Err(e) => {
-            tracing::error!("Failed to check trigger organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !belongs {
@@ -417,15 +321,12 @@ pub async fn delete_trigger(
     }
 
     // Delete trigger
-    let deleted = match TriggerRepository::delete(&pool, &trigger_id).await {
+    let deleted = match handle_db_error(
+        TriggerRepository::delete(&pool, &trigger_id).await,
+        "delete trigger",
+    ) {
         Ok(deleted) => deleted,
-        Err(e) => {
-            tracing::error!("Failed to delete trigger: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete trigger",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !deleted {

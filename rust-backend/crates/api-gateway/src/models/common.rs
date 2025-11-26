@@ -47,11 +47,13 @@ impl<T> SuccessResponse<T> {
 }
 
 /// Pagination parameters
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, validator::Validate)]
 pub struct PaginationParams {
     #[serde(default = "default_limit")]
+    #[validate(range(min = 1, max = 100))]
     pub limit: i64,
     #[serde(default)]
+    #[validate(range(min = 0))]
     pub offset: i64,
 }
 

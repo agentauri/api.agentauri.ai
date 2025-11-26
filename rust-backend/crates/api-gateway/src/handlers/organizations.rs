@@ -44,10 +44,11 @@
 
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use shared::DbPool;
-use validator::Validate;
 
 use crate::{
-    middleware::get_user_id,
+    handlers::helpers::{
+        bad_request, extract_user_id_or_unauthorized, forbidden, handle_db_error, validate_request,
+    },
     models::{
         can_delete_org, can_manage_members, can_manage_org, is_owner, AddMemberRequest,
         CreateOrganizationRequest, ErrorResponse, MemberResponse, OrganizationResponse,
@@ -71,22 +72,14 @@ pub async fn create_organization(
     req: web::Json<CreateOrganizationRequest>,
 ) -> impl Responder {
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Create organization - let the database handle uniqueness via constraint
@@ -146,14 +139,9 @@ pub async fn list_organizations(
     query: web::Query<PaginationParams>,
 ) -> impl Responder {
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate pagination
@@ -165,34 +153,22 @@ pub async fn list_organizations(
     }
 
     // Get total count
-    let total = match OrganizationRepository::count_by_user(&pool, &user_id).await {
+    let total = match handle_db_error(
+        OrganizationRepository::count_by_user(&pool, &user_id).await,
+        "count organizations",
+    ) {
         Ok(count) => count,
-        Err(e) => {
-            tracing::error!("Failed to count organizations: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch organizations",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get organizations WITH roles in a single optimized query (no N+1)
-    let orgs_with_roles = match OrganizationRepository::list_by_user_with_roles(
-        &pool,
-        &user_id,
-        query.limit,
-        query.offset,
-    )
-    .await
-    {
+    let orgs_with_roles = match handle_db_error(
+        OrganizationRepository::list_by_user_with_roles(&pool, &user_id, query.limit, query.offset)
+            .await,
+        "list organizations",
+    ) {
         Ok(orgs) => orgs,
-        Err(e) => {
-            tracing::error!("Failed to list organizations: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch organizations",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Build response (no additional queries needed)
@@ -223,46 +199,35 @@ pub async fn get_organization(
     let org_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Check membership
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get organization
-    let org = match OrganizationRepository::find_by_id(&pool, &org_id).await {
+    let org = match handle_db_error(
+        OrganizationRepository::find_by_id(&pool, &org_id).await,
+        "fetch organization",
+    ) {
         Ok(Some(org)) => org,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to fetch organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to fetch organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = OrganizationWithRoleResponse {
@@ -285,65 +250,47 @@ pub async fn update_organization(
     let org_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Check if user can manage org (owner or admin)
     if !can_manage_org(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to update organization",
-        ));
+        return forbidden("Insufficient permissions to update organization");
     }
 
     // Update organization
-    let org = match OrganizationRepository::update(
-        &pool,
-        &org_id,
-        req.name.as_deref(),
-        req.description.as_ref().map(|d| Some(d.as_str())),
-    )
-    .await
-    {
+    let org = match handle_db_error(
+        OrganizationRepository::update(
+            &pool,
+            &org_id,
+            req.name.as_deref(),
+            req.description.as_ref().map(|d| Some(d.as_str())),
+        )
+        .await,
+        "update organization",
+    ) {
         Ok(org) => org,
-        Err(e) => {
-            tracing::error!("Failed to update organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = OrganizationResponse::from(org);
@@ -361,73 +308,53 @@ pub async fn delete_organization(
     let org_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Only owner can delete
     if !can_delete_org(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Only the owner can delete an organization",
-        ));
+        return forbidden("Only the owner can delete an organization");
     }
 
     // Check if it's a personal organization
-    let org = match OrganizationRepository::find_by_id(&pool, &org_id).await {
+    let org = match handle_db_error(
+        OrganizationRepository::find_by_id(&pool, &org_id).await,
+        "fetch organization",
+    ) {
         Ok(Some(org)) => org,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to fetch organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if org.is_personal {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Personal organizations cannot be deleted",
-        ));
+        return bad_request("Personal organizations cannot be deleted");
     }
 
     // Delete organization
-    let deleted = match OrganizationRepository::delete(&pool, &org_id).await {
+    let deleted = match handle_db_error(
+        OrganizationRepository::delete(&pool, &org_id).await,
+        "delete organization",
+    ) {
         Ok(deleted) => deleted,
-        Err(e) => {
-            tracing::error!("Failed to delete organization: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to delete organization",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !deleted {
@@ -454,69 +381,56 @@ pub async fn add_member(
     let org_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Cannot add as owner
     if is_owner(&req.role) {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Cannot add a member as owner",
-        ));
+        return bad_request("Cannot add a member as owner");
     }
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to add member"));
-        }
+        Err(resp) => return resp,
     };
 
     // Check if user can manage members (owner or admin)
     if !can_manage_members(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to add members",
-        ));
+        return forbidden("Insufficient permissions to add members");
     }
 
     // Check if target user exists
-    let target_user = match UserRepository::find_by_id(&pool, &req.user_id).await {
+    let target_user = match handle_db_error(
+        UserRepository::find_by_id(&pool, &req.user_id).await,
+        "find user",
+    ) {
         Ok(Some(u)) => u,
         Ok(None) => {
             return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "User not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to find user: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to add member"));
-        }
+        Err(resp) => return resp,
     };
 
     // Check if already a member
-    match MemberRepository::is_member(&pool, &org_id, &req.user_id).await {
+    match handle_db_error(
+        MemberRepository::is_member(&pool, &org_id, &req.user_id).await,
+        "check membership",
+    ) {
         Ok(true) => {
             return HttpResponse::Conflict().json(ErrorResponse::new(
                 "conflict",
@@ -524,29 +438,16 @@ pub async fn add_member(
             ))
         }
         Ok(false) => {}
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to add member"));
-        }
+        Err(resp) => return resp,
     }
 
     // Add member
-    let member = match MemberRepository::add(
-        &pool,
-        &org_id,
-        &req.user_id,
-        &req.role,
-        Some(&user_id),
-    )
-    .await
-    {
+    let member = match handle_db_error(
+        MemberRepository::add(&pool, &org_id, &req.user_id, &req.role, Some(&user_id)).await,
+        "add member",
+    ) {
         Ok(m) => m,
-        Err(e) => {
-            tracing::error!("Failed to add member: {}", e);
-            return HttpResponse::InternalServerError()
-                .json(ErrorResponse::new("internal_error", "Failed to add member"));
-        }
+        Err(resp) => return resp,
     };
 
     let response = MemberResponse {
@@ -573,14 +474,9 @@ pub async fn list_members(
     let org_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate pagination
@@ -592,45 +488,35 @@ pub async fn list_members(
     }
 
     // Check membership and get role (needed for email masking decision)
-    let requester_role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let requester_role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(role)) => role,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to list members",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get total count
-    let total = match MemberRepository::count(&pool, &org_id).await {
+    let total = match handle_db_error(
+        MemberRepository::count(&pool, &org_id).await,
+        "count members",
+    ) {
         Ok(count) => count,
-        Err(e) => {
-            tracing::error!("Failed to count members: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to list members",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Get members WITH user info in a single optimized query (no N+1)
-    let members_with_users =
-        match MemberRepository::list_with_users(&pool, &org_id, query.limit, query.offset).await {
-            Ok(m) => m,
-            Err(e) => {
-                tracing::error!("Failed to list members: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to list members",
-                ));
-            }
-        };
+    let members_with_users = match handle_db_error(
+        MemberRepository::list_with_users(&pool, &org_id, query.limit, query.offset).await,
+        "list members",
+    ) {
+        Ok(m) => m,
+        Err(resp) => return resp,
+    };
 
     // Determine if emails should be shown (only owner/admin can see full emails)
     let can_see_emails = is_owner(&requester_role) || requester_role == ROLE_ADMIN;
@@ -707,107 +593,77 @@ pub async fn update_member_role(
     } = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Cannot set role to owner
     if is_owner(&req.role) {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Cannot change role to owner",
-        ));
+        return bad_request("Cannot change role to owner");
     }
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update member",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Only owner can update roles
     if !is_owner(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Only the owner can update member roles",
-        ));
+        return forbidden("Only the owner can update member roles");
     }
 
     // Check target member exists
-    let target_role = match MemberRepository::get_role(&pool, &org_id, &target_user_id).await {
+    let target_role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &target_user_id).await,
+        "check target membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Member not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check target membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update member",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Cannot change owner's role
     if is_owner(&target_role) {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Cannot change the owner's role",
-        ));
+        return bad_request("Cannot change the owner's role");
     }
 
     // Update role
-    let member =
-        match MemberRepository::update_role(&pool, &org_id, &target_user_id, &req.role).await {
-            Ok(m) => m,
-            Err(e) => {
-                tracing::error!("Failed to update member role: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to update member",
-                ));
-            }
-        };
+    let member = match handle_db_error(
+        MemberRepository::update_role(&pool, &org_id, &target_user_id, &req.role).await,
+        "update member role",
+    ) {
+        Ok(m) => m,
+        Err(resp) => return resp,
+    };
 
     // Get user info
-    let target_user = match UserRepository::find_by_id(&pool, &target_user_id).await {
+    let target_user = match handle_db_error(
+        UserRepository::find_by_id(&pool, &target_user_id).await,
+        "find user",
+    ) {
         Ok(Some(u)) => u,
         Ok(None) => {
             return HttpResponse::InternalServerError()
                 .json(ErrorResponse::new("internal_error", "User not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to find user: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update member",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     let response = MemberResponse {
@@ -836,74 +692,54 @@ pub async fn remove_member(
     } = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Check membership and role
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to remove member",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Check if user can manage members (owner or admin)
     if !can_manage_members(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Insufficient permissions to remove members",
-        ));
+        return forbidden("Insufficient permissions to remove members");
     }
 
     // Check target member exists and get their role
-    let target_role = match MemberRepository::get_role(&pool, &org_id, &target_user_id).await {
+    let target_role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &target_user_id).await,
+        "check target membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Member not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check target membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to remove member",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Cannot remove owner
     if is_owner(&target_role) {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Cannot remove the owner from the organization",
-        ));
+        return bad_request("Cannot remove the owner from the organization");
     }
 
     // Remove member
-    let removed = match MemberRepository::remove(&pool, &org_id, &target_user_id).await {
+    let removed = match handle_db_error(
+        MemberRepository::remove(&pool, &org_id, &target_user_id).await,
+        "remove member",
+    ) {
         Ok(r) => r,
-        Err(e) => {
-            tracing::error!("Failed to remove member: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to remove member",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     if !removed {
@@ -937,58 +773,44 @@ pub async fn transfer_ownership(
     let org_id = path.into_inner();
 
     // Get authenticated user_id
-    let user_id = match get_user_id(&req_http) {
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
         Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required",
-            ))
-        }
+        Err(resp) => return resp,
     };
 
     // Validate request
-    if let Err(e) = req.validate() {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "validation_error",
-            format!("Validation failed: {}", e),
-        ));
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
     }
 
     // Cannot transfer to yourself
     if req.new_owner_id == user_id {
-        return HttpResponse::BadRequest().json(ErrorResponse::new(
-            "bad_request",
-            "Cannot transfer ownership to yourself",
-        ));
+        return bad_request("Cannot transfer ownership to yourself");
     }
 
     // Check membership and role - must be owner
-    let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
                 .json(ErrorResponse::new("not_found", "Organization not found"))
         }
-        Err(e) => {
-            tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to transfer ownership",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Only owner can transfer ownership
     if !is_owner(&role) {
-        return HttpResponse::Forbidden().json(ErrorResponse::new(
-            "forbidden",
-            "Only the owner can transfer ownership",
-        ));
+        return forbidden("Only the owner can transfer ownership");
     }
 
     // Check that the new owner is a member
-    let new_owner_role = match MemberRepository::get_role(&pool, &org_id, &req.new_owner_id).await {
+    let new_owner_role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &req.new_owner_id).await,
+        "check new owner membership",
+    ) {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::BadRequest().json(ErrorResponse::new(
@@ -996,13 +818,7 @@ pub async fn transfer_ownership(
                 "New owner must be a member of the organization",
             ))
         }
-        Err(e) => {
-            tracing::error!("Failed to check new owner membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to transfer ownership",
-            ));
-        }
+        Err(resp) => return resp,
     };
 
     // Warn if transferring to a viewer (unusual but allowed)
