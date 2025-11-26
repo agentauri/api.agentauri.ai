@@ -1205,7 +1205,9 @@ mod tests {
         assert!(service.verify_key(&generated.key, &generated.hash).unwrap());
 
         // Verify wrong key
-        assert!(!service.verify_key("sk_live_wrongkey12345678901234567890123", &generated.hash).unwrap());
+        assert!(!service
+            .verify_key("sk_live_wrongkey12345678901234567890123", &generated.hash)
+            .unwrap());
     }
 
     #[test]

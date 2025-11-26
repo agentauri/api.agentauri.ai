@@ -34,6 +34,8 @@ const DEFAULT_GLOBAL_RATE: u32 = 1000;
 #[derive(Debug, Clone)]
 pub struct RateLimitError {
     pub message: String,
+    /// Retry-After value in milliseconds (for HTTP header)
+    #[allow(dead_code)]
     pub retry_after_ms: Option<u64>,
 }
 
@@ -80,9 +82,8 @@ impl AuthRateLimiter {
     pub fn with_rates(global_rate: u32, per_ip_rate: u32) -> Self {
         // Convert per-minute rates to per-second for governor
         // governor uses per-second quotas, so we need to handle this
-        let global_quota = Quota::per_minute(
-            NonZeroU32::new(global_rate).expect("Global rate must be > 0"),
-        );
+        let global_quota =
+            Quota::per_minute(NonZeroU32::new(global_rate).expect("Global rate must be > 0"));
 
         Self {
             global_limiter: Arc::new(GovernorRateLimiter::direct(global_quota)),
@@ -104,10 +105,7 @@ impl AuthRateLimiter {
     pub fn check(&self, ip_address: &str) -> Result<(), RateLimitError> {
         // Check global limit first
         if self.global_limiter.check().is_err() {
-            tracing::warn!(
-                ip = ip_address,
-                "Global auth rate limit exceeded"
-            );
+            tracing::warn!(ip = ip_address, "Global auth rate limit exceeded");
             return Err(RateLimitError {
                 message: "Too many authentication attempts. Please try again later.".to_string(),
                 retry_after_ms: Some(1000), // 1 second
@@ -117,12 +115,10 @@ impl AuthRateLimiter {
         // Check per-IP limit
         let ip_limiter = self.get_ip_limiter(ip_address);
         if ip_limiter.check().is_err() {
-            tracing::warn!(
-                ip = ip_address,
-                "Per-IP auth rate limit exceeded"
-            );
+            tracing::warn!(ip = ip_address, "Per-IP auth rate limit exceeded");
             return Err(RateLimitError {
-                message: "Too many authentication attempts from your IP. Please try again later.".to_string(),
+                message: "Too many authentication attempts from your IP. Please try again later."
+                    .to_string(),
                 retry_after_ms: Some(60000), // 1 minute
             });
         }
@@ -235,7 +231,10 @@ mod tests {
         // Third check should fail due to global limit
         let result = limiter.check("192.168.1.3");
         assert!(result.is_err());
-        assert!(result.unwrap_err().message.contains("Too many authentication attempts"));
+        assert!(result
+            .unwrap_err()
+            .message
+            .contains("Too many authentication attempts"));
     }
 
     #[test]

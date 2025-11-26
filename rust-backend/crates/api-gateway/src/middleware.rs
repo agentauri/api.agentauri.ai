@@ -585,11 +585,7 @@ async fn validate_api_key(
     if let Some(limiter) = rate_limiter {
         let ip = ip_address.unwrap_or("unknown");
         if let Err(e) = limiter.check(ip) {
-            tracing::warn!(
-                ip = ip,
-                "API key auth rate limited: {}",
-                e.message
-            );
+            tracing::warn!(ip = ip, "API key auth rate limited: {}", e.message);
 
             // Log to auth_failures table (no org context for rate limits)
             let _ = AuthFailureRepository::log(
