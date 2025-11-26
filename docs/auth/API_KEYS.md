@@ -188,32 +188,40 @@ CREATE INDEX idx_api_keys_org ON api_keys(organization_id) WHERE revoked_at IS N
 ## Validation Flow
 
 ```
-1. Extract key from Authorization header
+1. Check authentication rate limit (per-IP + global)
+   → If exceeded: 429 Too Many Requests (log to auth_failures)
+
+2. Extract key from Authorization header
    Authorization: Bearer sk_live_abc123...
 
-2. Parse prefix (sk_live_abc123de)
+3. Parse and validate key format
+   → If invalid format: 401 Unauthorized (log to auth_failures)
 
-3. Look up key by prefix in database
-   → If not found: 401 Unauthorized
+4. Parse prefix (first 16 chars: sk_live_abc123de)
 
-4. Verify key against stored Argon2 hash
-   → If mismatch: 401 Unauthorized
+5. Look up key by prefix in database
+   → If not found: dummy_verify() + 401 Unauthorized (log to auth_failures)
 
-5. Check revocation status
+6. Verify key against stored Argon2id hash (constant-time)
+   → If mismatch: 401 Unauthorized (log to api_key_audit_log)
+
+7. Check revocation status
    → If revoked: 401 Unauthorized (key revoked)
 
-6. Check expiration
+8. Check expiration
    → If expired: 401 Unauthorized (key expired)
 
-7. Check permissions for requested operation
+9. Check permissions for requested operation
    → If insufficient: 403 Forbidden
 
-8. Apply rate limiting based on organization plan
-   → If exceeded: 429 Too Many Requests
+10. Apply API rate limiting based on organization plan
+    → If exceeded: 429 Too Many Requests
 
-9. Update last_used_at and last_used_ip
+11. Update last_used_at and last_used_ip
 
-10. Allow request to proceed
+12. Log successful auth to api_key_audit_log
+
+13. Allow request to proceed
 ```
 
 ## Rate Limiting
@@ -227,6 +235,91 @@ API keys inherit rate limits from their organization's plan:
 | Enterprise | 2000 | 50 |
 
 Individual keys can have `rate_limit_override` for custom limits (lower than plan max).
+
+## Security Hardening (Phase 3.5b)
+
+The API key authentication system includes comprehensive security hardening:
+
+### Timing Attack Mitigation
+
+To prevent timing attacks during key verification, the system uses a pre-computed dummy hash:
+
+```rust
+// Pre-computed Argon2id hash for dummy verification
+// This ensures constant-time verification even for non-existent keys
+lazy_static! {
+    static ref DUMMY_HASH: String = {
+        ApiKeyService::hash_key("dummy_key_for_timing_attack_mitigation")
+            .expect("Failed to compute dummy hash")
+    };
+}
+
+// Even if key prefix not found, we verify against dummy hash
+// This makes timing analysis ineffective
+fn dummy_verify() -> bool {
+    let _ = verify_key("invalid", &DUMMY_HASH);
+    false
+}
+```
+
+**Why this matters**: Without this mitigation, an attacker could measure response times to determine if a key prefix exists in the database (fast fail) vs. hash verification (slower).
+
+### Authentication Rate Limiting
+
+Dedicated rate limiting for authentication attempts using the Governor crate:
+
+| Limit Type | Rate | Purpose |
+|------------|------|---------|
+| Per-IP | 20/minute | Prevent brute-force from single source |
+| Global | 1000/minute | Prevent distributed attacks |
+
+```rust
+// Rate limiter configuration
+AuthRateLimiter::new(
+    per_ip_rate: 20,      // 20 auth attempts per minute per IP
+    global_rate: 1000,    // 1000 total auth attempts per minute
+)
+```
+
+Rate limit responses include `Retry-After` header with seconds until reset.
+
+### Dual Audit Logging
+
+Two-tier logging system for comprehensive security monitoring:
+
+1. **`api_key_audit_log`** - Organization-scoped events
+   - Key creation, rotation, revocation
+   - Successful authentications
+   - Failed authentications (when org is known)
+
+2. **`auth_failures`** - Pre-organization failures
+   - Invalid key format
+   - Unknown key prefix
+   - Rate-limited requests
+
+```sql
+-- auth_failures table for logging failures without org context
+CREATE TABLE auth_failures (
+    id BIGSERIAL PRIMARY KEY,
+    failure_type TEXT NOT NULL,  -- 'invalid_format', 'prefix_not_found', 'rate_limited'
+    key_prefix TEXT,             -- First 16 chars for pattern analysis
+    ip_address INET,
+    user_agent TEXT,
+    endpoint TEXT,
+    details JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Argon2id Parameters (OWASP Recommended)
+
+```rust
+// OWASP-recommended Argon2id parameters
+const MEMORY_COST: u32 = 65536;  // 64 MiB
+const TIME_COST: u32 = 3;        // 3 iterations
+const PARALLELISM: u32 = 1;      // 1 thread
+const OUTPUT_LENGTH: usize = 32; // 256 bits
+```
 
 ## Security Best Practices
 
@@ -247,6 +340,7 @@ Individual keys can have `rate_limit_override` for custom limits (lower than pla
 5. **Monitor key usage**
    - Check `last_used_at` for unused keys
    - Review access logs for anomalies
+   - Monitor `auth_failures` table for attack patterns
 
 6. **Set expiration dates**
    - Avoid permanent keys when possible
@@ -259,7 +353,8 @@ Individual keys can have `rate_limit_override` for custom limits (lower than pla
 | 401 | `KEY_REVOKED` | Key has been revoked |
 | 401 | `KEY_EXPIRED` | Key has expired |
 | 403 | `INSUFFICIENT_PERMISSIONS` | Key lacks required permission |
-| 429 | `RATE_LIMITED` | Rate limit exceeded |
+| 429 | `AUTH_RATE_LIMITED` | Authentication rate limit exceeded (20/min per IP) |
+| 429 | `RATE_LIMITED` | API rate limit exceeded (per-plan) |
 
 ## Related Documentation
 
@@ -269,4 +364,4 @@ Individual keys can have `rate_limit_override` for custom limits (lower than pla
 
 ---
 
-**Last Updated**: November 24, 2025
+**Last Updated**: November 26, 2024

@@ -23,6 +23,12 @@ This document outlines the complete implementation roadmap for the api.8004.dev 
 - ✅ Trigger evaluation engine complete (Week 8, 100%)
 - ✅ Telegram Worker complete with security hardening (Week 9, 100%)
 
+**Phase 3.5: Payment Foundation - Week 11 ✅ COMPLETE**
+- ✅ Organizations + Organization Members
+- ✅ API Key Authentication (Layer 1) with security hardening
+- ✅ Security hardening: timing attack mitigation, rate limiting, audit logging
+- 170 tests passing
+
 **Pull Layer (NEW)**
 The roadmap now includes Pull Layer features for agent-initiated queries:
 - Phase 3.5: Payment & Authentication Foundation (Organizations, Credits, Stripe, 3-Layer Auth)
@@ -312,50 +318,67 @@ See [Authentication Documentation](../docs/auth/AUTHENTICATION.md) for details.
 
 **Goal**: Establish multi-tenant account model, payment infrastructure, and 3-layer authentication for Pull Layer.
 
-#### Week 11: Organizations + API Key Auth (Layer 1)
+#### Week 11: Organizations + API Key Auth (Layer 1) ✅ COMPLETED
+
+**Status**: Security Hardening COMPLETE (commit `26e9f92`)
 
 **Deliverables**:
-- Organizations table with multi-tenant support
-- Organization members with role-based access
-- Organization CRUD API endpoints
-- JWT middleware updates for organization context
-- **Enhanced API Keys** with `sk_live_xxx` / `sk_test_xxx` format (Layer 1 Auth)
-- API Key CRUD endpoints and middleware
+- ✅ Organizations table with multi-tenant support
+- ✅ Organization members with role-based access
+- ✅ Organization CRUD API endpoints
+- ✅ JWT middleware updates for organization context
+- ✅ **Enhanced API Keys** with `sk_live_xxx` / `sk_test_xxx` format (Layer 1 Auth)
+- ✅ API Key CRUD endpoints and middleware
+- ✅ **Security Hardening**:
+  - Timing attack mitigation via pre-computed dummy hash for constant-time verification
+  - Authentication rate limiting with Governor crate (20/min per IP, 1000/min global)
+  - Dual audit logging: `api_key_audit_log` (org-scoped) + `auth_failures` (pre-org failures)
 
 **Database Migrations**:
-- `20250125000001_create_organizations_table.sql`
-- `20250125000002_create_organization_members_table.sql`
-- `20250125000003_create_api_keys_enhanced.sql`
+- ✅ `20251125000001_create_organizations_table.sql`
+- ✅ `20251125000002_create_organization_members_table.sql`
+- ✅ `20251126000001_create_api_keys_table.sql`
+- ✅ `20251126000002_create_api_key_audit_log_table.sql`
+- ✅ `20251126000003_create_auth_failures_table.sql`
 
-**Subagents**:
-- `backend-architect` - Account model design
-- `rust-engineer` - Implementation
+**Implementation Stats**:
+- 18 files changed, 3504 insertions
+- 170 tests passing (8 new for rate limiter)
+- DualAuth middleware (JWT + API Key)
 
-**Tasks**:
-1. Create organizations table (id, name, slug, owner_user_id, plan, stripe_customer_id)
-2. Create organization_members table with roles (admin, member, viewer)
-3. Implement organization repository and handlers
-4. Update JWT middleware to include organization context
-5. Create API endpoints for organization CRUD and member management
-6. **Create enhanced api_keys table** (environment, key_type, permissions, Argon2 hash)
-7. **Implement API key generation** with secure random prefix (`sk_live_`, `sk_test_`)
-8. **Create ApiKeyAuth middleware** for Layer 1 authentication
-9. **Implement dual auth support** (JWT OR API Key for all endpoints)
+**Subagents Used**:
+- ✅ `backend-architect` - Account model design
+- ✅ `rust-engineer` - Implementation
+- ✅ `security-engineer` - Security hardening
 
-**API Endpoints**:
-- `POST /api/v1/organizations` - Create organization
-- `GET /api/v1/organizations` - List user's organizations
-- `GET /api/v1/organizations/:id` - Get organization details
-- `PUT /api/v1/organizations/:id` - Update organization
-- `DELETE /api/v1/organizations/:id` - Delete organization
-- `POST /api/v1/organizations/:id/members` - Invite member
-- `GET /api/v1/organizations/:id/members` - List members
-- `DELETE /api/v1/organizations/:id/members/:user_id` - Remove member
-- **`POST /api/v1/api-keys`** - Create API key
-- **`GET /api/v1/api-keys`** - List organization's keys
-- **`GET /api/v1/api-keys/:id`** - Get key details (masked)
-- **`DELETE /api/v1/api-keys/:id`** - Revoke key
-- **`POST /api/v1/api-keys/:id/rotate`** - Rotate key
+**Tasks Completed**:
+1. ✅ Create organizations table (id, name, slug, owner_user_id, plan, stripe_customer_id)
+2. ✅ Create organization_members table with roles (admin, member, viewer)
+3. ✅ Implement organization repository and handlers
+4. ✅ Update JWT middleware to include organization context
+5. ✅ Create API endpoints for organization CRUD and member management
+6. ✅ **Create enhanced api_keys table** (environment, key_type, permissions, Argon2 hash)
+7. ✅ **Implement API key generation** with secure random prefix (`sk_live_`, `sk_test_`)
+8. ✅ **Create DualAuth middleware** for Layer 1 authentication
+9. ✅ **Implement dual auth support** (JWT OR API Key for all endpoints)
+10. ✅ **Timing attack mitigation** with pre-computed dummy hash
+11. ✅ **Authentication rate limiting** with Governor crate
+12. ✅ **Dual audit logging** for comprehensive security monitoring
+
+**API Endpoints** (All Implemented):
+- ✅ `POST /api/v1/organizations` - Create organization
+- ✅ `GET /api/v1/organizations` - List user's organizations
+- ✅ `GET /api/v1/organizations/:id` - Get organization details
+- ✅ `PUT /api/v1/organizations/:id` - Update organization
+- ✅ `DELETE /api/v1/organizations/:id` - Delete organization
+- ✅ `POST /api/v1/organizations/:id/members` - Invite member
+- ✅ `GET /api/v1/organizations/:id/members` - List members
+- ✅ `DELETE /api/v1/organizations/:id/members/:user_id` - Remove member
+- ✅ **`POST /api/v1/api-keys`** - Create API key
+- ✅ **`GET /api/v1/api-keys`** - List organization's keys
+- ✅ **`GET /api/v1/api-keys/:id`** - Get key details (masked)
+- ✅ **`DELETE /api/v1/api-keys/:id`** - Revoke key
+- ✅ **`POST /api/v1/api-keys/:id/rotate`** - Rotate key
 
 #### Week 12: Credits + Wallet Auth (Layer 2)
 
@@ -1003,8 +1026,8 @@ After completing Phase 7 (Production Deployment), the project will enter mainten
 
 ---
 
-**Last Updated**: November 25, 2024
-**Current Phase**: Phase 3 (Core Backend) - ✅ COMPLETE (100%)
-**Current Week**: Week 10 (Integration Testing) - ✅ COMPLETE
-**Next Milestone**: Payment Foundation (Week 11)
+**Last Updated**: November 26, 2024
+**Current Phase**: Phase 3.5 (Payment Foundation) - Week 11 ✅ COMPLETE
+**Current Week**: Week 12 (Credits + Wallet Auth)
+**Next Milestone**: Week 12 - Credits System + Wallet Auth (Layer 2)
 **Total Timeline**: 25 weeks (+3 weeks: Pull Layer +2, Authentication +1)

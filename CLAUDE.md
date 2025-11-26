@@ -130,7 +130,11 @@ This backend transforms these raw blockchain signals into intelligent actions: n
   - Tier 0-1 queries only
 - **Layer 1: API Key** - Account-based authentication
   - Format: `sk_live_xxx` (production) / `sk_test_xxx` (testing)
-  - Argon2 hashing with secure storage
+  - Argon2id hashing with OWASP-recommended parameters (64MiB memory, 3 iterations)
+  - **Security hardening**:
+    - Timing attack mitigation via pre-computed dummy hash for constant-time verification
+    - Authentication rate limiting: 20 attempts/min per IP, 1000/min global
+    - Dual audit logging: `api_key_audit_log` (org-scoped) + `auth_failures` (pre-org failures)
   - All payment methods (Stripe, x402, Credits)
   - Per-plan rate limits (Starter: 100/hr, Pro: 500/hr, Enterprise: 2000/hr)
   - Full access to Tier 0-3 queries
@@ -232,9 +236,13 @@ REST API server providing trigger management and system queries.
 **Security Features**:
 - **3-layer authentication** (Anonymous, API Key, Wallet Signature)
 - JWT authentication middleware (jsonwebtoken crate)
-- API Key authentication middleware (`sk_live_xxx` format)
+- **DualAuth middleware** supporting both JWT and API Key authentication
+- API Key authentication middleware (`sk_live_xxx` format) with security hardening:
+  - **Timing attack mitigation**: Pre-computed Argon2id hash for dummy_verify()
+  - **Authentication rate limiting**: Governor crate (20 auth/min per IP, 1000/min global)
+  - **Comprehensive audit logging**: 2-tier system (api_key_audit_log + auth_failures)
 - EIP-191 wallet signature verification (alloy crate)
-- Argon2 hashing for passwords and API keys
+- Argon2id hashing for passwords and API keys (OWASP parameters: 64MiB, 3 iterations)
 - User ownership validation on all trigger operations
 - CORS whitelist with environment configuration
 - Input validation with validator crate
@@ -1144,21 +1152,26 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
   - 80 new api-gateway tests (middleware, models, validation)
   - Comprehensive coverage for DTOs and validators
 
-### Phase 3.5: Payment Foundation (Weeks 11-12) - NEW
+### Phase 3.5: Payment Foundation (Weeks 11-12)
 
 **Goal**: Establish multi-tenant account model and payment infrastructure (critical path for Pull Layer).
 
-**Week 11: Account Model + Organizations**
-- Database migrations: `organizations`, `organization_members`
-- Organization CRUD endpoints
-- Role-based access (admin, member, viewer)
-- User-organization linking
+**Week 11: Organizations + API Key Auth (Layer 1)** ✅ COMPLETE
+- ✅ Database migrations: `organizations`, `organization_members`, `api_keys`, `api_key_audit_log`, `auth_failures`
+- ✅ Organization CRUD endpoints with role-based access
+- ✅ API Key management endpoints (create, list, get, revoke, rotate)
+- ✅ DualAuth middleware (JWT + API Key authentication)
+- ✅ **Security hardening**:
+  - Timing attack mitigation (pre-computed dummy hash)
+  - Authentication rate limiting (Governor crate: 20/min IP, 1000/min global)
+  - Dual audit logging system
+- 170 tests passing (8 new for rate limiter)
 
-**Week 12: Credits System + Stripe Basics**
-- Database migrations: `credits`, `credit_transactions`, `subscriptions`
+**Week 12: Credits System + Wallet Auth (Layer 2)**
+- Database migrations: `credits`, `credit_transactions`, `subscriptions`, `agent_links`
 - Credit balance and transaction endpoints
 - Stripe webhook integration
-- Basic subscription management
+- Wallet signature authentication (EIP-191)
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - SHIFTED +2
 
@@ -1253,6 +1266,6 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 
 ---
 
-**Last Updated**: November 25, 2024
-**Version**: 1.0.0
+**Last Updated**: November 26, 2024
+**Version**: 1.1.0
 **Maintainers**: Development Team
