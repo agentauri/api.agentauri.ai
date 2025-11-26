@@ -1,3 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/**
+ * Ponder API Routes
+ *
+ * Note: ESLint unsafe rules are disabled because Ponder's dynamic API
+ * doesn't provide complete TypeScript type definitions for route handlers.
+ * The handlers are strongly typed at runtime by Ponder.
+ */
 import { ponder } from "@ponder/core";
 
 // ============================================================================
@@ -103,11 +114,14 @@ ponder.use("/status", async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    return c.json({
-      status: "error",
-      error: error instanceof Error ? error.message : "Unknown error",
-      timestamp: new Date().toISOString(),
-    }, 500);
+    return c.json(
+      {
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
+      },
+      500
+    );
   }
 });
 

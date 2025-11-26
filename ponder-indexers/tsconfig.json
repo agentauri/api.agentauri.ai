@@ -54,14 +54,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    "ponder.config.ts",
-    "ponder-env.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".ponder"
-  ]
+  "include": ["src/**/*", "ponder.config.ts", "ponder.schema.ts", "ponder-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".ponder"]
 }

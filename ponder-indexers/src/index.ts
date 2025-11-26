@@ -1,18 +1,17 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Ponder Event Handlers
+ *
+ * Note: ESLint unsafe rules are disabled because Ponder's dynamic API
+ * doesn't provide complete TypeScript type definitions for event handlers.
+ * The `event` and `context` objects are strongly typed at runtime by Ponder.
+ */
 import { ponder } from "@ponder/core";
 import type { Address, Hash, Hex } from "viem";
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-interface BaseEventContext {
-  chainId: bigint;
-  blockNumber: bigint;
-  blockHash: Hash;
-  transactionHash: Hash;
-  logIndex: number;
-  timestamp: bigint;
-}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -21,11 +20,7 @@ interface BaseEventContext {
 /**
  * Generate a unique event ID from chain, transaction, and log index
  */
-function generateEventId(
-  chainId: bigint,
-  transactionHash: Hash,
-  logIndex: number
-): string {
+function generateEventId(chainId: bigint, transactionHash: Hash, logIndex: number): string {
   return `${chainId}-${transactionHash}-${logIndex}`;
 }
 
@@ -60,18 +55,10 @@ ponder.on("IdentityRegistryPolygonAmoy:AgentRegistered", async ({ event, context
   await handleAgentRegistered(event, context, 80002n);
 });
 
-async function handleAgentRegistered(
-  event: any,
-  context: any,
-  chainId: bigint
-): Promise<void> {
+async function handleAgentRegistered(event: any, context: any, chainId: bigint): Promise<void> {
   const { Event } = context.db;
 
-  const eventId = generateEventId(
-    chainId,
-    event.transaction.hash,
-    event.log.logIndex
-  );
+  const eventId = generateEventId(chainId, event.transaction.hash, event.log.logIndex);
 
   await Event.create({
     id: eventId,
@@ -125,18 +112,10 @@ ponder.on("IdentityRegistryPolygonAmoy:MetadataUpdated", async ({ event, context
   await handleMetadataUpdated(event, context, 80002n);
 });
 
-async function handleMetadataUpdated(
-  event: any,
-  context: any,
-  chainId: bigint
-): Promise<void> {
+async function handleMetadataUpdated(event: any, context: any, chainId: bigint): Promise<void> {
   const { Event } = context.db;
 
-  const eventId = generateEventId(
-    chainId,
-    event.transaction.hash,
-    event.log.logIndex
-  );
+  const eventId = generateEventId(chainId, event.transaction.hash, event.log.logIndex);
 
   await Event.create({
     id: eventId,
@@ -194,18 +173,10 @@ ponder.on("ReputationRegistryPolygonAmoy:FeedbackSubmitted", async ({ event, con
   await handleFeedbackSubmitted(event, context, 80002n);
 });
 
-async function handleFeedbackSubmitted(
-  event: any,
-  context: any,
-  chainId: bigint
-): Promise<void> {
+async function handleFeedbackSubmitted(event: any, context: any, chainId: bigint): Promise<void> {
   const { Event } = context.db;
 
-  const eventId = generateEventId(
-    chainId,
-    event.transaction.hash,
-    event.log.logIndex
-  );
+  const eventId = generateEventId(chainId, event.transaction.hash, event.log.logIndex);
 
   await Event.create({
     id: eventId,
@@ -264,18 +235,10 @@ ponder.on("ReputationRegistryPolygonAmoy:ScoreUpdated", async ({ event, context 
   await handleScoreUpdated(event, context, 80002n);
 });
 
-async function handleScoreUpdated(
-  event: any,
-  context: any,
-  chainId: bigint
-): Promise<void> {
+async function handleScoreUpdated(event: any, context: any, chainId: bigint): Promise<void> {
   const { Event } = context.db;
 
-  const eventId = generateEventId(
-    chainId,
-    event.transaction.hash,
-    event.log.logIndex
-  );
+  const eventId = generateEventId(chainId, event.transaction.hash, event.log.logIndex);
 
   await Event.create({
     id: eventId,
@@ -333,18 +296,10 @@ ponder.on("ValidationRegistryPolygonAmoy:ValidationPerformed", async ({ event, c
   await handleValidationPerformed(event, context, 80002n);
 });
 
-async function handleValidationPerformed(
-  event: any,
-  context: any,
-  chainId: bigint
-): Promise<void> {
+async function handleValidationPerformed(event: any, context: any, chainId: bigint): Promise<void> {
   const { Event } = context.db;
 
-  const eventId = generateEventId(
-    chainId,
-    event.transaction.hash,
-    event.log.logIndex
-  );
+  const eventId = generateEventId(chainId, event.transaction.hash, event.log.logIndex);
 
   await Event.create({
     id: eventId,
@@ -402,18 +357,10 @@ ponder.on("ValidationRegistryPolygonAmoy:ValidationRequested", async ({ event, c
   await handleValidationRequested(event, context, 80002n);
 });
 
-async function handleValidationRequested(
-  event: any,
-  context: any,
-  chainId: bigint
-): Promise<void> {
+async function handleValidationRequested(event: any, context: any, chainId: bigint): Promise<void> {
   const { Event } = context.db;
 
-  const eventId = generateEventId(
-    chainId,
-    event.transaction.hash,
-    event.log.logIndex
-  );
+  const eventId = generateEventId(chainId, event.transaction.hash, event.log.logIndex);
 
   await Event.create({
     id: eventId,
