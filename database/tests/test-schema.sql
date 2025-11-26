@@ -483,7 +483,7 @@ BEGIN
     SELECT COUNT(*) INTO idx_count
     FROM pg_indexes
     WHERE tablename = 'triggers'
-    AND (indexname = 'idx_triggers_user_id' OR indexname = 'idx_triggers_chain_registry_enabled');
+    AND (indexname = 'idx_triggers_user_id' OR indexname = 'idx_triggers_org_chain_registry_enabled');
 
     PERFORM record_test(
         'T6.2: triggers has user_id and composite index',

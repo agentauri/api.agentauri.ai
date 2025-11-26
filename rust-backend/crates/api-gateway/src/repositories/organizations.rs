@@ -125,31 +125,30 @@ impl OrganizationRepository {
 
     /// Find organization by ID
     pub async fn find_by_id(pool: &DbPool, org_id: &str) -> Result<Option<Organization>> {
-        let org = sqlx::query_as::<_, Organization>(
-            r#"SELECT * FROM organizations WHERE id = $1"#,
-        )
-        .bind(org_id)
-        .fetch_optional(pool)
-        .await
-        .context("Failed to find organization by ID")?;
+        let org = sqlx::query_as::<_, Organization>(r#"SELECT * FROM organizations WHERE id = $1"#)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await
+            .context("Failed to find organization by ID")?;
 
         Ok(org)
     }
 
     /// Find organization by slug
+    #[allow(dead_code)]
     pub async fn find_by_slug(pool: &DbPool, slug: &str) -> Result<Option<Organization>> {
-        let org = sqlx::query_as::<_, Organization>(
-            r#"SELECT * FROM organizations WHERE slug = $1"#,
-        )
-        .bind(slug)
-        .fetch_optional(pool)
-        .await
-        .context("Failed to find organization by slug")?;
+        let org =
+            sqlx::query_as::<_, Organization>(r#"SELECT * FROM organizations WHERE slug = $1"#)
+                .bind(slug)
+                .fetch_optional(pool)
+                .await
+                .context("Failed to find organization by slug")?;
 
         Ok(org)
     }
 
     /// Check if slug already exists
+    #[allow(dead_code)]
     pub async fn slug_exists(pool: &DbPool, slug: &str) -> Result<bool> {
         let exists = sqlx::query_scalar::<_, bool>(
             r#"SELECT EXISTS(SELECT 1 FROM organizations WHERE slug = $1)"#,
@@ -163,6 +162,7 @@ impl OrganizationRepository {
     }
 
     /// List organizations for a user (via membership) with pagination
+    #[allow(dead_code)]
     pub async fn list_by_user(
         pool: &DbPool,
         user_id: &str,
@@ -238,7 +238,11 @@ impl OrganizationRepository {
     }
 
     /// Find user's personal organization
-    pub async fn find_personal_by_user(pool: &DbPool, user_id: &str) -> Result<Option<Organization>> {
+    #[allow(dead_code)]
+    pub async fn find_personal_by_user(
+        pool: &DbPool,
+        user_id: &str,
+    ) -> Result<Option<Organization>> {
         let org = sqlx::query_as::<_, Organization>(
             r#"
             SELECT * FROM organizations
@@ -301,13 +305,12 @@ impl OrganizationRepository {
 
     /// Delete organization (only non-personal organizations)
     pub async fn delete(pool: &DbPool, org_id: &str) -> Result<bool> {
-        let result = sqlx::query(
-            r#"DELETE FROM organizations WHERE id = $1 AND is_personal = false"#,
-        )
-        .bind(org_id)
-        .execute(pool)
-        .await
-        .context("Failed to delete organization")?;
+        let result =
+            sqlx::query(r#"DELETE FROM organizations WHERE id = $1 AND is_personal = false"#)
+                .bind(org_id)
+                .execute(pool)
+                .await
+                .context("Failed to delete organization")?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -376,10 +379,14 @@ impl OrganizationRepository {
 
         // Ensure the new owner was actually a member
         if rows.rows_affected() == 0 {
-            return Err(anyhow::anyhow!("New owner is not a member of the organization"));
+            return Err(anyhow::anyhow!(
+                "New owner is not a member of the organization"
+            ));
         }
 
-        tx.commit().await.context("Failed to commit ownership transfer")?;
+        tx.commit()
+            .await
+            .context("Failed to commit ownership transfer")?;
 
         Ok(org)
     }
@@ -466,6 +473,7 @@ impl MemberRepository {
     }
 
     /// List members of an organization with pagination
+    #[allow(dead_code)]
     pub async fn list(
         pool: &DbPool,
         org_id: &str,
@@ -572,6 +580,7 @@ impl MemberRepository {
     }
 
     /// Find member by ID
+    #[allow(dead_code)]
     pub async fn find_by_id(pool: &DbPool, member_id: &str) -> Result<Option<OrganizationMember>> {
         let member = sqlx::query_as::<_, OrganizationMember>(
             r#"SELECT * FROM organization_members WHERE id = $1"#,

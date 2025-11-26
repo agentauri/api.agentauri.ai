@@ -105,7 +105,9 @@ where
             let message = message.clone();
             async move {
                 // Acquire per-chat rate limit (also checks global limit)
-                rate_limiter.acquire_for_key(&chat_id, Duration::from_secs(30)).await?;
+                rate_limiter
+                    .acquire_for_key(&chat_id, Duration::from_secs(30))
+                    .await?;
 
                 // Send message
                 client.send_message(&chat_id, &message, parse_mode).await

@@ -364,7 +364,10 @@ mod tests {
             .to_request();
 
         let result = test::try_call_service(&app, req).await;
-        assert!(result.is_err(), "Expected unauthorized error for expired token");
+        assert!(
+            result.is_err(),
+            "Expected unauthorized error for expired token"
+        );
     }
 
     #[actix_web::test]
@@ -397,7 +400,10 @@ mod tests {
             .to_request();
 
         let result = test::try_call_service(&app, req).await;
-        assert!(result.is_err(), "Expected unauthorized error for invalid signature");
+        assert!(
+            result.is_err(),
+            "Expected unauthorized error for invalid signature"
+        );
     }
 
     #[actix_web::test]
@@ -409,12 +415,13 @@ mod tests {
         )
         .await;
 
-        let req = test::TestRequest::get()
-            .uri("/protected")
-            .to_request();
+        let req = test::TestRequest::get().uri("/protected").to_request();
 
         let result = test::try_call_service(&app, req).await;
-        assert!(result.is_err(), "Expected unauthorized error for missing header");
+        assert!(
+            result.is_err(),
+            "Expected unauthorized error for missing header"
+        );
     }
 
     #[actix_web::test]
@@ -434,7 +441,10 @@ mod tests {
             .to_request();
 
         let result = test::try_call_service(&app, req).await;
-        assert!(result.is_err(), "Expected unauthorized error for malformed header");
+        assert!(
+            result.is_err(),
+            "Expected unauthorized error for malformed header"
+        );
     }
 
     #[actix_web::test]
@@ -453,7 +463,10 @@ mod tests {
             .to_request();
 
         let result = test::try_call_service(&app, req).await;
-        assert!(result.is_err(), "Expected unauthorized error for basic auth header");
+        assert!(
+            result.is_err(),
+            "Expected unauthorized error for basic auth header"
+        );
     }
 
     #[actix_web::test]

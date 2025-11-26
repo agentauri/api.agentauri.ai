@@ -10,7 +10,10 @@ use shared::{Config, DbPool};
 use validator::Validate;
 
 use crate::{
-    models::{AuthResponse, Claims, ErrorResponse, LoginRequest, RegisterRequest, UserResponse, ROLE_OWNER},
+    models::{
+        AuthResponse, Claims, ErrorResponse, LoginRequest, RegisterRequest, UserResponse,
+        ROLE_OWNER,
+    },
     repositories::{MemberRepository, OrganizationRepository, UserRepository},
 };
 
@@ -93,7 +96,13 @@ pub async fn register(
     };
 
     // Create user within transaction
-    let user = match UserRepository::create_with_executor(&mut *tx, &req.username, &req.email, &password_hash).await
+    let user = match UserRepository::create_with_executor(
+        &mut *tx,
+        &req.username,
+        &req.email,
+        &password_hash,
+    )
+    .await
     {
         Ok(user) => user,
         Err(e) => {
@@ -161,7 +170,8 @@ pub async fn register(
 
     // Add user as owner of personal organization within transaction
     if let Err(e) =
-        MemberRepository::add_with_executor(&mut *tx, &personal_org.id, &user.id, ROLE_OWNER, None).await
+        MemberRepository::add_with_executor(&mut *tx, &personal_org.id, &user.id, ROLE_OWNER, None)
+            .await
     {
         tracing::error!("Failed to add user as org owner: {}", e);
         // Transaction will be rolled back automatically when dropped

@@ -359,7 +359,7 @@ Generate comprehensive reputation report.
       }
     }
   },
-  "modelUsed": "claude-3-5-sonnet",
+  "modelUsed": "claude-opus-4-5-20251101",
   "tokensUsed": 4523
 }
 ```

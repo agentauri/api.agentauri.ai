@@ -37,6 +37,7 @@ pub enum WorkerError {
 
     /// Job not found
     #[error("Job not found: {0}")]
+    #[allow(dead_code)]
     JobNotFound(String),
 
     /// Queue operation error
@@ -45,6 +46,7 @@ pub enum WorkerError {
 
     /// Generic internal error
     #[error("Internal error: {0}")]
+    #[allow(dead_code)]
     Internal(String),
 }
 
@@ -81,7 +83,9 @@ impl WorkerError {
         match self {
             WorkerError::Redis(_) => "Database connection error".to_string(),
             WorkerError::TelegramApi(_) => "Failed to send notification".to_string(),
-            WorkerError::RateLimitExceeded(_) => "Rate limit exceeded, please try again later".to_string(),
+            WorkerError::RateLimitExceeded(_) => {
+                "Rate limit exceeded, please try again later".to_string()
+            }
             WorkerError::Database(_) => "Database operation failed".to_string(),
             WorkerError::Serialization(_) => "Data format error".to_string(),
             WorkerError::InvalidConfig(msg) => {

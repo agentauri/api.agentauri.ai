@@ -58,6 +58,7 @@ impl RedisJobConsumer {
 
     /// Create with custom queue name (for testing)
     #[cfg(test)]
+    #[allow(dead_code)]
     pub fn with_queue_name(conn: MultiplexedConnection, queue_name: &str) -> Self {
         Self {
             conn,

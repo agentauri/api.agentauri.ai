@@ -33,7 +33,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("/{id}", web::put().to(handlers::update_organization))
                             .route("/{id}", web::delete().to(handlers::delete_organization))
                             // Ownership transfer endpoint
-                            .route("/{id}/transfer", web::post().to(handlers::transfer_ownership))
+                            .route(
+                                "/{id}/transfer",
+                                web::post().to(handlers::transfer_ownership),
+                            )
                             // Member endpoints
                             .route("/{id}/members", web::post().to(handlers::add_member))
                             .route("/{id}/members", web::get().to(handlers::list_members))

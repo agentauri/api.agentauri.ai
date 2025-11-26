@@ -66,6 +66,7 @@ impl TriggerRepository {
     }
 
     /// List triggers for a user with pagination (deprecated, use list_by_organization)
+    #[allow(dead_code)]
     pub async fn list_by_user(
         pool: &DbPool,
         user_id: &str,
@@ -116,6 +117,7 @@ impl TriggerRepository {
     }
 
     /// Count total triggers for a user (deprecated, use count_by_organization)
+    #[allow(dead_code)]
     pub async fn count_by_user(pool: &DbPool, user_id: &str) -> Result<i64> {
         let count = sqlx::query_scalar::<_, i64>(
             r#"
@@ -217,6 +219,7 @@ impl TriggerRepository {
     }
 
     /// Check if trigger belongs to user (deprecated, use belongs_to_organization)
+    #[allow(dead_code)]
     pub async fn belongs_to_user(pool: &DbPool, trigger_id: &str, user_id: &str) -> Result<bool> {
         let result = sqlx::query_scalar::<_, bool>(
             r#"

@@ -5,7 +5,9 @@ use shared::DbPool;
 use validator::Validate;
 
 use crate::{
-    middleware::{get_user_id, get_verified_organization_id, get_verified_organization_id_with_role},
+    middleware::{
+        get_user_id, get_verified_organization_id, get_verified_organization_id_with_role,
+    },
     models::{
         can_write, ActionResponse, ConditionResponse, CreateTriggerRequest, ErrorResponse,
         PaginatedResponse, PaginationMeta, PaginationParams, SuccessResponse,
@@ -187,19 +189,22 @@ pub async fn get_trigger(
     };
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to fetch trigger",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch trigger",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -304,19 +309,22 @@ pub async fn update_trigger(
     }
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to update trigger",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update trigger",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -387,19 +395,22 @@ pub async fn delete_trigger(
     }
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to delete trigger",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete trigger",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));

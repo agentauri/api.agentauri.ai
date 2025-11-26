@@ -100,11 +100,13 @@ pub trait ResultLogger: Send + Sync {
     async fn log(&self, result: ActionResult) -> WorkerResult<()>;
 
     /// Get recent results for a trigger (for debugging)
+    #[allow(dead_code)]
     async fn get_recent(&self, trigger_id: &str, limit: i64) -> WorkerResult<Vec<LoggedResult>>;
 }
 
 /// Logged result from database
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LoggedResult {
     pub id: i64,
     pub job_id: String,
@@ -213,10 +215,12 @@ impl ResultLogger for PostgresResultLogger {
 
 /// In-memory result logger for testing
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct InMemoryResultLogger {
     results: std::sync::Mutex<Vec<ActionResult>>,
 }
 
+#[allow(dead_code)]
 impl InMemoryResultLogger {
     pub fn new() -> Self {
         Self::default()

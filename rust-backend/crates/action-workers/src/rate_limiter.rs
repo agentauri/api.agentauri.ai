@@ -23,6 +23,7 @@ use crate::error::WorkerError;
 use crate::metrics;
 
 /// Rate limiter trait for testability
+#[allow(dead_code)]
 pub trait RateLimiter: Send + Sync {
     /// Wait until rate limit allows the operation (global limit)
     ///
@@ -89,6 +90,7 @@ impl TelegramRateLimiter {
     /// # Arguments
     ///
     /// * `messages_per_second` - Maximum messages per second globally
+    #[allow(dead_code)]
     pub fn with_rate(messages_per_second: u32) -> Self {
         Self::with_rates(messages_per_second, 1)
     }
@@ -110,6 +112,7 @@ impl TelegramRateLimiter {
     }
 
     /// Check if rate limit would allow immediate execution
+    #[allow(dead_code)]
     pub fn check(&self) -> bool {
         self.global_limiter.check().is_ok()
     }
@@ -122,7 +125,7 @@ impl TelegramRateLimiter {
             .entry(chat_id.to_string())
             .or_insert_with(|| {
                 let quota = Quota::per_second(
-                    NonZeroU32::new(self.per_chat_rate).expect("Per-chat rate must be > 0")
+                    NonZeroU32::new(self.per_chat_rate).expect("Per-chat rate must be > 0"),
                 );
                 Arc::new(ChatRateLimiter::direct(quota))
             })
@@ -168,7 +171,7 @@ impl RateLimiter for TelegramRateLimiter {
     async fn acquire_for_key(&self, key: &str, timeout: Duration) -> Result<(), WorkerError> {
         // First acquire global limit
         match tokio::time::timeout(timeout, self.global_limiter.until_ready()).await {
-            Ok(()) => {},
+            Ok(()) => {}
             Err(_) => {
                 metrics::record_rate_limit_hit();
                 tracing::warn!(
@@ -278,11 +281,20 @@ mod tests {
         let limiter = TelegramRateLimiter::with_rates(100, 2); // High global, low per-chat
 
         // Should be able to send to different chats
-        assert!(limiter.acquire_for_key("chat1", Duration::from_secs(1)).await.is_ok());
-        assert!(limiter.acquire_for_key("chat2", Duration::from_secs(1)).await.is_ok());
+        assert!(limiter
+            .acquire_for_key("chat1", Duration::from_secs(1))
+            .await
+            .is_ok());
+        assert!(limiter
+            .acquire_for_key("chat2", Duration::from_secs(1))
+            .await
+            .is_ok());
 
         // Per-chat limiters are independent
-        assert!(limiter.acquire_for_key("chat1", Duration::from_secs(1)).await.is_ok());
+        assert!(limiter
+            .acquire_for_key("chat1", Duration::from_secs(1))
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
@@ -291,15 +303,24 @@ mod tests {
         let limiter = TelegramRateLimiter::with_rates(100, 10);
 
         // First call should create a limiter for this chat
-        assert!(limiter.acquire_for_key("new_chat", Duration::from_secs(1)).await.is_ok());
+        assert!(limiter
+            .acquire_for_key("new_chat", Duration::from_secs(1))
+            .await
+            .is_ok());
 
         // Subsequent calls should use the same limiter
-        assert!(limiter.acquire_for_key("new_chat", Duration::from_secs(1)).await.is_ok());
+        assert!(limiter
+            .acquire_for_key("new_chat", Duration::from_secs(1))
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
     async fn test_noop_limiter_per_key() {
         let limiter = NoopRateLimiter;
-        assert!(limiter.acquire_for_key("any_key", Duration::from_millis(1)).await.is_ok());
+        assert!(limiter
+            .acquire_for_key("any_key", Duration::from_millis(1))
+            .await
+            .is_ok());
     }
 }

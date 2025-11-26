@@ -31,6 +31,7 @@ impl Default for RetryPolicy {
 
 impl RetryPolicy {
     /// Create a new retry policy
+    #[allow(dead_code)]
     pub fn new(max_attempts: u32, base_delay: Duration, max_delay: Duration) -> Self {
         Self {
             max_attempts,

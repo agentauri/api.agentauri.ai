@@ -216,6 +216,7 @@ pub struct MockTelegramClient {
 /// Record of a sent message
 #[cfg(test)]
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SentMessage {
     pub chat_id: String,
     pub text: String,

@@ -5,7 +5,9 @@ use shared::DbPool;
 use validator::Validate;
 
 use crate::{
-    middleware::{get_user_id, get_verified_organization_id, get_verified_organization_id_with_role},
+    middleware::{
+        get_user_id, get_verified_organization_id, get_verified_organization_id_with_role,
+    },
     models::{
         can_write, ActionResponse, CreateActionRequest, ErrorResponse, SuccessResponse,
         UpdateActionRequest,
@@ -60,19 +62,22 @@ pub async fn create_action(
     }
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to create action",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create action",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -131,19 +136,22 @@ pub async fn list_actions(
     };
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to fetch actions",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch actions",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -213,19 +221,22 @@ pub async fn update_action(
     }
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to update action",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to update action",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));
@@ -313,19 +324,22 @@ pub async fn delete_action(
     }
 
     // Check if trigger belongs to the organization
-    let belongs =
-        match TriggerRepository::belongs_to_organization(&pool, &trigger_id, &organization_id)
-            .await
-        {
-            Ok(belongs) => belongs,
-            Err(e) => {
-                tracing::error!("Failed to check trigger organization: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to delete action",
-                ));
-            }
-        };
+    let belongs = match TriggerRepository::belongs_to_organization(
+        &pool,
+        &trigger_id,
+        &organization_id,
+    )
+    .await
+    {
+        Ok(belongs) => belongs,
+        Err(e) => {
+            tracing::error!("Failed to check trigger organization: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to delete action",
+            ));
+        }
+    };
 
     if !belongs {
         return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "Trigger not found"));

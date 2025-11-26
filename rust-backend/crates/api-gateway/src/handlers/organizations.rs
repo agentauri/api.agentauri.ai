@@ -49,11 +49,11 @@ use validator::Validate;
 use crate::{
     middleware::get_user_id,
     models::{
-        AddMemberRequest, CreateOrganizationRequest, ErrorResponse, MemberResponse,
-        OrganizationResponse, OrganizationWithRoleResponse, PaginatedResponse, PaginationMeta,
-        PaginationParams, SuccessResponse, TransferOwnershipRequest, UpdateMemberRoleRequest,
-        UpdateOrganizationRequest, can_delete_org, can_manage_members, can_manage_org, is_owner,
-        ROLE_ADMIN, ROLE_OWNER,
+        can_delete_org, can_manage_members, can_manage_org, is_owner, AddMemberRequest,
+        CreateOrganizationRequest, ErrorResponse, MemberResponse, OrganizationResponse,
+        OrganizationWithRoleResponse, PaginatedResponse, PaginationMeta, PaginationParams,
+        SuccessResponse, TransferOwnershipRequest, UpdateMemberRoleRequest,
+        UpdateOrganizationRequest, ROLE_ADMIN, ROLE_OWNER,
     },
     repositories::{MemberRepository, OrganizationRepository, UserRepository},
 };
@@ -177,18 +177,23 @@ pub async fn list_organizations(
     };
 
     // Get organizations WITH roles in a single optimized query (no N+1)
-    let orgs_with_roles =
-        match OrganizationRepository::list_by_user_with_roles(&pool, &user_id, query.limit, query.offset).await
-        {
-            Ok(orgs) => orgs,
-            Err(e) => {
-                tracing::error!("Failed to list organizations: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to fetch organizations",
-                ));
-            }
-        };
+    let orgs_with_roles = match OrganizationRepository::list_by_user_with_roles(
+        &pool,
+        &user_id,
+        query.limit,
+        query.offset,
+    )
+    .await
+    {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            tracing::error!("Failed to list organizations: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to fetch organizations",
+            ));
+        }
+    };
 
     // Build response (no additional queries needed)
     let org_responses: Vec<OrganizationWithRoleResponse> = orgs_with_roles
@@ -232,10 +237,8 @@ pub async fn get_organization(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
@@ -250,10 +253,8 @@ pub async fn get_organization(
     let org = match OrganizationRepository::find_by_id(&pool, &org_id).await {
         Ok(Some(org)) => org,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to fetch organization: {}", e);
@@ -306,10 +307,8 @@ pub async fn update_organization(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
@@ -376,10 +375,8 @@ pub async fn delete_organization(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
@@ -402,10 +399,8 @@ pub async fn delete_organization(
     let org = match OrganizationRepository::find_by_id(&pool, &org_id).await {
         Ok(Some(org)) => org,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to fetch organization: {}", e);
@@ -436,10 +431,8 @@ pub async fn delete_organization(
     };
 
     if !deleted {
-        return HttpResponse::NotFound().json(ErrorResponse::new(
-            "not_found",
-            "Organization not found",
-        ));
+        return HttpResponse::NotFound()
+            .json(ErrorResponse::new("not_found", "Organization not found"));
     }
 
     HttpResponse::NoContent().finish()
@@ -491,17 +484,13 @@ pub async fn add_member(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to add member",
-            ));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "Failed to add member"));
         }
     };
 
@@ -517,17 +506,12 @@ pub async fn add_member(
     let target_user = match UserRepository::find_by_id(&pool, &req.user_id).await {
         Ok(Some(u)) => u,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "User not found",
-            ))
+            return HttpResponse::NotFound().json(ErrorResponse::new("not_found", "User not found"))
         }
         Err(e) => {
             tracing::error!("Failed to find user: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to add member",
-            ));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "Failed to add member"));
         }
     };
 
@@ -542,24 +526,26 @@ pub async fn add_member(
         Ok(false) => {}
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to add member",
-            ));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "Failed to add member"));
         }
     }
 
     // Add member
-    let member = match MemberRepository::add(&pool, &org_id, &req.user_id, &req.role, Some(&user_id))
-        .await
+    let member = match MemberRepository::add(
+        &pool,
+        &org_id,
+        &req.user_id,
+        &req.role,
+        Some(&user_id),
+    )
+    .await
     {
         Ok(m) => m,
         Err(e) => {
             tracing::error!("Failed to add member: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to add member",
-            ));
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "Failed to add member"));
         }
     };
 
@@ -609,10 +595,8 @@ pub async fn list_members(
     let requester_role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(role)) => role,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
@@ -636,16 +620,17 @@ pub async fn list_members(
     };
 
     // Get members WITH user info in a single optimized query (no N+1)
-    let members_with_users = match MemberRepository::list_with_users(&pool, &org_id, query.limit, query.offset).await {
-        Ok(m) => m,
-        Err(e) => {
-            tracing::error!("Failed to list members: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to list members",
-            ));
-        }
-    };
+    let members_with_users =
+        match MemberRepository::list_with_users(&pool, &org_id, query.limit, query.offset).await {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("Failed to list members: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to list members",
+                ));
+            }
+        };
 
     // Determine if emails should be shown (only owner/admin can see full emails)
     let can_see_emails = is_owner(&requester_role) || requester_role == ROLE_ADMIN;
@@ -752,10 +737,8 @@ pub async fn update_member_role(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
@@ -778,10 +761,8 @@ pub async fn update_member_role(
     let target_role = match MemberRepository::get_role(&pool, &org_id, &target_user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Member not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Member not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check target membership: {}", e);
@@ -801,26 +782,24 @@ pub async fn update_member_role(
     }
 
     // Update role
-    let member = match MemberRepository::update_role(&pool, &org_id, &target_user_id, &req.role).await
-    {
-        Ok(m) => m,
-        Err(e) => {
-            tracing::error!("Failed to update member role: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to update member",
-            ));
-        }
-    };
+    let member =
+        match MemberRepository::update_role(&pool, &org_id, &target_user_id, &req.role).await {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!("Failed to update member role: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to update member",
+                ));
+            }
+        };
 
     // Get user info
     let target_user = match UserRepository::find_by_id(&pool, &target_user_id).await {
         Ok(Some(u)) => u,
         Ok(None) => {
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "User not found",
-            ))
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "User not found"))
         }
         Err(e) => {
             tracing::error!("Failed to find user: {}", e);
@@ -871,10 +850,8 @@ pub async fn remove_member(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);
@@ -897,10 +874,8 @@ pub async fn remove_member(
     let target_role = match MemberRepository::get_role(&pool, &org_id, &target_user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Member not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Member not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check target membership: {}", e);
@@ -992,10 +967,8 @@ pub async fn transfer_ownership(
     let role = match MemberRepository::get_role(&pool, &org_id, &user_id).await {
         Ok(Some(r)) => r,
         Ok(None) => {
-            return HttpResponse::NotFound().json(ErrorResponse::new(
-                "not_found",
-                "Organization not found",
-            ))
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
         }
         Err(e) => {
             tracing::error!("Failed to check membership: {}", e);

@@ -50,6 +50,7 @@ pub const ROLE_MEMBER: &str = "member";
 pub const ROLE_VIEWER: &str = "viewer";
 
 /// All valid roles in order of increasing permission level
+#[allow(dead_code)]
 pub const ROLE_HIERARCHY: [&str; 4] = [ROLE_VIEWER, ROLE_MEMBER, ROLE_ADMIN, ROLE_OWNER];
 
 /// All valid role names (for validation)
@@ -204,9 +205,7 @@ fn validate_slug(slug: &str) -> Result<(), validator::ValidationError> {
 fn validate_role(role: &str) -> Result<(), validator::ValidationError> {
     if !VALID_ROLES.contains(&role) {
         let mut err = validator::ValidationError::new("invalid_role");
-        err.message = Some(
-            format!("Role must be one of: {}", VALID_ROLES.join(", ")).into(),
-        );
+        err.message = Some(format!("Role must be one of: {}", VALID_ROLES.join(", ")).into());
         return Err(err);
     }
     Ok(())
@@ -304,6 +303,7 @@ pub fn is_owner(role: &str) -> bool {
 /// assert!(has_permission(ROLE_ADMIN, ROLE_MEMBER)); // admin >= member
 /// assert!(!has_permission(ROLE_MEMBER, ROLE_ADMIN)); // member < admin
 /// ```
+#[allow(dead_code)]
 pub fn has_permission(user_role: &str, required_role: &str) -> bool {
     let user_level = ROLE_HIERARCHY.iter().position(|r| *r == user_role);
     let required_level = ROLE_HIERARCHY.iter().position(|r| *r == required_role);

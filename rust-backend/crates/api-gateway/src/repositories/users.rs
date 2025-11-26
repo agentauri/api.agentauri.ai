@@ -10,6 +10,7 @@ pub struct UserRepository;
 
 impl UserRepository {
     /// Create a new user
+    #[allow(dead_code)]
     pub async fn create(
         pool: &DbPool,
         username: &str,

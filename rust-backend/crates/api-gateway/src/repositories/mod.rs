@@ -9,6 +9,6 @@ pub mod users;
 // Re-exports
 pub use actions::ActionRepository;
 pub use conditions::ConditionRepository;
-pub use organizations::{MemberRepository, MemberWithUser, OrganizationRepository, OrganizationWithRole};
+pub use organizations::{MemberRepository, OrganizationRepository, OrganizationWithRole};
 pub use triggers::TriggerRepository;
 pub use users::UserRepository;

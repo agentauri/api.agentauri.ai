@@ -2,6 +2,8 @@
 //!
 //! Jobs that fail after all retries are moved to the DLQ for manual review.
 
+#![allow(dead_code)]
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use redis::aio::MultiplexedConnection;

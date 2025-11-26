@@ -133,11 +133,8 @@ mod tests {
 
     #[test]
     fn test_error_response_serialization_with_details() {
-        let err = ErrorResponse::with_details(
-            "error",
-            "message",
-            serde_json::json!({"key": "value"}),
-        );
+        let err =
+            ErrorResponse::with_details("error", "message", serde_json::json!({"key": "value"}));
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains("details"));
         assert!(json.contains("key"));
