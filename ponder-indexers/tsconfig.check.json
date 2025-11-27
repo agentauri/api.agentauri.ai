@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*", "ponder.config.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".ponder",
+    "src/index.ts",
+    "ponder.schema.ts"
+  ]
+}

@@ -1,60 +1,56 @@
-import { createSchema } from "@ponder/core";
+// Ponder Schema Definition for Ponder 0.7.x
+// Uses onchainTable from @ponder/core
 
-// ============================================================================
-// PONDER SCHEMA DEFINITION
-// ============================================================================
-// This schema defines the tables that Ponder will create in PostgreSQL.
-// It mirrors the existing database schema's events table structure.
+import { onchainTable } from "@ponder/core";
 
-export default createSchema((p) => ({
-  // Events table - stores all blockchain events from ERC-8004 registries
-  Event: p.createTable({
-    // Primary key - composite of chain_id, transaction_hash, and log_index
-    id: p.string(),
+// Events table - stores all blockchain events from ERC-8004 registries
+export const Event = onchainTable("Event", (t) => ({
+  // Primary key - composite of chain_id, transaction_hash, and log_index
+  id: t.text().primaryKey(),
 
-    // Chain and block information
-    chainId: p.bigint(),
-    blockNumber: p.bigint(),
-    blockHash: p.string(),
-    transactionHash: p.string(),
-    logIndex: p.int(),
+  // Chain and block information
+  chainId: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  blockHash: t.text().notNull(),
+  transactionHash: t.text().notNull(),
+  logIndex: t.integer().notNull(),
 
-    // Registry and event type
-    registry: p.string(), // 'identity', 'reputation', or 'validation'
-    eventType: p.string(), // Event name from the contract
+  // Registry and event type
+  registry: t.text().notNull(), // 'identity', 'reputation', or 'validation'
+  eventType: t.text().notNull(), // Event name from the contract
 
-    // Common fields (may be null depending on event type)
-    agentId: p.bigint().optional(),
-    timestamp: p.bigint(),
+  // Common fields (may be null depending on event type)
+  agentId: t.bigint(),
+  timestamp: t.bigint().notNull(),
 
-    // Identity Registry specific fields
-    owner: p.string().optional(),
-    tokenUri: p.string().optional(),
-    metadataKey: p.string().optional(),
-    metadataValue: p.string().optional(),
+  // Identity Registry specific fields
+  owner: t.text(),
+  tokenUri: t.text(),
+  metadataKey: t.text(),
+  metadataValue: t.text(),
 
-    // Reputation Registry specific fields
-    clientAddress: p.string().optional(),
-    feedbackIndex: p.bigint().optional(),
-    score: p.int().optional(),
-    tag1: p.string().optional(),
-    tag2: p.string().optional(),
-    fileUri: p.string().optional(),
-    fileHash: p.string().optional(),
+  // Reputation Registry specific fields
+  clientAddress: t.text(),
+  feedbackIndex: t.bigint(),
+  score: t.integer(),
+  tag1: t.text(),
+  tag2: t.text(),
+  fileUri: t.text(),
+  fileHash: t.text(),
 
-    // Validation Registry specific fields
-    validatorAddress: p.string().optional(),
-    requestHash: p.string().optional(),
-    response: p.int().optional(),
-    responseUri: p.string().optional(),
-    responseHash: p.string().optional(),
-    tag: p.string().optional(),
-  }),
+  // Validation Registry specific fields
+  validatorAddress: t.text(),
+  requestHash: t.text(),
+  response: t.integer(),
+  responseUri: t.text(),
+  responseHash: t.text(),
+  tag: t.text(),
+}));
 
-  // Checkpoint table - tracks last processed block per chain
-  Checkpoint: p.createTable({
-    chainId: p.bigint(),
-    lastBlockNumber: p.bigint(),
-    lastBlockHash: p.string(),
-  }),
+// Checkpoint table - tracks last processed block per chain
+export const Checkpoint = onchainTable("Checkpoint", (t) => ({
+  id: t.bigint().primaryKey(), // chainId as primary key
+  chainId: t.bigint().notNull(),
+  lastBlockNumber: t.bigint().notNull(),
+  lastBlockHash: t.text().notNull(),
 }));

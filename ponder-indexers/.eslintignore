@@ -1,0 +1,8 @@
+# Ponder event handlers - uses generated types from @/generated
+# Excluded because types require pnpm codegen which needs valid env vars
+src/index.ts
+
+# Build artifacts
+dist/
+node_modules/
+.ponder/

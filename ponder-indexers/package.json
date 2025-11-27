@@ -15,11 +15,17 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --project tsconfig.check.json",
+    "check": "vitest run && pnpm lint && pnpm typecheck"
   },
   "dependencies": {
-    "@ponder/core": "^0.6.0",
-    "viem": "^2.21.0"
+    "@ponder/core": "^0.7.17",
+    "@ponder/utils": "^0.2.16",
+    "hono": "^4.10.7",
+    "pino": "^10.1.0",
+    "pino-pretty": "^13.1.2",
+    "viem": "^2.21.0",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -28,6 +34,7 @@
     "@vitest/coverage-v8": "^1.6.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.7",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0",
     "vitest": "^1.6.0"
