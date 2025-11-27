@@ -67,9 +67,9 @@ POST   /api/v1/organizations/:id/members      # Add member
 PUT    /api/v1/organizations/:id/members/:uid # Update member role
 DELETE /api/v1/organizations/:id/members/:uid # Remove member
 
-# Billing (Pull Layer - Phase 3.5, planned)
+# Billing (Pull Layer - Phase 3.5)
 GET    /api/v1/billing/credits        # Get credit balance
-POST   /api/v1/billing/credits/purchase  # Purchase credits (Stripe)
+GET    /api/v1/billing/transactions   # List credit transactions
 
 # A2A Protocol (Pull Layer - Phase 5)
 POST   /api/v1/a2a/rpc                # JSON-RPC 2.0 endpoint

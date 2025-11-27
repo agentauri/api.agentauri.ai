@@ -244,20 +244,37 @@ docker build -f ../docker/action-workers.Dockerfile -t action-workers .
 - [x] Action Workers skeleton with Telegram and REST placeholders
 - [x] All crates compile successfully
 
-**Phase 2: Core Services** 🔄 IN PROGRESS
+**Phase 2: Core Services** ✅ COMPLETED
 
-- [ ] Ponder indexers for blockchain events
-- [ ] Complete API Gateway endpoints (triggers, auth)
-- [ ] Trigger matching logic in Event Processor
-- [ ] Redis job queueing
-- [ ] Telegram and REST worker implementations
+- [x] Ponder indexers for blockchain events (24 handlers)
+- [x] Complete API Gateway endpoints (triggers, auth)
+- [x] Trigger matching logic in Event Processor
+- [x] Redis job queueing
+- [x] Telegram worker with security hardening
 
-**Phase 3: Advanced Features** 📋 PLANNED
+**Phase 3: Core Backend** ✅ COMPLETED
+
+- [x] API Gateway CRUD (Week 7)
+- [x] Event Processor with trigger matching (Week 8)
+- [x] Telegram Worker with security (Week 9)
+- [x] Integration testing (Week 10) - 206 tests
+
+**Phase 3.5: Payment Foundation** ✅ COMPLETED
+
+- [x] Organizations + Organization Members (Week 11)
+- [x] API Key Authentication (Layer 1) with security hardening
+- [x] Credits System with atomic deduction (Week 12)
+- [x] Wallet Authentication (Layer 2) - EIP-191 verification
+- [x] Agent Linking with on-chain ownership verification
+- [x] Security hardening (race conditions, replay attacks)
+- [x] **272 tests passing**
+
+**Phase 4: Advanced Features** 📋 PLANNED
 
 - [ ] Stateful triggers (EMA, rate limits)
+- [ ] REST/HTTP worker
 - [ ] Circuit breaker pattern
 - [ ] MCP integration
-- [ ] Comprehensive testing
 
 ## Dependencies
 

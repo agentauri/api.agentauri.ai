@@ -657,6 +657,718 @@ Check API and database health.
 
 ---
 
+### Organizations
+
+Organizations are the multi-tenant unit for grouping resources, members, and billing.
+
+#### Create Organization
+
+Create a new organization. The creator becomes the owner.
+
+**Endpoint**: `POST /api/v1/organizations`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "name": "My Company",
+  "slug": "my-company",
+  "description": "Optional description"
+}
+```
+
+**Validation**:
+- `name`: 1-100 characters (required)
+- `slug`: 1-50 characters, lowercase alphanumeric and hyphens (required, unique)
+- `description`: Max 500 characters (optional)
+
+**Response** (201 Created):
+```json
+{
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "name": "My Company",
+    "slug": "my-company",
+    "description": "Optional description",
+    "is_personal": false,
+    "created_at": "2024-11-27T10:00:00Z",
+    "updated_at": "2024-11-27T10:00:00Z"
+  }
+}
+```
+
+**Error Responses**:
+- `400 Bad Request`: Validation failed
+- `409 Conflict`: Organization slug already exists
+
+---
+
+#### List Organizations
+
+Get all organizations the authenticated user is a member of.
+
+**Endpoint**: `GET /api/v1/organizations?limit=20&offset=0`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Query Parameters**:
+- `limit`: Number of results (1-100, default: 20)
+- `offset`: Number of results to skip (default: 0)
+
+**Response** (200 OK):
+```json
+{
+  "data": [
+    {
+      "organization": {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "name": "My Company",
+        "slug": "my-company",
+        "description": null,
+        "is_personal": false,
+        "created_at": "2024-11-27T10:00:00Z",
+        "updated_at": "2024-11-27T10:00:00Z"
+      },
+      "my_role": "owner"
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "limit": 20,
+    "offset": 0,
+    "has_more": false
+  }
+}
+```
+
+---
+
+#### Get Organization
+
+Get details for a single organization.
+
+**Endpoint**: `GET /api/v1/organizations/{id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "data": {
+    "organization": {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "name": "My Company",
+      "slug": "my-company",
+      "description": null,
+      "is_personal": false,
+      "created_at": "2024-11-27T10:00:00Z",
+      "updated_at": "2024-11-27T10:00:00Z"
+    },
+    "my_role": "owner"
+  }
+}
+```
+
+**Error Responses**:
+- `404 Not Found`: Organization not found or not a member
+
+---
+
+#### Update Organization
+
+Update organization details. Requires admin or owner role.
+
+**Endpoint**: `PUT /api/v1/organizations/{id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "name": "Updated Company Name",
+  "description": "New description"
+}
+```
+
+**Response** (200 OK): Returns updated organization
+
+**Error Responses**:
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Organization not found
+
+---
+
+#### Delete Organization
+
+Delete an organization. Requires owner role. Personal organizations cannot be deleted.
+
+**Endpoint**: `DELETE /api/v1/organizations/{id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (204 No Content)
+
+**Error Responses**:
+- `400 Bad Request`: Cannot delete personal organization
+- `403 Forbidden`: Only owner can delete
+- `404 Not Found`: Organization not found
+
+---
+
+#### Transfer Ownership
+
+Transfer organization ownership to another member.
+
+**Endpoint**: `POST /api/v1/organizations/{id}/transfer`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "new_owner_id": "550e8400-e29b-41d4-a716-446655440002"
+}
+```
+
+**Response** (200 OK): Returns updated organization
+
+**Error Responses**:
+- `400 Bad Request`: Cannot transfer to yourself or personal org
+- `403 Forbidden`: Only owner can transfer
+- `404 Not Found`: Organization not found
+
+---
+
+### Organization Members
+
+#### Add Member
+
+Add a user to an organization. Requires admin or owner role.
+
+**Endpoint**: `POST /api/v1/organizations/{id}/members`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "user_id": "550e8400-e29b-41d4-a716-446655440002",
+  "role": "member"
+}
+```
+
+**Validation**:
+- `user_id`: Valid user UUID (required)
+- `role`: One of `viewer`, `member`, `admin` (cannot add as `owner`)
+
+**Response** (201 Created):
+```json
+{
+  "data": {
+    "id": 1,
+    "user_id": "550e8400-e29b-41d4-a716-446655440002",
+    "username": "jane_doe",
+    "email": "jane@example.com",
+    "role": "member",
+    "created_at": "2024-11-27T10:00:00Z"
+  }
+}
+```
+
+**Error Responses**:
+- `400 Bad Request`: Cannot add as owner
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: User not found
+- `409 Conflict`: User is already a member
+
+---
+
+#### List Members
+
+Get all members of an organization. Email addresses are masked for privacy unless you are an admin/owner or viewing your own email.
+
+**Endpoint**: `GET /api/v1/organizations/{id}/members?limit=20&offset=0`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "user_id": "550e8400-e29b-41d4-a716-446655440000",
+      "username": "john_doe",
+      "email": "john@example.com",
+      "role": "owner",
+      "created_at": "2024-11-27T10:00:00Z"
+    },
+    {
+      "id": 2,
+      "user_id": "550e8400-e29b-41d4-a716-446655440002",
+      "username": "jane_doe",
+      "email": "j***@e***.com",
+      "role": "member",
+      "created_at": "2024-11-27T11:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "limit": 20,
+    "offset": 0,
+    "has_more": false
+  }
+}
+```
+
+---
+
+#### Update Member Role
+
+Update a member's role. Requires owner role.
+
+**Endpoint**: `PUT /api/v1/organizations/{id}/members/{user_id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "role": "admin"
+}
+```
+
+**Response** (200 OK): Returns updated member
+
+**Error Responses**:
+- `400 Bad Request`: Cannot change role to owner
+- `403 Forbidden`: Only owner can update roles
+- `404 Not Found`: Member not found
+
+---
+
+#### Remove Member
+
+Remove a member from an organization. Requires admin or owner role.
+
+**Endpoint**: `DELETE /api/v1/organizations/{id}/members/{user_id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (204 No Content)
+
+**Error Responses**:
+- `400 Bad Request`: Cannot remove the owner
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Member not found
+
+---
+
+### API Keys
+
+API keys provide programmatic access to the API (Layer 1 authentication).
+
+#### Create API Key
+
+Create a new API key. The full key is shown **only once** at creation time.
+
+**Endpoint**: `POST /api/v1/api-keys?organization_id=xxx`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "name": "Production API Key",
+  "environment": "live",
+  "key_type": "standard",
+  "permissions": ["read", "write"],
+  "rate_limit_override": 500,
+  "expires_at": "2025-12-31T23:59:59Z"
+}
+```
+
+**Validation**:
+- `name`: 1-100 characters (required)
+- `environment`: `live` or `test` (required)
+- `key_type`: `standard`, `restricted`, or `admin` (required)
+- `permissions`: Array of strings (required)
+- `rate_limit_override`: Integer (optional)
+- `expires_at`: ISO 8601 timestamp (optional)
+
+**Response** (201 Created):
+```json
+{
+  "data": {
+    "id": "key_550e8400",
+    "key": "sk_live_abc123xyz456789...",
+    "name": "Production API Key",
+    "prefix": "sk_live_abc123x",
+    "environment": "live",
+    "key_type": "standard",
+    "permissions": ["read", "write"],
+    "created_at": "2024-11-27T10:00:00Z",
+    "expires_at": "2025-12-31T23:59:59Z"
+  }
+}
+```
+
+**Security Note**: Save the `key` value immediately - it will never be shown again.
+
+---
+
+#### List API Keys
+
+List all API keys for an organization. Keys are masked (only prefix shown).
+
+**Endpoint**: `GET /api/v1/api-keys?organization_id=xxx&limit=20&offset=0&include_revoked=false`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "items": [
+    {
+      "id": "key_550e8400",
+      "name": "Production API Key",
+      "prefix": "sk_live_abc123x",
+      "environment": "live",
+      "key_type": "standard",
+      "permissions": ["read", "write"],
+      "rate_limit_override": 500,
+      "last_used_at": "2024-11-27T15:30:00Z",
+      "expires_at": "2025-12-31T23:59:59Z",
+      "created_at": "2024-11-27T10:00:00Z",
+      "created_by": "user_123",
+      "is_revoked": false,
+      "revoked_at": null
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 1
+}
+```
+
+---
+
+#### Get API Key
+
+Get details for a specific API key.
+
+**Endpoint**: `GET /api/v1/api-keys/{id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK): Returns API key details (masked)
+
+---
+
+#### Revoke API Key
+
+Revoke an API key. Revoked keys cannot be used.
+
+**Endpoint**: `DELETE /api/v1/api-keys/{id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body** (optional):
+```json
+{
+  "reason": "Compromised key"
+}
+```
+
+**Response** (200 OK): Returns revoked API key
+
+**Error Responses**:
+- `400 Bad Request`: Key is already revoked
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: API key not found
+
+---
+
+#### Rotate API Key
+
+Rotate an API key (revoke old, create new in one transaction).
+
+**Endpoint**: `POST /api/v1/api-keys/{id}/rotate`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body** (optional):
+```json
+{
+  "name": "New Key Name",
+  "expires_at": "2026-01-01T00:00:00Z"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "data": {
+    "id": "new_key_id",
+    "key": "sk_live_new_secret...",
+    "prefix": "sk_live_new_sec",
+    "old_key_id": "key_550e8400",
+    "old_key_revoked_at": "2024-11-27T12:00:00Z"
+  }
+}
+```
+
+**Security Note**: Save the new `key` value immediately.
+
+---
+
+### Agent Linking
+
+Link on-chain agent NFTs to organizations using wallet signature verification (Layer 2 authentication).
+
+#### Link Agent
+
+Link an agent NFT to an organization. Requires wallet signature proving ownership.
+
+**Endpoint**: `POST /api/v1/agents/link`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "agent_id": 42,
+  "chain_id": 11155111,
+  "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+  "wallet_address": "0x1234567890abcdef1234567890abcdef12345678",
+  "challenge": "Sign this message to authenticate with ERC-8004 API\n\nWallet: 0x1234...\nNonce: abc123...\nExpires: 2024-11-27T12:00:00Z",
+  "signature": "0x..."
+}
+```
+
+**Validation**:
+- `agent_id`: Integer (required)
+- `chain_id`: Integer (required)
+- `organization_id`: Valid org UUID (required)
+- `wallet_address`: 42 characters (0x + 40 hex chars)
+- `challenge`: Non-empty string with nonce and expiration
+- `signature`: 130-132 characters (EIP-191 signature)
+
+**Security Flow**:
+1. Verify EIP-191 signature matches wallet address
+2. Check nonce hasn't been used (replay attack prevention)
+3. Verify challenge hasn't expired
+4. Verify on-chain ownership via IdentityRegistry.ownerOf()
+5. Create agent link
+
+**Response** (201 Created):
+```json
+{
+  "id": "link_550e8400",
+  "agent_id": 42,
+  "chain_id": 11155111,
+  "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+  "wallet_address": "0x1234567890abcdef1234567890abcdef12345678",
+  "status": "active",
+  "created_at": "2024-11-27T10:00:00Z"
+}
+```
+
+**Error Responses**:
+- `400 Bad Request`: Invalid signature, nonce reused, or challenge expired
+- `403 Forbidden`: Wallet does not own this agent NFT
+- `409 Conflict`: Agent is already linked to an organization
+
+---
+
+#### List Linked Agents
+
+List all agents linked to an organization.
+
+**Endpoint**: `GET /api/v1/agents/linked?organization_id=xxx`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+[
+  {
+    "id": "link_550e8400",
+    "agent_id": 42,
+    "chain_id": 11155111,
+    "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+    "wallet_address": "0x1234567890abcdef1234567890abcdef12345678",
+    "status": "active",
+    "created_at": "2024-11-27T10:00:00Z"
+  }
+]
+```
+
+---
+
+#### Unlink Agent
+
+Remove an agent link from an organization. Requires admin or owner role.
+
+**Endpoint**: `DELETE /api/v1/agents/{agent_id}/link?chain_id=xxx&organization_id=xxx`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "message": "Agent unlinked successfully"
+}
+```
+
+**Error Responses**:
+- `403 Forbidden`: Agent not linked to your organization
+- `404 Not Found`: Agent link not found
+
+---
+
+### Billing
+
+Credit management and Stripe integration for the payment system.
+
+#### Get Credit Balance
+
+Get the credit balance for an organization.
+
+**Endpoint**: `GET /api/v1/billing/credits?organization_id=xxx`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "balance": 50000000,
+  "balance_formatted": "50.00 USDC"
+}
+```
+
+**Note**: Balance is in micro-USDC (1 USDC = 1,000,000 micro-USDC).
+
+---
+
+#### List Transactions
+
+List credit transactions for an organization.
+
+**Endpoint**: `GET /api/v1/billing/transactions?organization_id=xxx&limit=20&offset=0&transaction_type=purchase`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Query Parameters**:
+- `organization_id`: Required
+- `limit`: 1-100 (default: 20)
+- `offset`: Default: 0
+- `transaction_type`: Filter by type (optional): `purchase`, `usage`, `refund`, `adjustment`
+
+**Response** (200 OK):
+```json
+[
+  {
+    "id": "tx_550e8400",
+    "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+    "amount": 50000000,
+    "transaction_type": "purchase",
+    "description": "Stripe checkout purchase",
+    "reference_id": "cs_test_xxx",
+    "balance_after": 50000000,
+    "created_at": "2024-11-27T10:00:00Z"
+  }
+]
+```
+
+---
+
+#### Purchase Credits
+
+Create a Stripe Checkout session to purchase credits.
+
+**Endpoint**: `POST /api/v1/billing/credits/purchase`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+  "amount": 50,
+  "success_url": "https://example.com/success",
+  "cancel_url": "https://example.com/cancel"
+}
+```
+
+**Validation**:
+- `amount`: 1-10000 (USD, whole units)
+- `success_url`: Valid URL
+- `cancel_url`: Valid URL
+
+**Response** (200 OK):
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/...",
+  "session_id": "cs_test_xxx"
+}
+```
+
+**Note**: Redirect user to `checkout_url` to complete payment.
+
+---
+
+#### Get Subscription
+
+Get subscription details for an organization.
+
+**Endpoint**: `GET /api/v1/billing/subscription?organization_id=xxx`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "id": "sub_550e8400",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+  "stripe_subscription_id": "sub_xxx",
+  "stripe_customer_id": "cus_xxx",
+  "plan": "pro",
+  "status": "active",
+  "current_period_start": "2024-11-01T00:00:00Z",
+  "current_period_end": "2024-12-01T00:00:00Z",
+  "created_at": "2024-11-01T00:00:00Z"
+}
+```
+
+---
+
+#### Stripe Webhook
+
+Handle Stripe webhook events. No authentication required (uses Stripe signature verification).
+
+**Endpoint**: `POST /api/v1/billing/webhook`
+
+**Headers**: `Stripe-Signature: <signature>`
+
+**Handled Events**:
+- `checkout.session.completed`: Add credits to organization
+- `checkout.session.async_payment_failed`: Log failure
+- `customer.subscription.created`: Create subscription record
+- `customer.subscription.updated`: Update subscription status
+- `customer.subscription.deleted`: Cancel subscription
+
+**Response** (200 OK):
+```json
+{
+  "received": true
+}
+```
+
+---
+
 ## Error Responses
 
 All error responses follow this format:
