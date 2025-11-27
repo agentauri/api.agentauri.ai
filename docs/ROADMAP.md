@@ -161,6 +161,15 @@ See [Authentication Documentation](../docs/auth/AUTHENTICATION.md) for details.
 
 #### Recent Achievements (November 2025)
 
+**Ponder Indexers Security Hardening** (commit `6e1d19c`):
+- ✅ Zod v4 environment validation with strict schema enforcement
+- ✅ HTTPS-only RPC URL validation (security requirement)
+- ✅ Pino structured logging with credential redaction (API keys, passwords)
+- ✅ 38 unit tests with comprehensive coverage (env validation, logger)
+- ✅ Pre-commit hooks via Husky (`pnpm check` validation)
+- ✅ TypeScript strict mode configuration with separate `tsconfig.check.json`
+- ✅ ESLint and Prettier integration with auto-fix
+
 **Local Testing Infrastructure**:
 - ✅ `local-ci.sh` - Daily development workflow validation (2-5 min)
 - ✅ `local-lint.sh` - Pre-PR code quality checks (3-5 min)
@@ -183,6 +192,7 @@ See [Authentication Documentation](../docs/auth/AUTHENTICATION.md) for details.
 - ✅ 108 database tests passing (100% coverage)
 - ✅ Event Store NOTIFY/LISTEN fully tested
 - ✅ Multi-chain event processing verified
+- ✅ 38 ponder-indexer unit tests (env validation + logging)
 
 **API Gateway Implementation (Week 7)**:
 - ✅ Complete REST API with 15 endpoints

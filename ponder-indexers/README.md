@@ -94,13 +94,21 @@ ponder-indexers/
 │   └── ValidationRegistry.json    # Validation Registry ABI
 ├── src/
 │   ├── index.ts                   # Event handlers
-│   └── api/
-│       └── index.ts               # GraphQL API extensions
+│   ├── env-validation.ts          # Zod environment validation
+│   ├── logger.ts                  # Pino structured logging
+│   ├── api/
+│   │   └── index.ts               # GraphQL API extensions
+│   └── __tests__/                 # Unit tests
+│       ├── env-validation.test.ts # Environment validation tests
+│       └── logger.test.ts         # Logger tests
 ├── ponder.config.ts               # Ponder configuration
 ├── ponder.schema.ts               # Database schema
 ├── ponder-env.d.ts                # Type definitions
 ├── tsconfig.json                  # TypeScript configuration
+├── tsconfig.check.json            # Type checking configuration
 ├── package.json                   # Dependencies and scripts
+├── .husky/                        # Git hooks
+│   └── pre-commit                 # Pre-commit validation
 └── README.md                      # This file
 ```
 
@@ -233,14 +241,20 @@ Tracks the last processed block for each chain:
 
 ## Development
 
+### Run All Checks (Pre-Commit)
+```bash
+pnpm check   # Runs tests + lint + typecheck
+```
+
 ### Run Tests
 ```bash
-pnpm test
+pnpm test                    # Run all tests
+pnpm test:coverage           # Run with coverage report
 ```
 
 ### Type Check
 ```bash
-pnpm typecheck
+pnpm typecheck               # Uses tsconfig.check.json
 ```
 
 ### Lint
@@ -260,7 +274,59 @@ pnpm format:check
 pnpm codegen
 ```
 
+### Pre-Commit Hooks
+
+This project uses Husky pre-commit hooks to ensure code quality. Before every commit, the following checks run automatically:
+
+1. Unit tests (`pnpm test`)
+2. Linting (`pnpm lint`)
+3. Type checking (`pnpm typecheck`)
+
+To bypass hooks (not recommended):
+```bash
+git commit --no-verify -m "message"
+```
+
 ## Recent Updates
+
+### November 2025 (Latest): Security Hardening - Complete Validation Suite
+
+Major security hardening with comprehensive validation, structured logging, and test coverage.
+
+**What Changed** (commit `6e1d19c`):
+
+1. **Zod v4 Environment Validation** (`src/env-validation.ts`):
+   - Strict schema validation at startup
+   - HTTPS-only RPC URL enforcement (security requirement)
+   - Type-safe environment access
+   - Clear error messages for missing/invalid config
+
+2. **Pino Structured Logging** (`src/logger.ts`):
+   - Production-ready structured JSON logs
+   - Automatic credential redaction (API keys, passwords in URLs)
+   - Separate loggers per component (config, rpc, event)
+   - Pretty printing in development mode
+
+3. **Unit Test Suite** (38 tests):
+   - Environment validation tests (valid/invalid configs, edge cases)
+   - Logger tests (formatting, redaction, levels)
+   - Run with `pnpm test` or `pnpm test:coverage`
+
+4. **Pre-Commit Hooks** (Husky):
+   - Runs `pnpm check` before every commit
+   - Prevents broken code from being committed
+   - Validates: tests, lint, typecheck
+
+5. **TypeScript Strict Mode**:
+   - Separate `tsconfig.check.json` for standalone typechecking
+   - Excludes Ponder codegen files (require `pnpm codegen`)
+   - ESLint + Prettier integration
+
+**Dependencies Added**:
+- `zod@^4.1.13` - Environment validation
+- `pino@^10.1.0` - Structured logging
+- `pino-pretty@^13.1.2` - Development pretty printing
+- `husky@^9.1.7` - Git hooks
 
 ### November 2025: Security Enhancement - Environment-Based Configuration
 
