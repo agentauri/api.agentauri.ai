@@ -217,6 +217,55 @@ pub fn bad_request(message: &str) -> HttpResponse {
     HttpResponse::BadRequest().json(ErrorResponse::new("bad_request", message))
 }
 
+/// Return a safe internal server error that doesn't leak implementation details
+///
+/// SECURITY: Use this for errors where the cause should never be exposed to clients,
+/// such as database errors, configuration issues, or third-party service failures.
+///
+/// # Example
+///
+/// ```ignore
+/// if let Err(e) = some_sensitive_operation().await {
+///     tracing::error!("Sensitive operation failed: {}", e);
+///     return safe_internal_error();
+/// }
+/// ```
+pub fn safe_internal_error() -> HttpResponse {
+    HttpResponse::InternalServerError().json(ErrorResponse::new(
+        "internal_error",
+        "An internal error occurred. Please try again later.",
+    ))
+}
+
+/// Handle errors with strict sanitization - no dynamic content in response
+///
+/// SECURITY: This variant never includes any dynamic content in the error response,
+/// making it suitable for handling sensitive errors where even the action name
+/// might reveal too much information.
+///
+/// # Arguments
+///
+/// * `result` - A Result from any operation
+/// * `context` - Context string for logging (not exposed to client)
+///
+/// # Example
+///
+/// ```ignore
+/// let secret = handle_db_error_safe(
+///     fetch_secret_config(&pool).await,
+///     "fetch secret configuration"
+/// )?;
+/// ```
+pub fn handle_db_error_safe<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+    context: &str,
+) -> Result<T, HttpResponse> {
+    result.map_err(|e| {
+        tracing::error!(context = context, error = %e, "Operation failed (sanitized response)");
+        safe_internal_error()
+    })
+}
+
 // ============================================================================
 // Request Context
 // ============================================================================

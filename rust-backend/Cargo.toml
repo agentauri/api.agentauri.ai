@@ -94,6 +94,15 @@ regex = "1"
 base64 = "0.22"
 rand = "0.8"
 
+# Ethereum / EIP-191 signature verification
+alloy = { version = "0.5", features = ["signers", "contract", "provider-http"] }
+
+# Stripe payment processing
+async-stripe = { version = "0.39", features = ["runtime-tokio-hyper"] }
+
+# Hex encoding/decoding
+hex = "0.4"
+
 [profile.dev]
 opt-level = 0
 debug = true

@@ -20,6 +20,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/register", web::post().to(handlers::register))
                     .route("/login", web::post().to(handlers::login)),
             )
+            // Stripe webhook (no auth - uses signature verification)
+            .route(
+                "/billing/webhook",
+                web::post().to(handlers::handle_stripe_webhook),
+            )
             // Protected routes (JWT or API Key auth)
             .service(
                 web::scope("")
@@ -57,6 +62,24 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("/{id}", web::get().to(handlers::get_api_key))
                             .route("/{id}", web::delete().to(handlers::revoke_api_key))
                             .route("/{id}/rotate", web::post().to(handlers::rotate_api_key)),
+                    )
+                    // Agent linking endpoints (Layer 2 - wallet signature auth)
+                    .service(
+                        web::scope("/agents")
+                            .route("/link", web::post().to(handlers::link_agent))
+                            .route("/linked", web::get().to(handlers::list_linked_agents))
+                            .route("/{agent_id}/link", web::delete().to(handlers::unlink_agent)),
+                    )
+                    // Billing endpoints
+                    .service(
+                        web::scope("/billing")
+                            .route("/credits", web::get().to(handlers::get_credits))
+                            .route(
+                                "/credits/purchase",
+                                web::post().to(handlers::purchase_credits),
+                            )
+                            .route("/transactions", web::get().to(handlers::list_transactions))
+                            .route("/subscription", web::get().to(handlers::get_subscription)),
                     )
                     // Trigger endpoints
                     .service(

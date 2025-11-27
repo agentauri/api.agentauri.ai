@@ -12,6 +12,9 @@ mod models;
 mod repositories;
 mod routes;
 mod services;
+mod validators;
+
+use services::WalletService;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,6 +41,15 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Database health check failed")?;
 
+    // Initialize WalletService with chain configs from environment (loaded once at startup)
+    // This creates a shared HTTP client with connection pooling for RPC calls
+    let chain_configs = WalletService::load_chain_configs_from_env();
+    let wallet_service = WalletService::new(chain_configs.clone());
+    tracing::info!(
+        "WalletService initialized with {} chain configurations",
+        chain_configs.len()
+    );
+
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("API Gateway listening on {}", server_addr);
 
@@ -53,6 +65,8 @@ async fn main() -> anyhow::Result<()> {
             // Store database pool in app state
             .app_data(web::Data::new(db_pool.clone()))
             .app_data(web::Data::new(config.clone()))
+            // Store WalletService in app state (shared across all requests)
+            .app_data(web::Data::new(wallet_service.clone()))
             // Configure routes
             .configure(routes::configure)
     })
