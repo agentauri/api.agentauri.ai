@@ -188,22 +188,62 @@ where
 
             // Check if rate limit exceeded
             if !result.allowed {
-                warn!(
-                    scope = ?scope,
-                    current_usage = result.current_usage,
-                    limit = result.limit,
-                    retry_after = result.retry_after,
-                    "Rate limit exceeded"
-                );
+                // Check rate limit mode (shadow or enforcing)
+                let mode = std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string());
 
-                // Return 429 Too Many Requests error
-                // Note: The actual response formatting with headers would be done by an error handler
-                // For now, we return a simple error. In production, you'd want a custom error type
-                // that includes the rate limit info and a custom error handler that sets the headers.
-                return Err(ErrorTooManyRequests(format!(
-                    "Rate limit exceeded. Try again in {} seconds. (Limit: {}, Window: {}s)",
-                    result.retry_after, result.limit, window_seconds
-                )));
+                if mode == "shadow" {
+                    // Shadow mode: Log violation but allow request
+                    warn!(
+                        mode = "SHADOW",
+                        scope = ?scope,
+                        current_usage = result.current_usage,
+                        limit = result.limit,
+                        retry_after = result.retry_after,
+                        "Rate limit WOULD BE exceeded (shadow mode - request allowed)"
+                    );
+
+                    // Continue processing request (no error)
+                    // Add special header to indicate shadow mode violation
+                    let mut res = service.call(req).await?;
+                    let headers = res.headers_mut();
+                    headers.insert(
+                        HeaderName::from_static("x-ratelimit-status"),
+                        HeaderValue::from_static("shadow-violation"),
+                    );
+                    headers.insert(
+                        HeaderName::from_static("x-ratelimit-limit"),
+                        HeaderValue::from(result.limit),
+                    );
+                    headers.insert(
+                        HeaderName::from_static("x-ratelimit-remaining"),
+                        HeaderValue::from(0),
+                    );
+                    headers.insert(
+                        HeaderName::from_static("x-ratelimit-reset"),
+                        HeaderValue::from(result.reset_at),
+                    );
+                    headers.insert(
+                        HeaderName::from_static("x-ratelimit-window"),
+                        HeaderValue::from(window_seconds),
+                    );
+                    return Ok(res);
+                } else {
+                    // Enforcing mode: Block request
+                    warn!(
+                        mode = "ENFORCING",
+                        scope = ?scope,
+                        current_usage = result.current_usage,
+                        limit = result.limit,
+                        retry_after = result.retry_after,
+                        "Rate limit exceeded"
+                    );
+
+                    // Return 429 Too Many Requests error
+                    return Err(ErrorTooManyRequests(format!(
+                        "Rate limit exceeded. Try again in {} seconds. (Limit: {}, Window: {}s)",
+                        result.retry_after, result.limit, window_seconds
+                    )));
+                }
             }
 
             debug!(

@@ -20,9 +20,14 @@
 
 use crate::middleware::{ip_extractor, ApiKeyAuth};
 use crate::models::Claims;
-use actix_web::{HttpMessage, HttpRequest};
+use actix_web::{
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    Error, HttpMessage, HttpRequest,
+};
+use futures_util::future::LocalBoxFuture;
 use shared::models::Organization;
 use shared::DbPool;
+use std::future::{ready, Ready};
 use tracing::debug;
 
 /// Authentication layer (for rate limiting scope)
@@ -303,6 +308,96 @@ async fn get_organization_plan(pool: &DbPool, organization_id: &str) -> Option<S
             );
             None
         }
+    }
+}
+
+/// AuthExtractor middleware
+///
+/// Extracts authentication context from the request and stores it in extensions.
+/// This middleware should run BEFORE UnifiedRateLimiter.
+pub struct AuthExtractor;
+
+impl AuthExtractor {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for AuthExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S, B> Transform<S, ServiceRequest> for AuthExtractor
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = AuthExtractorMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(AuthExtractorMiddleware {
+            service: std::rc::Rc::new(service),
+        }))
+    }
+}
+
+pub struct AuthExtractorMiddleware<S> {
+    service: std::rc::Rc<S>,
+}
+
+impl<S, B> Service<ServiceRequest> for AuthExtractorMiddleware<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    forward_ready!(service);
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let service = self.service.clone();
+
+        Box::pin(async move {
+            // Extract database pool from app state
+            let pool = match req.app_data::<actix_web::web::Data<DbPool>>() {
+                Some(pool) => pool.get_ref().clone(),
+                None => {
+                    tracing::error!("Database pool not found in app state");
+                    return Err(actix_web::error::ErrorInternalServerError(
+                        "Database configuration error",
+                    ));
+                }
+            };
+
+            // Extract HTTP request reference before consuming ServiceRequest
+            let http_req = req.request();
+
+            // Extract auth context
+            let auth_ctx = extract_auth_context(http_req, &pool).await;
+
+            debug!(
+                layer = %auth_ctx.layer.as_str(),
+                plan = %auth_ctx.plan,
+                rate_limit = auth_ctx.get_rate_limit(),
+                "Auth context extracted"
+            );
+
+            // Store auth context in request extensions
+            req.extensions_mut().insert(auth_ctx);
+
+            // Continue to next service
+            service.call(req).await
+        })
     }
 }
 

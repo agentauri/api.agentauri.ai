@@ -4,7 +4,7 @@
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use anyhow::Context;
-use shared::{db, Config};
+use shared::{db, Config, RateLimiter};
 
 mod background_tasks;
 mod handlers;
@@ -16,7 +16,10 @@ mod services;
 mod validators;
 
 use background_tasks::BackgroundTaskRunner;
+use middleware::auth_extractor::AuthExtractor;
+use middleware::query_tier::QueryTierExtractor;
 use middleware::security_headers::SecurityHeaders;
+use middleware::unified_rate_limiter::UnifiedRateLimiter;
 use services::WalletService;
 
 #[actix_web::main]
@@ -53,6 +56,21 @@ async fn main() -> anyhow::Result<()> {
         chain_configs.len()
     );
 
+    // Initialize Redis client for rate limiting
+    let redis_client = shared::redis::create_client(&config.redis.connection_url())
+        .await
+        .context("Failed to create Redis client")?;
+    tracing::info!("Redis client connected for rate limiting");
+
+    // Create RateLimiter instance (shared across all requests)
+    let rate_limiter = RateLimiter::new(redis_client)
+        .await
+        .context("Failed to create rate limiter")?;
+    tracing::info!(
+        "Rate limiter initialized (mode: {})",
+        std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string())
+    );
+
     // Start background tasks (nonce cleanup)
     let bg_runner = BackgroundTaskRunner::new(db_pool.clone());
     let shutdown_token = bg_runner.start();
@@ -64,12 +82,19 @@ async fn main() -> anyhow::Result<()> {
     // Start HTTP server
     let server = HttpServer::new(move || {
         App::new()
-            // Add security headers middleware
+            // Add security headers middleware (must be first to apply to all responses)
             .wrap(SecurityHeaders::for_api())
             // Add logger middleware
             .wrap(Logger::default())
             // Add CORS middleware
             .wrap(middleware::cors())
+            // Add rate limiting middleware chain (order matters!)
+            // 1. UnifiedRateLimiter: Checks rate limits using AuthContext + QueryTier
+            .wrap(UnifiedRateLimiter::new(rate_limiter.clone()))
+            // 2. QueryTierExtractor: Extracts query tier from path/query params
+            .wrap(QueryTierExtractor::new())
+            // 3. AuthExtractor: Extracts auth context (IP, API key, or wallet signature)
+            .wrap(AuthExtractor::new())
             // Configure JSON payload size limit (1MB)
             .app_data(web::JsonConfig::default().limit(1_048_576))
             // Store database pool in app state
