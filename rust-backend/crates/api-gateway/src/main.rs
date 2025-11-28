@@ -6,6 +6,7 @@ use actix_web::{middleware::Logger, web, App, HttpServer};
 use anyhow::Context;
 use shared::{db, Config};
 
+mod background_tasks;
 mod handlers;
 mod middleware;
 mod models;
@@ -14,6 +15,8 @@ mod routes;
 mod services;
 mod validators;
 
+use background_tasks::BackgroundTaskRunner;
+use middleware::security_headers::SecurityHeaders;
 use services::WalletService;
 
 #[actix_web::main]
@@ -50,12 +53,19 @@ async fn main() -> anyhow::Result<()> {
         chain_configs.len()
     );
 
+    // Start background tasks (nonce cleanup)
+    let bg_runner = BackgroundTaskRunner::new(db_pool.clone());
+    let shutdown_token = bg_runner.start();
+    tracing::info!("Background tasks started (nonce cleanup every hour)");
+
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("API Gateway listening on {}", server_addr);
 
     // Start HTTP server
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
+            // Add security headers middleware
+            .wrap(SecurityHeaders::for_api())
             // Add logger middleware
             .wrap(Logger::default())
             // Add CORS middleware
@@ -71,10 +81,27 @@ async fn main() -> anyhow::Result<()> {
             .configure(routes::configure)
     })
     .bind(&server_addr)
-    .with_context(|| format!("Failed to bind to {}", server_addr))?
-    .run()
-    .await
-    .context("Server error")?;
+    .with_context(|| format!("Failed to bind to {}", server_addr))?;
+
+    let server_handle = server.run();
+
+    // Register graceful shutdown handler
+    tokio::spawn(async move {
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => {
+                tracing::info!("Shutdown signal received, stopping background tasks...");
+                shutdown_token.cancel();
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to listen for shutdown signal");
+            }
+        }
+    });
+
+    // Run server and wait for completion
+    server_handle.await.context("Server error")?;
+
+    tracing::info!("API Gateway shutdown complete");
 
     Ok(())
 }
