@@ -20,11 +20,29 @@
 //! - [`get_verified_organization_id()`] - Verify membership, return org_id
 //! - [`get_verified_organization_id_with_role()`] - Verify membership, return (org_id, role)
 //!
+//! # API Key Authentication
+//!
+//! - [`DualAuth`] - Middleware supporting both JWT and API Key authentication
+//! - [`ApiKeyAuth`] - API key authentication context
+//! - [`get_api_key_auth()`] - Extract API key auth from request
+//!
+//! # Rate Limiting
+//!
+//! - [`auth_extractor`] - Extract authentication context for rate limiting
+//! - [`ip_extractor`] - Extract client IP address with proxy support
+//! - [`query_tier`] - Extract query tier for cost calculation
+//! - [`unified_rate_limiter`] - Unified rate limiting middleware
+//!
 //! # Security Notes
 //!
 //! - JWT tokens are validated using HS256 algorithm
 //! - The `X-Organization-ID` header is untrusted and always verified against membership
 //! - All verification functions return appropriate HTTP error responses on failure
+
+pub mod auth_extractor;
+pub mod ip_extractor;
+pub mod query_tier;
+pub mod unified_rate_limiter;
 
 use actix_cors::Cors;
 use actix_web::{
@@ -47,6 +65,11 @@ use crate::repositories::{
     ApiKeyAuditRepository, ApiKeyRepository, AuthFailureRepository, MemberRepository,
 };
 use crate::services::{ApiKeyService, AuthRateLimiter};
+
+// Re-export middleware components
+pub use auth_extractor::{AuthContext, AuthLayer};
+pub use query_tier::{QueryTier, QueryTierExtractor};
+pub use unified_rate_limiter::UnifiedRateLimiter;
 
 /// Configure CORS middleware
 pub fn cors() -> Cors {

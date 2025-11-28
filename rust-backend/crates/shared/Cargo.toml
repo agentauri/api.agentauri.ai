@@ -26,7 +26,6 @@ tracing-subscriber = { workspace = true }
 
 # Configuration
 dotenvy = { workspace = true }
-config = { workspace = true }
 
 # Date and time
 chrono = { workspace = true }
@@ -37,5 +36,5 @@ uuid = { workspace = true }
 # Validation
 validator = { workspace = true }
 
-[dev-dependencies]
-tokio-test = "0.4"
+# Redis
+redis = { workspace = true }
