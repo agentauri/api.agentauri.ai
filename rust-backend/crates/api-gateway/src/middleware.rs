@@ -33,15 +33,21 @@
 //! - [`query_tier`] - Extract query tier for cost calculation
 //! - [`unified_rate_limiter`] - Unified rate limiting middleware
 //!
+//! # Security Headers
+//!
+//! - [`security_headers`] - Adds security headers (HSTS, X-Frame-Options, etc.)
+//!
 //! # Security Notes
 //!
 //! - JWT tokens are validated using HS256 algorithm
 //! - The `X-Organization-ID` header is untrusted and always verified against membership
 //! - All verification functions return appropriate HTTP error responses on failure
+//! - Security headers protect against common web vulnerabilities
 
 pub mod auth_extractor;
 pub mod ip_extractor;
 pub mod query_tier;
+pub mod security_headers;
 pub mod unified_rate_limiter;
 
 use actix_cors::Cors;

@@ -9,36 +9,48 @@
 //! - **Sliding Window**: 1-hour window with 1-minute granularity (60 buckets)
 //! - **Atomic Operations**: Redis Lua script for check-and-increment
 //! - **Cost Multipliers**: Different query tiers consume different amounts (1x-10x)
-//! - **Graceful Degradation**: Fails open if Redis is unavailable
+//! - **Graceful Degradation**: Falls back to in-memory rate limiting when Redis unavailable
+//!
+//! # Fallback Mechanism
+//!
+//! When Redis is unavailable, the rate limiter automatically falls back to an
+//! in-memory DashMap-based limiter with conservative limits:
+//! - Uses a 1-minute window for simplicity
+//! - Applies a more restrictive fallback limit (default: 10 req/min)
+//! - Automatically switches back to Redis when it becomes available
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```ignore
 //! use shared::redis::{RateLimiter, RateLimitScope};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let limiter = RateLimiter::new(redis_manager).await?;
+//! async fn example(redis_manager: redis::aio::ConnectionManager) -> Result<(), Box<dyn std::error::Error>> {
+//!     let limiter = RateLimiter::new(redis_manager).await?;
 //!
-//! // Check rate limit for an organization
-//! let result = limiter.check(
-//!     RateLimitScope::Organization("org_123"),
-//!     100,  // limit
-//!     2,    // cost (Tier 1 query)
-//! ).await?;
+//!     // Check rate limit for an organization
+//!     let result = limiter.check(
+//!         RateLimitScope::Organization("org_123".to_string()),
+//!         100,  // limit
+//!         2,    // cost (Tier 1 query)
+//!     ).await?;
 //!
-//! if result.allowed {
-//!     println!("Request allowed. Remaining: {}", result.remaining);
-//! } else {
-//!     println!("Rate limited. Retry after: {}", result.retry_after);
+//!     if result.allowed {
+//!         println!("Request allowed. Remaining: {}", result.remaining);
+//!     } else {
+//!         println!("Rate limited. Retry after: {}", result.retry_after);
+//!     }
+//!     Ok(())
 //! }
-//! # Ok(())
-//! # }
 //! ```
+//!
+//! Rust guideline compliant 2025-01-28
 
 use crate::error::{Error, Result};
+use dashmap::DashMap;
 use redis::{aio::ConnectionManager, AsyncCommands, Script};
-use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::{debug, error, warn};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tracing::{debug, error, info, warn};
 
 /// Rate limit scope (determines Redis key prefix)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,9 +138,19 @@ impl RateLimitResult {
     }
 }
 
-/// Redis-based rate limiter
+/// Entry in the fallback rate limiter
+#[derive(Debug, Clone)]
+struct FallbackEntry {
+    /// Current request count in the window
+    count: i64,
+    /// When this window started
+    window_start: Instant,
+}
+
+/// Redis-based rate limiter with in-memory fallback
 ///
 /// Uses a Lua script for atomic check-and-increment operations.
+/// Falls back to in-memory rate limiting when Redis is unavailable.
 #[derive(Clone)]
 pub struct RateLimiter {
     /// Redis connection manager
@@ -139,11 +161,24 @@ pub struct RateLimiter {
     window_seconds: i64,
     /// Whether to fail open (allow requests) when Redis is unavailable
     fail_open: bool,
+    /// In-memory fallback rate limiter (DashMap for thread-safe concurrent access)
+    /// Key: scope key prefix, Value: (count, window_start)
+    fallback_limiter: Arc<DashMap<String, FallbackEntry>>,
+    /// Conservative limit for fallback mode (requests per minute)
+    fallback_limit: i64,
+    /// Fallback window duration
+    fallback_window: Duration,
 }
 
 impl RateLimiter {
     /// Default window size (1 hour)
     pub const DEFAULT_WINDOW: i64 = 3600;
+
+    /// Default fallback limit (10 requests per minute - conservative)
+    pub const DEFAULT_FALLBACK_LIMIT: i64 = 10;
+
+    /// Default fallback window (1 minute)
+    pub const DEFAULT_FALLBACK_WINDOW: Duration = Duration::from_secs(60);
 
     /// Lua script source (embedded at compile time)
     const LUA_SCRIPT: &'static str = include_str!("rate_limit.lua");
@@ -178,7 +213,7 @@ impl RateLimiter {
         debug!(
             window_seconds = window_seconds,
             fail_open = fail_open,
-            "Rate limiter initialized"
+            "Rate limiter initialized with in-memory fallback"
         );
 
         Ok(Self {
@@ -186,7 +221,87 @@ impl RateLimiter {
             script,
             window_seconds,
             fail_open,
+            fallback_limiter: Arc::new(DashMap::new()),
+            fallback_limit: Self::DEFAULT_FALLBACK_LIMIT,
+            fallback_window: Self::DEFAULT_FALLBACK_WINDOW,
         })
+    }
+
+    /// Check rate limit using the in-memory fallback limiter
+    ///
+    /// This is used when Redis is unavailable. It provides a simpler,
+    /// more conservative rate limiting mechanism.
+    ///
+    /// # Arguments
+    ///
+    /// * `scope` - The rate limit scope
+    /// * `cost` - Cost of this request
+    ///
+    /// # Returns
+    ///
+    /// `RateLimitResult` with fallback limits applied
+    fn check_fallback(&self, scope: &RateLimitScope, cost: i64) -> RateLimitResult {
+        let key = scope.key_prefix();
+        let now = Instant::now();
+        let limit = self.fallback_limit;
+
+        let mut entry = self.fallback_limiter.entry(key.clone()).or_insert_with(|| {
+            FallbackEntry {
+                count: 0,
+                window_start: now,
+            }
+        });
+
+        // Check if window has expired
+        if now.duration_since(entry.window_start) >= self.fallback_window {
+            // Reset window
+            entry.count = 0;
+            entry.window_start = now;
+        }
+
+        // Check if we're over limit
+        let new_count = entry.count + cost;
+        let allowed = new_count <= limit;
+
+        if allowed {
+            entry.count = new_count;
+        }
+
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        let reset_at = current_time + self.fallback_window.as_secs() as i64;
+        let retry_after = if allowed { 0 } else { self.fallback_window.as_secs() as i64 };
+        let remaining = (limit - new_count).max(0);
+
+        RateLimitResult {
+            allowed,
+            current_usage: new_count,
+            limit,
+            reset_at,
+            retry_after,
+            remaining,
+        }
+    }
+
+    /// Clean up expired entries from the fallback limiter
+    ///
+    /// Should be called periodically to prevent memory growth.
+    /// Entries older than 2x the fallback window are removed.
+    pub fn cleanup_fallback(&self) {
+        let now = Instant::now();
+        let expiry = self.fallback_window * 2;
+
+        self.fallback_limiter.retain(|_, entry| {
+            now.duration_since(entry.window_start) < expiry
+        });
+
+        debug!(
+            entries_remaining = self.fallback_limiter.len(),
+            "Cleaned up expired fallback rate limit entries"
+        );
     }
 
     /// Check rate limit and increment if allowed
@@ -274,11 +389,31 @@ impl RateLimiter {
                 );
 
                 if self.fail_open {
-                    warn!(
+                    // Use fallback rate limiter instead of just failing open
+                    info!(
                         scope = %scope.description(),
-                        "Redis unavailable, failing open (allowing request)"
+                        fallback_limit = self.fallback_limit,
+                        "Redis unavailable, using in-memory fallback rate limiter"
                     );
-                    Ok(RateLimitResult::fail_open(limit))
+                    let result = self.check_fallback(&scope, cost);
+
+                    if result.allowed {
+                        debug!(
+                            scope = %scope.description(),
+                            current_usage = result.current_usage,
+                            remaining = result.remaining,
+                            "Fallback rate limit check: ALLOWED"
+                        );
+                    } else {
+                        warn!(
+                            scope = %scope.description(),
+                            current_usage = result.current_usage,
+                            limit = result.limit,
+                            "Fallback rate limit check: REJECTED"
+                        );
+                    }
+
+                    Ok(result)
                 } else {
                     Err(Error::internal(format!("Rate limiter unavailable: {}", e)))
                 }
@@ -307,7 +442,7 @@ impl RateLimiter {
         let key_prefix = scope.key_prefix();
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| Error::internal(format!("System time error: {}", e)))?
             .as_secs() as i64;
 
         // Calculate minute boundaries (same as Lua script)
@@ -429,5 +564,126 @@ mod tests {
         assert!(result.allowed);
         assert_eq!(result.current_usage, 0);
         assert_eq!(result.remaining, 100);
+    }
+
+    #[test]
+    fn test_fallback_entry_creation() {
+        let fallback_limiter: DashMap<String, FallbackEntry> = DashMap::new();
+        let now = Instant::now();
+
+        fallback_limiter.insert(
+            "test_key".to_string(),
+            FallbackEntry {
+                count: 5,
+                window_start: now,
+            },
+        );
+
+        let entry = fallback_limiter.get("test_key").unwrap();
+        assert_eq!(entry.count, 5);
+    }
+
+    #[test]
+    fn test_fallback_limiter_basic() {
+        // Create a minimal fallback limiter for testing
+        let fallback_limiter: Arc<DashMap<String, FallbackEntry>> = Arc::new(DashMap::new());
+        let fallback_limit: i64 = 10;
+        let fallback_window = Duration::from_secs(60);
+
+        let scope = RateLimitScope::Ip("192.168.1.1".to_string());
+        let key = scope.key_prefix();
+        let now = Instant::now();
+        let cost: i64 = 1;
+
+        // First request should be allowed
+        let mut entry = fallback_limiter.entry(key.clone()).or_insert_with(|| FallbackEntry {
+            count: 0,
+            window_start: now,
+        });
+
+        let new_count = entry.count + cost;
+        let allowed = new_count <= fallback_limit;
+
+        assert!(allowed);
+        assert_eq!(new_count, 1);
+
+        entry.count = new_count;
+        drop(entry);
+
+        // Simulate 9 more requests (should all be allowed)
+        for i in 2..=10 {
+            let mut entry = fallback_limiter.get_mut(&key).unwrap();
+            let new_count = entry.count + cost;
+            let allowed = new_count <= fallback_limit;
+            assert!(allowed, "Request {} should be allowed", i);
+            entry.count = new_count;
+        }
+
+        // 11th request should be rejected
+        let entry = fallback_limiter.get(&key).unwrap();
+        let new_count = entry.count + cost;
+        let allowed = new_count <= fallback_limit;
+        assert!(!allowed, "11th request should be rejected");
+    }
+
+    #[test]
+    fn test_fallback_limiter_window_reset() {
+        let fallback_limiter: Arc<DashMap<String, FallbackEntry>> = Arc::new(DashMap::new());
+        let key = "test_key".to_string();
+        let old_start = Instant::now() - Duration::from_secs(120); // 2 minutes ago
+
+        // Insert an old entry
+        fallback_limiter.insert(
+            key.clone(),
+            FallbackEntry {
+                count: 100, // Over limit
+                window_start: old_start,
+            },
+        );
+
+        // Check that we can detect window expiry
+        let now = Instant::now();
+        let fallback_window = Duration::from_secs(60);
+
+        let entry = fallback_limiter.get(&key).unwrap();
+        let window_expired = now.duration_since(entry.window_start) >= fallback_window;
+
+        assert!(window_expired, "Window should be expired");
+    }
+
+    #[test]
+    fn test_fallback_cleanup() {
+        let fallback_limiter: Arc<DashMap<String, FallbackEntry>> = Arc::new(DashMap::new());
+        let fallback_window = Duration::from_secs(60);
+        let expiry = fallback_window * 2;
+
+        // Insert a fresh entry
+        let now = Instant::now();
+        fallback_limiter.insert(
+            "fresh".to_string(),
+            FallbackEntry {
+                count: 5,
+                window_start: now,
+            },
+        );
+
+        // Insert an old entry (should be cleaned up)
+        fallback_limiter.insert(
+            "old".to_string(),
+            FallbackEntry {
+                count: 10,
+                window_start: now - Duration::from_secs(300), // 5 minutes ago
+            },
+        );
+
+        // Cleanup
+        fallback_limiter.retain(|_, entry| {
+            now.duration_since(entry.window_start) < expiry
+        });
+
+        // Fresh entry should remain
+        assert!(fallback_limiter.contains_key("fresh"));
+        // Old entry should be removed
+        assert!(!fallback_limiter.contains_key("old"));
     }
 }

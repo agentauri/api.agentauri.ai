@@ -82,9 +82,13 @@ mockall = "0.13"
 
 # Rate limiting
 governor = "0.6"
+dashmap = "6.1"
 
 # Metrics
-prometheus = "0.13"
+# NOTE: prometheus 0.13 has protobuf CVE vulnerability
+# Using metrics + metrics-exporter-prometheus as recommended alternative
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
 lazy_static = "1.4"
 
 # Template parsing

@@ -49,20 +49,36 @@ use std::{
 };
 use tracing::{debug, error, warn};
 
+/// Default window size in seconds (1 hour)
+const DEFAULT_WINDOW_SECONDS: i64 = 3600;
+
 /// Unified rate limiter middleware
 pub struct UnifiedRateLimiter {
     rate_limiter: Rc<RateLimiter>,
+    /// Window size in seconds for rate limit headers
+    window_seconds: i64,
 }
 
 impl UnifiedRateLimiter {
-    /// Create a new unified rate limiter
+    /// Create a new unified rate limiter with default window (1 hour)
     ///
     /// # Arguments
     ///
     /// * `rate_limiter` - The rate limiter instance (shared across requests)
     pub fn new(rate_limiter: RateLimiter) -> Self {
+        Self::with_window(rate_limiter, DEFAULT_WINDOW_SECONDS)
+    }
+
+    /// Create a new unified rate limiter with custom window size
+    ///
+    /// # Arguments
+    ///
+    /// * `rate_limiter` - The rate limiter instance (shared across requests)
+    /// * `window_seconds` - Window size in seconds for rate limiting
+    pub fn with_window(rate_limiter: RateLimiter, window_seconds: i64) -> Self {
         Self {
             rate_limiter: Rc::new(rate_limiter),
+            window_seconds,
         }
     }
 }
@@ -83,6 +99,7 @@ where
         ready(Ok(UnifiedRateLimiterMiddleware {
             service: Rc::new(service),
             rate_limiter: self.rate_limiter.clone(),
+            window_seconds: self.window_seconds,
         }))
     }
 }
@@ -90,6 +107,7 @@ where
 pub struct UnifiedRateLimiterMiddleware<S> {
     service: Rc<S>,
     rate_limiter: Rc<RateLimiter>,
+    window_seconds: i64,
 }
 
 impl<S, B> Service<ServiceRequest> for UnifiedRateLimiterMiddleware<S>
@@ -107,6 +125,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = self.service.clone();
         let rate_limiter = self.rate_limiter.clone();
+        let window_seconds = self.window_seconds;
 
         Box::pin(async move {
             // Extract authentication context (set by AuthExtractor or DualAuth middleware)
@@ -182,8 +201,8 @@ where
                 // For now, we return a simple error. In production, you'd want a custom error type
                 // that includes the rate limit info and a custom error handler that sets the headers.
                 return Err(ErrorTooManyRequests(format!(
-                    "Rate limit exceeded. Try again in {} seconds. (Limit: {}, Window: 3600s)",
-                    result.retry_after, result.limit
+                    "Rate limit exceeded. Try again in {} seconds. (Limit: {}, Window: {}s)",
+                    result.retry_after, result.limit, window_seconds
                 )));
             }
 
@@ -211,10 +230,13 @@ where
                 HeaderName::from_static("x-ratelimit-reset"),
                 HeaderValue::from(result.reset_at),
             );
-            headers.insert(
-                HeaderName::from_static("x-ratelimit-window"),
-                HeaderValue::from_static("3600"),
-            );
+            // Use configured window size instead of hardcoded value
+            if let Ok(window_str) = HeaderValue::try_from(window_seconds.to_string()) {
+                headers.insert(
+                    HeaderName::from_static("x-ratelimit-window"),
+                    window_str,
+                );
+            }
 
             Ok(res)
         })

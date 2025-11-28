@@ -54,7 +54,11 @@ uuid = { workspace = true }
 governor = { workspace = true }
 
 # Metrics
-prometheus = { workspace = true }
+# NOTE: Migrated from prometheus to metrics crate due to protobuf CVE in prometheus 0.13
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+
+# Used for template pattern compilation (lazy_static for regex)
 lazy_static = { workspace = true }
 
 # Template parsing

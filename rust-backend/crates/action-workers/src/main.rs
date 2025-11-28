@@ -46,8 +46,8 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting Action Workers...");
 
-    // Register Prometheus metrics
-    metrics::register_metrics();
+    // Initialize Prometheus metrics exporter with default address (0.0.0.0:9090)
+    metrics::init_metrics_default();
 
     // Load configuration
     let config = Config::from_env().context("Failed to load configuration")?;

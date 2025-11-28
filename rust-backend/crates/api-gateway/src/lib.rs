@@ -3,6 +3,7 @@
 //! This library module exposes the core functionality of the API Gateway
 //! for use in integration tests and potential future library consumers.
 
+pub mod background_tasks;
 pub mod handlers;
 pub mod middleware;
 pub mod models;

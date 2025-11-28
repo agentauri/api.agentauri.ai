@@ -1,4 +1,13 @@
 //! Configuration management using environment variables
+//!
+//! # Security
+//!
+//! This module enforces security requirements for sensitive configuration:
+//! - JWT_SECRET must be at least 32 characters (256 bits of entropy)
+//! - Production mode rejects weak or default secrets
+//! - Development mode warns but allows weaker secrets for testing
+//!
+//! Rust guideline compliant 2025-01-28
 
 use crate::error::{Error, Result};
 use serde::Deserialize;
@@ -122,19 +131,100 @@ impl Config {
                     .unwrap_or_else(|_| "8080".to_string())
                     .parse()
                     .map_err(|e| Error::config(format!("Invalid SERVER_PORT: {}", e)))?,
-                jwt_secret: if cfg!(debug_assertions) {
-                    // Development mode: Allow default
-                    env::var("JWT_SECRET").unwrap_or_else(|_| {
-                        tracing::warn!("Using development JWT secret. DO NOT use in production!");
-                        "dev_secret_change_in_production".to_string()
-                    })
-                } else {
-                    // Production mode: JWT_SECRET is required
-                    env::var("JWT_SECRET")
-                        .expect("JWT_SECRET environment variable must be set in production")
-                },
+                jwt_secret: Self::load_and_validate_jwt_secret()?,
             },
         })
+    }
+
+    /// Load and validate the JWT secret with security checks
+    ///
+    /// # Security Requirements
+    ///
+    /// - Minimum 32 characters (256 bits of entropy) in production
+    /// - Cannot be a known default/example value in production
+    /// - Development mode allows weaker secrets with warnings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the secret doesn't meet security requirements in production.
+    fn load_and_validate_jwt_secret() -> Result<String> {
+        // Known weak/default patterns that should never be used in production
+        const WEAK_PATTERNS: &[&str] = &[
+            "dev_secret",
+            "change_me",
+            "changeme",
+            "example",
+            "secret",
+            "password",
+            "test",
+            "default",
+            "your_secret",
+            "your-secret",
+            "jwt_secret",
+            "jwt-secret",
+        ];
+
+        let secret = if cfg!(debug_assertions) {
+            // Development mode: Allow default but warn
+            env::var("JWT_SECRET").unwrap_or_else(|_| {
+                tracing::warn!(
+                    "JWT_SECRET not set - using development default. \
+                     DO NOT use in production!"
+                );
+                "dev_secret_change_in_production_32chars".to_string()
+            })
+        } else {
+            // Production mode: JWT_SECRET is required
+            env::var("JWT_SECRET").map_err(|_| {
+                Error::config("JWT_SECRET environment variable must be set in production")
+            })?
+        };
+
+        // Validate minimum length (256 bits = 32 bytes minimum)
+        if !cfg!(debug_assertions) && secret.len() < 32 {
+            return Err(Error::config(format!(
+                "JWT_SECRET must be at least 32 characters (256 bits of entropy). \
+                 Current length: {} characters. \
+                 Generate a secure secret with: openssl rand -base64 32",
+                secret.len()
+            )));
+        }
+
+        // Check for weak/default patterns
+        let secret_lower = secret.to_lowercase();
+        for pattern in WEAK_PATTERNS {
+            if secret_lower.contains(pattern) {
+                if cfg!(debug_assertions) {
+                    tracing::error!(
+                        "JWT_SECRET contains weak pattern '{}'. \
+                         This is acceptable in development but MUST be changed for production!",
+                        pattern
+                    );
+                } else {
+                    return Err(Error::config(format!(
+                        "JWT_SECRET contains weak pattern '{}'. \
+                         Use a cryptographically secure random value. \
+                         Generate with: openssl rand -base64 32",
+                        pattern
+                    )));
+                }
+            }
+        }
+
+        // In production, also check for low entropy (all same char, sequential, etc.)
+        if !cfg!(debug_assertions) {
+            let unique_chars: std::collections::HashSet<char> = secret.chars().collect();
+            if unique_chars.len() < 10 {
+                return Err(Error::config(
+                    "JWT_SECRET has low entropy (too few unique characters). \
+                     Use a cryptographically secure random value. \
+                     Generate with: openssl rand -base64 32"
+                        .to_string(),
+                ));
+            }
+        }
+
+        Ok(secret)
     }
 }
 

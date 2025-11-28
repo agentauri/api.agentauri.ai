@@ -38,3 +38,6 @@ validator = { workspace = true }
 
 # Redis
 redis = { workspace = true }
+
+# Concurrent data structures for fallback rate limiting
+dashmap = { workspace = true }

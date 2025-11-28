@@ -1,12 +1,30 @@
 -- Migration: Create oauth_tokens table
 -- Description: OAuth 2.0 access and refresh tokens for authorized applications
 -- Phase: 4 Week 13 - OAuth 2.0 Infrastructure
--- Security: Tokens stored as SHA-256 hashes for secure lookups
+--
+-- SECURITY NOTICE:
+-- ================
+-- Token hashing MUST use Argon2id (not SHA-256) in application code.
+-- Argon2id provides resistance against GPU-based brute force attacks.
+--
+-- Recommended Argon2id parameters (OWASP 2024):
+-- - Memory: 64 MiB (65536 KiB)
+-- - Iterations: 3
+-- - Parallelism: 4
+-- - Output length: 32 bytes
+--
+-- The column is named 'access_token_hash' for clarity, but the actual
+-- hash algorithm is Argon2id, not SHA-256.
+--
+-- TODO: Application code in rust-backend must implement token hashing
+-- using the argon2 crate with the parameters above. See:
+-- - rust-backend/crates/api-gateway/src/services/api_key_service.rs
+--   for reference Argon2id implementation.
 
 CREATE TABLE oauth_tokens (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
-    access_token_hash TEXT UNIQUE NOT NULL,       -- SHA-256 hash of access token
-    refresh_token_hash TEXT UNIQUE,               -- SHA-256 hash of refresh token (nullable)
+    access_token_hash TEXT UNIQUE NOT NULL,       -- Argon2id hash of access token (NOT SHA-256!)
+    refresh_token_hash TEXT UNIQUE,               -- Argon2id hash of refresh token (nullable)
     client_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     organization_id TEXT NOT NULL,                -- Scoped to organization for resource access
@@ -49,8 +67,8 @@ CREATE INDEX idx_oauth_tokens_expires ON oauth_tokens(expires_at)
 CREATE INDEX idx_oauth_tokens_organization ON oauth_tokens(organization_id);
 
 COMMENT ON TABLE oauth_tokens IS 'OAuth 2.0 access and refresh tokens for authorized third-party applications';
-COMMENT ON COLUMN oauth_tokens.access_token_hash IS 'SHA-256 hash of access token for secure lookup';
-COMMENT ON COLUMN oauth_tokens.refresh_token_hash IS 'SHA-256 hash of refresh token (null for client_credentials grant)';
+COMMENT ON COLUMN oauth_tokens.access_token_hash IS 'Argon2id hash of access token (NOT SHA-256 - see migration header for details)';
+COMMENT ON COLUMN oauth_tokens.refresh_token_hash IS 'Argon2id hash of refresh token (null for client_credentials grant)';
 COMMENT ON COLUMN oauth_tokens.scopes IS 'Array of scopes granted to this token (subset of client allowed scopes)';
 COMMENT ON COLUMN oauth_tokens.expires_at IS 'Access token expiration (typically 1 hour)';
 COMMENT ON COLUMN oauth_tokens.refresh_token_expires_at IS 'Refresh token expiration (typically 30 days)';
