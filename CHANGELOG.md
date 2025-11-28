@@ -7,7 +7,76 @@ and this project follows phases and weeks for versioning during development.
 
 ## [Unreleased]
 
-### Phase 3.5: Payment Foundation - 100% Complete (Week 12 of 12)
+### Phase 4: Advanced Triggers & Actions - In Progress (Week 13 of 15)
+
+---
+
+## Week 13 (November 28, 2024) - Auth Completion + Rate Limiting + OAuth 2.0
+
+### Added
+- **Redis-based Sliding Window Rate Limiting**
+  - Lua script for atomic check-and-increment operations
+  - 1-hour window with 1-minute bucket granularity
+  - Support for IP, Organization, and Agent scopes
+  - Graceful degradation when Redis unavailable
+- **Query Tier Cost Multipliers**
+  - Tier 0 (Basic): 1x cost - feedbacks, validations, agent profile
+  - Tier 1 (Aggregated): 2x cost - reputation summary, trends
+  - Tier 2 (Analysis): 5x cost - client analysis, baseline comparison
+  - Tier 3 (AI-powered): 10x cost - reputation reports, dispute analysis
+- **3-Layer Authentication Model Complete**
+  - Layer 0 (Anonymous): IP-based rate limiting (10 requests/hour)
+  - Layer 1 (API Key): Organization-based limits (50-2000/hour by plan)
+  - Layer 2 (Wallet Signature): Inherits organization limits
+- **OAuth 2.0 Infrastructure**
+  - oauth_clients table (client credentials, redirect URIs, scopes)
+  - oauth_tokens table (access/refresh tokens with SHA-256 hashing)
+  - Foundation for future third-party integrations
+- **IP Extraction Middleware**
+  - X-Forwarded-For and X-Real-IP header support
+  - Trusted proxy validation with CIDR ranges
+  - Security against header spoofing
+- **Rate Limit Response Headers**
+  - X-RateLimit-Limit - Maximum requests in window
+  - X-RateLimit-Remaining - Remaining quota
+  - X-RateLimit-Reset - Unix timestamp for reset
+  - X-RateLimit-Window - Window size (3600s)
+
+### Database Migrations
+- `20251128000010_create_oauth_clients_table.sql`
+- `20251128000011_create_oauth_tokens_table.sql`
+
+### Architecture Components
+- `shared/src/redis/rate_limit.lua` (82 lines) - Atomic Lua script
+- `shared/src/redis/rate_limiter.rs` (434 lines) - RateLimiter service
+- `api-gateway/src/middleware/auth_extractor.rs` (358 lines) - Auth context extraction
+- `api-gateway/src/middleware/ip_extractor.rs` (294 lines) - IP extraction with proxy support
+- `api-gateway/src/middleware/query_tier.rs` (309 lines) - Query tier detection
+- `api-gateway/src/middleware/unified_rate_limiter.rs` (251 lines) - Unified rate limiter
+
+### Documentation
+- `docs/QUICK_START.md` - Code examples in 4 languages (curl, Python, JavaScript, Rust)
+- `docs/auth/AUTHENTICATION.md` - Layer 0 (Anonymous) documentation
+- `docs/auth/RATE_LIMITING.md` - Comprehensive rate limit rules
+- `docs/rate-limiting/ARCHITECTURE.md` - System architecture
+- `docs/rate-limiting/QUICK_REFERENCE.md` - Developer quick reference
+- `rust-backend/crates/api-gateway/API_DOCUMENTATION.md` - Updated with rate limiting section
+
+### Testing
+- 340 total tests passing (November 28, 2024)
+  - 315 unit tests
+  - 25 integration tests (rate_limiting_integration.rs)
+- Comprehensive coverage across all 3 authentication layers
+- Query tier cost multiplier verification
+- Rate limit header validation
+- Edge cases: concurrent requests, graceful degradation
+
+### Subagents Used
+- `database-administrator` - OAuth 2.0 migrations
+- `backend-architect` - Rate limiting architecture
+- `rust-engineer` - Unified middleware implementation
+- `debugger` - Integration testing
+- `api-documenter` - Comprehensive documentation
 
 ---
 
