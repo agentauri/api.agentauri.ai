@@ -20,6 +20,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/register", web::post().to(handlers::register))
                     .route("/login", web::post().to(handlers::login)),
             )
+            // OAuth token endpoints (public - client credentials auth)
+            .route("/oauth/token", web::post().to(handlers::token_endpoint))
             // Stripe webhook (no auth - uses signature verification)
             .route(
                 "/billing/webhook",
@@ -62,6 +64,13 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("/{id}", web::get().to(handlers::get_api_key))
                             .route("/{id}", web::delete().to(handlers::revoke_api_key))
                             .route("/{id}/rotate", web::post().to(handlers::rotate_api_key)),
+                    )
+                    // OAuth client management endpoints (JWT auth required)
+                    .service(
+                        web::scope("/oauth/clients")
+                            .route("", web::post().to(handlers::create_oauth_client))
+                            .route("", web::get().to(handlers::list_oauth_clients))
+                            .route("/{id}", web::delete().to(handlers::delete_oauth_client)),
                     )
                     // Agent linking endpoints (Layer 2 - wallet signature auth)
                     .service(

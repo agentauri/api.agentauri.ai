@@ -329,6 +329,40 @@ impl AuthFailureType {
     }
 }
 
+/// OAuth Client for OAuth 2.0 authentication
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct OAuthClient {
+    pub id: String,
+    pub client_id: String,
+    #[serde(skip_serializing)]
+    pub client_secret_hash: String,
+    pub client_name: String,
+    pub redirect_uris: Vec<String>,
+    pub scopes: Vec<String>,
+    pub owner_organization_id: String,
+    pub grant_types: Vec<String>,
+    pub is_trusted: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// OAuth Token for OAuth 2.0 authentication
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct OAuthToken {
+    pub id: String,
+    #[serde(skip_serializing)]
+    pub access_token_hash: String,
+    #[serde(skip_serializing)]
+    pub refresh_token_hash: Option<String>,
+    pub client_id: String,
+    pub user_id: String,
+    pub organization_id: String,
+    pub scopes: Vec<String>,
+    pub expires_at: DateTime<Utc>,
+    pub refresh_token_expires_at: Option<DateTime<Utc>>,
+    pub revoked: bool,
+    pub created_at: DateTime<Utc>,
+}
 // ============================================================================
 // Request/Response DTOs for API
 // ============================================================================

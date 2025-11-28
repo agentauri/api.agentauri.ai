@@ -8,6 +8,7 @@ pub mod billing;
 pub mod conditions;
 pub mod health;
 pub mod helpers;
+pub mod oauth;
 pub mod organizations;
 pub mod triggers;
 
@@ -26,6 +27,11 @@ pub use agents::{link_agent, list_linked_agents, unlink_agent};
 // Explicitly re-export billing handlers
 pub use billing::{
     get_credits, get_subscription, handle_stripe_webhook, list_transactions, purchase_credits,
+};
+
+// Explicitly re-export OAuth handlers
+pub use oauth::{
+    create_oauth_client, delete_oauth_client, list_oauth_clients, token_endpoint,
 };
 
 // Note: helpers module is not re-exported to avoid polluting the namespace

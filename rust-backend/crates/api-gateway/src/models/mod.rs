@@ -6,6 +6,7 @@ pub mod auth;
 pub mod billing;
 pub mod common;
 pub mod conditions;
+pub mod oauth;
 pub mod organizations;
 pub mod triggers;
 pub mod wallet;
@@ -16,6 +17,7 @@ pub use api_keys::*;
 pub use auth::*;
 pub use common::*;
 pub use conditions::*;
+pub use oauth::*;
 pub use organizations::*;
 pub use triggers::*;
 
