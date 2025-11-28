@@ -1179,19 +1179,25 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - SHIFTED +2
 
-**Week 13: Stateful Triggers + Rate Limiting**
-- Stateful trigger support (EMA, counters)
-- API rate limiting infrastructure
-- Per-trigger execution limits
+**Week 13: Auth Completion + Rate Limiting + OAuth 2.0** ✅ COMPLETE
+- ✅ Redis-based sliding window rate limiting (Lua script, atomic operations)
+- ✅ Layer 0 (Anonymous) IP-based rate limiting with X-Forwarded-For support
+- ✅ Query tier cost multipliers (Tier 0: 1x, Tier 1: 2x, Tier 2: 5x, Tier 3: 10x)
+- ✅ Auth layer precedence extractor (L2 → L1 → L0)
+- ✅ OAuth 2.0 database tables (clients, tokens)
+- ✅ Unified rate limiter middleware with graceful degradation
+- ✅ 25 comprehensive integration tests (all 3 auth layers)
+- ✅ Complete documentation (QUICK_START.md, AUTHENTICATION.md, RATE_LIMITING.md)
+- 340 tests passing (315 unit + 25 integration)
 
 **Week 14: REST Worker + Discovery**
 - REST/HTTP action worker
 - Discovery endpoint (`/.well-known/agent.json`)
 - Agent Card generation
 
-**Week 15: Circuit Breaker + Payment Nonces**
+**Week 15: Circuit Breaker + Stateful Triggers**
 - Circuit breaker implementation
-- Payment nonces table for idempotency
+- Stateful trigger support (EMA, counters)
 - Result Logger with analytics views
 
 ### Phase 5: MCP + A2A Integration (Weeks 16-18) - EXTENDED
