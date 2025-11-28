@@ -22,15 +22,67 @@ No authentication required. Suitable for public data access with micropayment.
 **Characteristics**:
 - **Auth Method**: None (identified by IP address)
 - **Payment Method**: x402 only (crypto micropayments)
-- **Rate Limit**: 10 calls/hour per IP
+- **Rate Limit**: 10 requests/hour per IP address
 - **Query Tiers**: 0-1 only (raw and aggregated queries)
-- **Use Case**: One-off queries, public exploration
+- **Use Case**: One-off queries, public exploration, testing
 
 **Request Example**:
 ```http
-GET /api/v1/queries/getAgentProfile?agentId=42
+GET /api/v1/queries/tier0/getAgentProfile?agentId=42
 X-Payment: x402 <payment_proof>
 ```
+
+**IP Detection and Rate Limiting**:
+- Checks `X-Forwarded-For` header if request comes from trusted proxy
+- Falls back to direct connection IP address
+- Supports both IPv4 and IPv6 addresses
+- Rate limit scope: `anon:ip:<ip_address>`
+
+**Rate Limit Response Headers**:
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 7
+X-RateLimit-Reset: 1732800600
+X-RateLimit-Window: 3600
+
+{
+  "data": { ... }
+}
+```
+
+**429 Rate Limit Exceeded Example**:
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 2847
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1732803447
+
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limit exceeded. Try again in 2847 seconds. (Limit: 10, Window: 3600s)",
+    "retry_after": 2847,
+    "limit": 10,
+    "window": 3600
+  }
+}
+```
+
+**Query Tier Restrictions**:
+- **Allowed**: Tier 0 (1x cost), Tier 1 (2x cost)
+- **Blocked**: Tier 2, Tier 3 (requires API Key authentication)
+- With 10 requests/hour, you can make:
+  - 10 Tier 0 queries (10 × 1 = 10 cost units), OR
+  - 5 Tier 1 queries (5 × 2 = 10 cost units), OR
+  - Mixed: 6 Tier 0 + 2 Tier 1 = 10 cost units
+
+**Best Practices**:
+- Use for testing and exploration only
+- Upgrade to API Key (Layer 1) for production use
+- Implement client-side caching to reduce calls
+- Check `X-RateLimit-Remaining` header before making requests
 
 ### Layer 1: API Key Authentication
 

@@ -46,8 +46,11 @@ See [Authentication Documentation](../../../docs/auth/AUTHENTICATION.md) for com
 
 **Rate Limiting**:
 - Layer 0: 10 requests/hour per IP
-- Layer 1: Per-plan limits (Starter: 100/hr, Pro: 500/hr, Enterprise: 2000/hr)
+- Layer 1: Per-plan limits (Free: 50/hr, Starter: 100/hr, Pro: 500/hr, Enterprise: 2000/hr)
 - Layer 2: Per-account limits based on subscription
+- Query tier cost multipliers apply (Tier 0: 1x, Tier 1: 2x, Tier 2: 5x, Tier 3: 10x)
+
+See [Rate Limiting](#rate-limiting) section for detailed information.
 
 ### Common Security Errors
 
@@ -59,6 +62,8 @@ See [Authentication Documentation](../../../docs/auth/AUTHENTICATION.md) for com
 
 **429 Too Many Requests**: Rate limit exceeded
 - Solution: Wait before retrying, implement exponential backoff
+- Check `X-RateLimit-Reset` header to know when limit resets
+- See [Rate Limiting](#rate-limiting) for details
 
 ---
 
@@ -1366,6 +1371,254 @@ Handle Stripe webhook events. No authentication required (uses Stripe signature 
   "received": true
 }
 ```
+
+---
+
+## Rate Limiting
+
+All API requests are rate limited to ensure fair usage and system stability. The rate limiting system is tier-aware, meaning different query complexity levels consume different amounts of your quota.
+
+### Rate Limits by Authentication Layer
+
+The API implements a 3-layer authentication system with different rate limits per layer:
+
+| Layer | Auth Method | Rate Limit | Query Tiers Available |
+|-------|-------------|------------|----------------------|
+| **Layer 0** | Anonymous (IP-based) | 10 requests/hour | Tier 0-1 only |
+| **Layer 1** | API Key | 50-2000 requests/hour (plan-based) | Tier 0-3 |
+| **Layer 2** | Wallet Signature | Inherits from organization | Tier 0-3 + agent operations |
+
+### Subscription Plans (Layer 1)
+
+API Key authentication provides different rate limits based on your organization's subscription plan:
+
+| Plan | Requests/Hour | Query Tiers | Cost | Features |
+|------|---------------|-------------|------|----------|
+| **Free** | 50 | Tier 0-1 | Free | Basic queries, limited access |
+| **Starter** | 100 | Tier 0-2 | $29/month | Includes analysis queries |
+| **Pro** | 500 | Tier 0-3 | $99/month | Full access including AI-powered queries |
+| **Enterprise** | 2000 | Tier 0-3 | Custom | Custom limits, dedicated support |
+
+### Query Tier Cost Multipliers
+
+Different query complexity levels consume different amounts of your rate limit quota:
+
+| Tier | Type | Cost Multiplier | Example Queries | Use Case |
+|------|------|-----------------|-----------------|----------|
+| **Tier 0** | Raw Data | **1x** | `getMyFeedbacks`, `getAgentProfile`, `getValidationHistory` | Direct blockchain data access |
+| **Tier 1** | Aggregated | **2x** | `getReputationSummary`, `getReputationTrend` | Pre-computed statistics |
+| **Tier 2** | Analysis | **5x** | `getClientAnalysis`, `compareToBaseline` | Complex calculations |
+| **Tier 3** | AI-Powered | **10x** | `getReputationReport`, `analyzeDispute`, `getRootCauseAnalysis` | LLM-based insights |
+
+**Example Calculation**:
+
+With a **Starter plan** (100 requests/hour), you can make:
+- **100 Tier 0 queries** (100 × 1 = 100 cost units), OR
+- **50 Tier 1 queries** (50 × 2 = 100 cost units), OR
+- **20 Tier 2 queries** (20 × 5 = 100 cost units), OR
+- **10 Tier 3 queries** (10 × 10 = 100 cost units)
+
+You can also mix tiers. For example:
+- 40 Tier 0 queries (40 × 1 = 40)
+- 20 Tier 1 queries (20 × 2 = 40)
+- 4 Tier 2 queries (4 × 5 = 20)
+- **Total: 100 cost units** ✓
+
+### Rate Limit Response Headers
+
+Every API response includes rate limit information in the headers:
+
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 73
+X-RateLimit-Reset: 1732800600
+X-RateLimit-Window: 3600
+Content-Type: application/json
+
+{
+  "data": { ... }
+}
+```
+
+| Header | Type | Description | Example |
+|--------|------|-------------|---------|
+| `X-RateLimit-Limit` | Integer | Maximum cost units allowed in current window | `100` |
+| `X-RateLimit-Remaining` | Integer | Remaining cost units in current window | `73` |
+| `X-RateLimit-Reset` | Unix timestamp | When the rate limit window resets | `1732800600` |
+| `X-RateLimit-Window` | Integer | Window duration in seconds (always 3600 = 1 hour) | `3600` |
+
+**Important**: The `Remaining` value accounts for query tier costs. A Tier 2 query (5x cost) will decrease `Remaining` by 5 units.
+
+### Rate Limit Exceeded (429 Error)
+
+When you exceed your rate limit, the API returns a 429 status code:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 1847
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1732802447
+Content-Type: application/json
+
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limit exceeded. Try again in 1847 seconds. (Limit: 100, Window: 3600s)",
+    "retry_after": 1847,
+    "limit": 100,
+    "window": 3600
+  }
+}
+```
+
+**Response Headers**:
+- `Retry-After`: Seconds to wait before retrying (same as `X-RateLimit-Reset` - current time)
+- `X-RateLimit-Limit`: Your rate limit ceiling
+- `X-RateLimit-Remaining`: Always 0 when rate limited
+- `X-RateLimit-Reset`: Unix timestamp when quota refills
+
+### Best Practices for Rate Limiting
+
+1. **Monitor Your Usage**
+   ```bash
+   # Check remaining quota before making expensive queries
+   curl -H "Authorization: Bearer sk_live_..." \
+     https://api.8004.dev/api/v1/billing/credits?organization_id=org_123
+   ```
+
+2. **Check Headers Before Retrying**
+   ```python
+   import time
+   import requests
+
+   response = requests.get(url, headers=headers)
+
+   if response.status_code == 429:
+       retry_after = int(response.headers['Retry-After'])
+       print(f"Rate limited. Waiting {retry_after} seconds...")
+       time.sleep(retry_after)
+   ```
+
+3. **Implement Exponential Backoff**
+   ```javascript
+   async function makeRequestWithBackoff(url, options, maxRetries = 3) {
+     for (let i = 0; i < maxRetries; i++) {
+       const response = await fetch(url, options);
+
+       if (response.status !== 429) {
+         return response;
+       }
+
+       const retryAfter = parseInt(response.headers.get('Retry-After'));
+       const backoff = Math.min(retryAfter || (2 ** i), 3600); // Cap at 1 hour
+
+       console.log(`Attempt ${i + 1} rate limited, waiting ${backoff}s`);
+       await new Promise(resolve => setTimeout(resolve, backoff * 1000));
+     }
+
+     throw new Error('Max retries exceeded');
+   }
+   ```
+
+4. **Cache Responses When Possible**
+   - Store Tier 1-3 query results locally
+   - Use ETags if available
+   - Implement client-side caching with TTL
+
+5. **Use Webhooks Instead of Polling**
+   - Subscribe to event notifications via triggers
+   - Avoid repeated queries for the same data
+   - Significantly reduces API usage
+
+6. **Optimize Query Tier Usage**
+   - Use Tier 0 queries when raw data is sufficient
+   - Batch Tier 3 queries (AI-powered) for periodic reports
+   - Cache expensive query results
+
+7. **Upgrade When Needed**
+   - Monitor `X-RateLimit-Remaining` trends
+   - Upgrade plan before consistently hitting limits
+   - Consider Enterprise plan for high-volume applications
+
+### Monitoring Rate Limit Usage
+
+#### Check Current Usage (API)
+
+```bash
+GET /api/v1/billing/credits?organization_id=org_abc123
+Authorization: Bearer sk_live_...
+
+# Response
+{
+  "data": {
+    "balance": 1000,
+    "usage_this_hour": 45,
+    "limit": 100,
+    "reset_at": "2024-11-28T15:00:00Z",
+    "tier_breakdown": {
+      "tier0_calls": 20,
+      "tier1_calls": 10,
+      "tier2_calls": 3,
+      "tier3_calls": 0,
+      "total_cost": 45
+    }
+  }
+}
+```
+
+#### Track Headers in Every Response
+
+```python
+import requests
+
+def track_rate_limits(response):
+    """Extract and log rate limit info from response headers"""
+    limit = int(response.headers.get('X-RateLimit-Limit', 0))
+    remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
+    reset = int(response.headers.get('X-RateLimit-Reset', 0))
+
+    usage_percent = ((limit - remaining) / limit) * 100 if limit > 0 else 0
+
+    print(f"Rate Limit: {remaining}/{limit} ({usage_percent:.1f}% used)")
+
+    if usage_percent > 80:
+        print("WARNING: Approaching rate limit!")
+
+    return {
+        'limit': limit,
+        'remaining': remaining,
+        'reset': reset,
+        'usage_percent': usage_percent
+    }
+
+response = requests.get(url, headers=headers)
+rate_info = track_rate_limits(response)
+```
+
+### Rate Limit FAQs
+
+**Q: What happens if my rate limit resets while I'm being rate limited?**
+A: The limit automatically resets at the Unix timestamp specified in `X-RateLimit-Reset`. You can make requests immediately after that time.
+
+**Q: Do failed requests count toward my rate limit?**
+A: Yes, all requests (successful or failed) count toward your rate limit, except for authentication failures (401) and server errors (5xx).
+
+**Q: Can I increase my rate limit temporarily?**
+A: Enterprise plans can request temporary limit increases. Contact support with your use case.
+
+**Q: How are rate limits calculated for Layer 2 (Wallet Signature)?**
+A: Agents inherit the rate limit from their linked organization. Multiple agents under one organization share the same quota.
+
+**Q: What if Redis is unavailable?**
+A: The system fails open (allows requests) with degraded mode. You'll see `X-RateLimit-Status: degraded` header. Normal limits resume when Redis recovers.
+
+**Q: Can I monitor rate limit usage across all my API keys?**
+A: Yes, all API keys within an organization share the same quota. Check `/api/v1/billing/credits` for organization-wide usage.
+
+**Q: How do I know which tier my query uses?**
+A: Check the endpoint path (`/api/v1/queries/tier0/...`) or query parameter (`?tier=2`). If not specified, defaults to Tier 0.
 
 ---
 
