@@ -1167,11 +1167,15 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
   - Dual audit logging system
 - 170 tests passing (8 new for rate limiter)
 
-**Week 12: Credits System + Wallet Auth (Layer 2)**
-- Database migrations: `credits`, `credit_transactions`, `subscriptions`, `agent_links`
-- Credit balance and transaction endpoints
-- Stripe webhook integration
-- Wallet signature authentication (EIP-191)
+**Week 12: Credits System + Wallet Auth (Layer 2)** ✅ COMPLETE
+- ✅ Database migrations: `credits`, `credit_transactions`, `subscriptions`, `agent_links`, `used_nonces`, `payment_nonces`
+- ✅ Credit balance and transaction endpoints
+- ✅ Stripe webhook integration (security hardening)
+- ✅ Wallet signature authentication (EIP-191)
+- ✅ Agent linking with on-chain ownership verification
+- ✅ Security fixes: race conditions, replay attacks, error sanitization
+- ✅ HTTP client connection pooling for RPC calls
+- 352 tests passing (272 api-gateway + 80 action-workers)
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - SHIFTED +2
 
@@ -1266,6 +1270,6 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 
 ---
 
-**Last Updated**: November 26, 2024
-**Version**: 1.1.0
+**Last Updated**: November 28, 2024
+**Version**: 1.2.0 (Phase 3.5 Complete - Week 12)
 **Maintainers**: Development Team

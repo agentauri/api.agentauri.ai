@@ -34,10 +34,19 @@ Common functionality used across all services:
 
 REST API server built with Actix-web:
 
-- **Health check endpoint**: `GET /api/v1/health`
-- **Future endpoints**: Trigger CRUD, authentication, event queries
-- **CORS configuration**: Configured for local development
-- **Middleware**: Logging, authentication (placeholder)
+- **Authentication**: User registration/login (JWT), API Key auth (Layer 1), Wallet signatures (Layer 2)
+- **Triggers CRUD**: 5 endpoints with pagination and ownership validation
+- **Conditions CRUD**: 4 endpoints for trigger conditions
+- **Actions CRUD**: 4 endpoints for trigger actions
+- **Organizations**: Full CRUD + member management (Week 11)
+- **API Keys**: Create, list, rotate, revoke (Week 11)
+- **Billing**: Credit balance, transactions (Week 12)
+- **Agent Linking**: Link agents to organizations with on-chain verification (Week 12)
+- **Health check**: `GET /api/v1/health`
+- **CORS configuration**: Environment-based whitelist
+- **Middleware**: DualAuth (JWT + API Key), logging, rate limiting
+
+See `crates/api-gateway/API_DOCUMENTATION.md` for complete API reference.
 
 ### event-processor
 
@@ -52,9 +61,9 @@ Listens to PostgreSQL NOTIFY events and evaluates triggers:
 
 Consumes jobs from Redis and executes actions:
 
-- **Telegram worker**: Sends notifications via Telegram Bot API
-- **REST worker**: Executes HTTP requests to external APIs
-- **MCP worker**: Pushes feedback to agent MCP servers (future)
+- **Telegram worker**: Sends notifications via Telegram Bot API (Week 9 ✅)
+- **REST worker**: Executes HTTP requests to external APIs (Planned: Week 15)
+- **MCP worker**: Pushes feedback to agent MCP servers (Planned: Week 18)
 
 ## Prerequisites
 

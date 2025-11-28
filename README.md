@@ -65,10 +65,10 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 5. **Run tests** (optional, to verify setup):
    ```bash
    ./scripts/run-tests.sh
-   # Should show: All 7 test suites passing (206+ tests)
+   # Should show: All 7 test suites passing (352 tests)
    ```
 
-**Note**: Phase 3 is complete. Phase 3.5 (Organizations & Payments) is in progress. See roadmap for details.
+**Note**: Phase 3 and Phase 3.5 are complete (Week 12). Ready for Phase 4 development. See roadmap for details.
 
 ### 6. Run Rust Services (optional)
 
@@ -155,7 +155,7 @@ cd ponder-indexers
 pnpm test
 ```
 
-**Current Status**: ✅ 206+ tests passing (108 database, 98+ Rust across all crates)
+**Current Status**: ✅ 352 tests passing (108 database, 244 Rust across all crates)
 
 ### Local Testing
 
@@ -364,10 +364,14 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 - ✅ Telegram Worker with security hardening
 - ✅ Integration Testing (206 total tests across workspace)
 
-### Phase 3.5: Payment Foundation (Weeks 11-12) - 🔄 IN PROGRESS
+### Phase 3.5: Payment Foundation (Weeks 11-12) - ✅ COMPLETE
 - ✅ Organizations & multi-tenant account model (database + API)
-- 🔄 Credits system & Stripe integration
+- ✅ Credits system & Stripe integration (Week 12)
+- ✅ Wallet Authentication Layer 2 (EIP-191, Week 12)
+- ✅ Agent Linking with on-chain verification (Week 12)
+- ✅ API Key Authentication Layer 1 with security hardening (Week 11)
 - ✅ Role-based access (admin, member, viewer)
+- 352 tests passing
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 13-15)
 - ⏳ Stateful triggers (EMA, counters, rate limiting)

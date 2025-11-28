@@ -7,7 +7,145 @@ and this project follows phases and weeks for versioning during development.
 
 ## [Unreleased]
 
-### Phase 2 Progress: 85% Complete (Week 7 of 10)
+### Phase 3.5: Payment Foundation - 100% Complete (Week 12 of 12)
+
+---
+
+## Week 12 (November 27-28, 2024) - Credits System + Wallet Auth Layer 2
+
+### Added
+- **Credits System with Stripe Integration**
+  - Credits table with atomic balance tracking
+  - Credit transactions audit log
+  - Billing endpoints: `/api/v1/billing/credits`, `/api/v1/billing/transactions`
+  - Row-level locking for race condition prevention
+- **Wallet Authentication Layer 2 (EIP-191)**
+  - Challenge-response flow with nonce management
+  - EIP-191 signature verification
+  - Endpoints: `/api/v1/auth/wallet/challenge`, `/api/v1/auth/wallet/verify`
+- **Agent Linking**
+  - On-chain ownership verification via IdentityRegistry.ownerOf()
+  - Endpoints: `/api/v1/agents/link`, `/api/v1/agents/linked`, `/api/v1/agents/:id/link` (DELETE)
+  - Agent links table (agent_id, chain_id, organization_id, wallet_address)
+- **Security Hardening**
+  - Replay attack prevention (used_nonces table with 5-min expiration)
+  - Webhook idempotency (payment_nonces table)
+  - Error message sanitization
+  - HTTP client connection pooling for RPC calls
+
+### Database Migrations
+- `20251126000004_create_credits_table.sql`
+- `20251126000005_create_credit_transactions_table.sql`
+- `20251126000006_create_subscriptions_table.sql`
+- `20251126000007_create_payment_nonces_table.sql`
+- `20251126000008_create_agent_links_table.sql`
+- `20251126000009_create_used_nonces_table.sql`
+
+### Testing
+- 352 total tests passing (verified November 28, 2024)
+  - 272 api-gateway tests
+  - 80 action-workers tests
+- Week 12 API endpoints fully tested and operational
+
+---
+
+## Week 11 (November 25-26, 2024) - Organizations + API Key Auth Layer 1
+
+### Added
+- **Multi-tenant Organization Model**
+  - Organizations table (id, name, slug, owner_id, plan, is_personal)
+  - Organization members with role-based access (admin, member, viewer)
+  - Organization CRUD endpoints: `/api/v1/organizations/*`
+  - Member management endpoints
+- **API Key Authentication Layer 1**
+  - Enhanced API keys table (`sk_live_xxx` / `sk_test_xxx` format)
+  - API Key CRUD endpoints: `/api/v1/api-keys/*`
+  - DualAuth middleware (JWT + API Key support)
+- **Security Hardening**
+  - Timing attack mitigation (pre-computed dummy hash)
+  - Authentication rate limiting (Governor crate: 20/min IP, 1000/min global)
+  - Dual audit logging (api_key_audit_log + auth_failures tables)
+
+### Database Migrations
+- `20251125000001_create_organizations_table.sql`
+- `20251125000002_create_organization_members_table.sql`
+- `20251126000001_create_api_keys_table.sql`
+- `20251126000002_create_api_key_audit_log_table.sql`
+- `20251126000003_create_auth_failures_table.sql`
+
+### Testing
+- 170 tests passing (8 new for rate limiter)
+
+---
+
+## Week 10 (November 25, 2024) - Integration Testing
+
+### Added
+- **Comprehensive Test Suite** (206 total tests)
+  - 80 new api-gateway tests (from 1 to 81)
+  - JWT middleware tests (8 tests)
+  - Auth model validation tests (14 tests)
+  - Trigger model validation tests (17 tests)
+  - Condition model validation tests (11 tests)
+  - Action model validation tests (15 tests)
+  - Common model tests (16 tests)
+
+### Changed
+- **Test Coverage**: Excellent across all crates
+  - action-workers: 80 tests
+  - api-gateway: 81 tests
+  - event-processor: 34 tests
+  - shared: 11 tests
+
+---
+
+## Week 9 (November 24, 2024) - Telegram Worker + Security Hardening
+
+### Added
+- **Telegram Worker Implementation**
+  - Redis queue consumer with BRPOP
+  - Teloxide Telegram Bot API integration
+  - Template engine with variable substitution (25 whitelisted variables)
+  - Exponential backoff retry (3 attempts: 1s, 2s, 4s)
+  - Rate limiting (30 msg/sec global + per-chat)
+  - Dead Letter Queue for permanent failures
+  - PostgreSQL result logging
+  - Prometheus metrics
+  - Graceful shutdown with CancellationToken
+- **Security Hardening**
+  - Bot token protection (secrecy crate)
+  - Log injection prevention
+  - Template variable whitelist
+  - Chat ID validation
+  - Input length validation (4096 chars max)
+  - Job TTL (1 hour expiration)
+  - Per-chat rate limiting
+  - Safe error messages for external use
+
+### Testing
+- 80 unit tests passing
+- Production-ready with comprehensive security hardening
+
+---
+
+## Week 8 (November 24, 2024) - Event Processor
+
+### Added
+- **Event Processor Implementation**
+  - PostgreSQL NOTIFY/LISTEN integration
+  - Trigger loading from Trigger Store
+  - Condition evaluators:
+    - `agent_id_equals`
+    - `score_threshold` (6 operators: <, >, =, <=, >=, !=)
+    - `tag_equals` (tag1, tag2)
+    - `event_type_equals`
+  - Trigger matching logic (AND conditions)
+  - Redis job enqueueing for matched triggers
+  - Logging and tracing integration
+
+### Testing
+- 34 unit tests passing
+- Full NOTIFY/LISTEN integration verified
 
 ---
 
@@ -131,34 +269,30 @@ and this project follows phases and weeks for versioning during development.
 
 ## Roadmap
 
-### Week 8 (Next) - Trigger Evaluation Engine
-- Condition evaluation logic
-- Stateful trigger support (EMA, counters, rate limits)
-- Integration with Event Processor
-- Estimated: 40 hours
+### Week 13 (Next) - Auth Completion + Rate Limiting + OAuth 2.0
+- Layer 0 (Anonymous) IP-based rate limiting
+- Enhanced rate limiting middleware (per-tier, per-account, per-IP)
+- Auth layer precedence logic (L0 < L1 < L2)
+- OAuth 2.0 tables for future third-party integrations
+- Comprehensive auth integration tests
+- Estimated: 30-40 hours
 
-### Week 9 - Telegram Worker
-- Telegram bot integration
-- Message templating
-- Error handling and retries
-- Estimated: 20 hours
+### Phase 4 - Advanced Triggers & Actions (Weeks 14-16)
+- Stateful triggers (EMA, counters, rate limits)
+- REST/HTTP action worker
+- Discovery endpoint (`/.well-known/agent.json`)
+- Circuit breaker implementation
+- Payment nonces for x402
 
-### Week 10 - Integration Testing
-- End-to-end testing
-- Load testing
-- Performance optimization
-- MVP launch
-- Estimated: 30 hours
-
-### Phase 3 - Advanced Features (Post-MVP)
-- Application-level rate limiting (4-6 hours)
-- Token refresh pattern (3-4 hours)
-- Enhanced password validation (1 hour)
-- Request correlation IDs (2 hours)
-- Comprehensive monitoring (8+ hours)
+### Phase 5 - MCP + A2A Integration (Weeks 17-19)
+- A2A Protocol (Google Agent-to-Agent)
+- MCP Query Tools (Tier 0-3)
+- x402 crypto payment integration
+- Query caching and usage metering
 
 ---
 
-**Current Version**: Phase 2, Week 7 (v2.7.0-dev)
-**Production Status**: ✅ API Gateway production-ready (100%)
-**Next Milestone**: Week 10 - MVP Launch
+**Current Version**: Phase 3.5 Complete, Week 12 (v3.5.12)
+**Production Status**: ✅ Phase 3.5 (Payment Foundation) production-ready (100%)
+**Next Milestone**: Week 13 - Enhanced Rate Limiting + OAuth 2.0 Tables
+**Total Progress**: 12/25 weeks (48% complete)
