@@ -725,10 +725,7 @@ async fn test_rate_limit_headers_present_on_success() {
         .unwrap()
         .parse::<i64>()
         .unwrap();
-    assert!(
-        (0..10).contains(&remaining),
-        "Remaining should decrease"
-    );
+    assert!((0..10).contains(&remaining), "Remaining should decrease");
 
     let window = headers.get("x-ratelimit-window").unwrap().to_str().unwrap();
     assert_eq!(window, "3600", "Window should be 3600 seconds (1 hour)");
