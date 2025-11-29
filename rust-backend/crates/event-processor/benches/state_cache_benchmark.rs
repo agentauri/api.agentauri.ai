@@ -67,7 +67,7 @@ async fn ensure_test_user_and_org(pool: &PgPool) {
         INSERT INTO organizations (id, name, slug, owner_id, plan, is_personal)
         VALUES ('bench_org', 'Bench Org', 'bench-org', 'bench_user', 'free', true)
         ON CONFLICT (id) DO NOTHING
-        "#
+        "#,
     )
     .execute(pool)
     .await
@@ -83,8 +83,8 @@ async fn create_test_trigger(pool: &PgPool, trigger_id: &str) {
         VALUES ($1, 'bench_org', 'bench_user', 'Bench Trigger', 84532, 'reputation', true, true)
         ON CONFLICT (id) DO NOTHING
         "#,
-        trigger_id
     )
+    .bind(trigger_id)
     .execute(pool)
     .await
     .expect("Failed to create benchmark trigger");
