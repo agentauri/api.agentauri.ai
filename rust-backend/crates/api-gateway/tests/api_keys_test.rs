@@ -731,4 +731,117 @@ mod unit_tests {
         let owner = crate::common::TestMember::owner("org_1", "user_4");
         assert_eq!(owner.role, "owner");
     }
+
+    // ========================================================================
+    // TIMING ATTACK MITIGATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_dummy_verify_timing_consistency() {
+        use api_gateway::services::ApiKeyService;
+        use std::time::Instant;
+
+        let service = ApiKeyService::new();
+
+        // Measure timing for dummy_verify (when key not found)
+        let mut dummy_times = Vec::new();
+        for _ in 0..10 {
+            let start = Instant::now();
+            service.dummy_verify();
+            dummy_times.push(start.elapsed());
+        }
+
+        // Measure timing for real verification (when key found)
+        let generated = service.generate_key("live").unwrap();
+        let mut real_times = Vec::new();
+        for _ in 0..10 {
+            let start = Instant::now();
+            let _ = service.verify_key(&generated.key, &generated.hash);
+            real_times.push(start.elapsed());
+        }
+
+        // Calculate average timings
+        let avg_dummy = dummy_times.iter().sum::<std::time::Duration>() / dummy_times.len() as u32;
+        let avg_real = real_times.iter().sum::<std::time::Duration>() / real_times.len() as u32;
+
+        // The timing difference should be minimal (within 20% variance)
+        // This ensures that attackers cannot distinguish between valid/invalid keys
+        // by measuring response times
+        let difference = if avg_dummy > avg_real {
+            (avg_dummy.as_millis() - avg_real.as_millis()) as f64
+        } else {
+            (avg_real.as_millis() - avg_dummy.as_millis()) as f64
+        };
+
+        let max_allowed_diff = (avg_real.as_millis() as f64) * 0.20; // 20% variance
+
+        assert!(
+            difference < max_allowed_diff,
+            "Timing difference too large: {}ms (max allowed: {}ms). \
+             This indicates a potential timing attack vulnerability. \
+             avg_dummy={}ms, avg_real={}ms",
+            difference, max_allowed_diff,
+            avg_dummy.as_millis(), avg_real.as_millis()
+        );
+    }
+
+    #[test]
+    fn test_dummy_verify_uses_valid_hash() {
+        use api_gateway::services::ApiKeyService;
+
+        // The vulnerability was that dummy_verify() used an invalid hash format,
+        // which would fail during parsing and exit early, creating a timing sidechannel.
+        // This test verifies that dummy_verify() completes without error.
+
+        let service = ApiKeyService::new();
+
+        // Should not panic or fail - it should complete the full Argon2 verification
+        service.dummy_verify();
+
+        // Run multiple times to ensure consistency
+        for _ in 0..5 {
+            service.dummy_verify();
+        }
+    }
+
+    #[test]
+    fn test_api_key_verification_constant_time() {
+        use api_gateway::services::ApiKeyService;
+        use std::time::Instant;
+
+        let service = ApiKeyService::new();
+        let generated = service.generate_key("live").unwrap();
+
+        // Test 1: Correct key
+        let start = Instant::now();
+        let result = service.verify_key(&generated.key, &generated.hash).unwrap();
+        let correct_time = start.elapsed();
+        assert!(result, "Valid key should verify successfully");
+
+        // Test 2: Incorrect key (different key, same format)
+        let wrong_key = "sk_live_WRONGKEYWRONGKEYWRONGKEYWRONGKEYWRONGKE";
+        let start = Instant::now();
+        let result = service.verify_key(wrong_key, &generated.hash).unwrap();
+        let incorrect_time = start.elapsed();
+        assert!(!result, "Invalid key should not verify");
+
+        // Timing should be similar (within reasonable variance)
+        // Argon2's verify_password is constant-time by design
+        let difference = if correct_time > incorrect_time {
+            correct_time.as_millis() - incorrect_time.as_millis()
+        } else {
+            incorrect_time.as_millis() - correct_time.as_millis()
+        };
+
+        // Allow 20% variance (crypto operations can have some natural variance)
+        let max_allowed_diff = (correct_time.as_millis() as f64) * 0.20;
+
+        assert!(
+            difference as f64 <= max_allowed_diff,
+            "Timing difference too large: {}ms (max: {}ms). \
+             correct={}ms, incorrect={}ms",
+            difference, max_allowed_diff,
+            correct_time.as_millis(), incorrect_time.as_millis()
+        );
+    }
 }

@@ -151,7 +151,8 @@ impl TestApp {
 /// Create a test database pool
 async fn create_test_pool() -> DbPool {
     let database_url = std::env::var("TEST_DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost/erc8004_backend_test".to_string());
+        .or_else(|_| std::env::var("DATABASE_URL"))
+        .expect("TEST_DATABASE_URL or DATABASE_URL must be set for integration tests. See database/README.md for setup instructions.");
 
     PgPool::connect(&database_url)
         .await

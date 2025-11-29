@@ -45,12 +45,11 @@
 //! - Security headers protect against common web vulnerabilities
 
 pub mod auth_extractor;
+pub mod cors;
 pub mod ip_extractor;
 pub mod query_tier;
 pub mod security_headers;
 pub mod unified_rate_limiter;
-
-use actix_cors::Cors;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     error::ErrorUnauthorized,
@@ -74,50 +73,9 @@ use crate::services::{ApiKeyService, AuthRateLimiter};
 
 // Re-export middleware components
 pub use auth_extractor::{AuthContext, AuthLayer};
+pub use cors::cors;
 pub use query_tier::{QueryTier, QueryTierExtractor};
 pub use unified_rate_limiter::UnifiedRateLimiter;
-
-/// Configure CORS middleware
-pub fn cors() -> Cors {
-    // Get allowed origins from environment variable
-    // Format: comma-separated list of origins
-    // Example: ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
-    let allowed_origins = env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| String::new());
-
-    let origins: Vec<String> = allowed_origins
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(|s| s.trim().to_string())
-        .collect();
-
-    Cors::default()
-        .allowed_origin_fn(move |origin, _req_head| {
-            let origin_str = origin.to_str().unwrap_or("");
-
-            if cfg!(debug_assertions) {
-                // Development mode: Allow localhost
-                origin_str.starts_with("http://localhost")
-                    || origin_str.starts_with("http://127.0.0.1")
-            } else {
-                // Production mode: Whitelist only
-                if origins.is_empty() {
-                    tracing::warn!(
-                        "ALLOWED_ORIGINS not set. Denying all CORS requests in production."
-                    );
-                    false
-                } else {
-                    origins.iter().any(|allowed| origin_str == allowed)
-                }
-            }
-        })
-        .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE"])
-        .allowed_headers(vec![
-            http::header::AUTHORIZATION,
-            http::header::ACCEPT,
-            http::header::CONTENT_TYPE,
-        ])
-        .max_age(3600)
-}
 
 // ============================================================================
 // JWT Authentication Middleware
@@ -658,10 +616,14 @@ async fn validate_api_key(
     let api_key = match ApiKeyRepository::find_by_prefix(pool, &prefix).await {
         Ok(Some(key)) => key,
         Ok(None) => {
-            // Key not found - perform dummy verification for timing attack mitigation
+            // CRITICAL: Perform dummy verification FIRST for timing attack mitigation
+            // This ensures constant-time behavior regardless of whether the key exists.
+            // Any I/O operations (database writes, logging) MUST happen AFTER this.
             api_key_service.dummy_verify();
 
-            // Log to auth_failures table (no org context since key not found)
+            // Now safe to log (timing attack already mitigated)
+            // Note: This is async and adds latency, but that's acceptable since
+            // we've already maintained constant-time behavior above
             let _ = AuthFailureRepository::log(
                 pool,
                 "prefix_not_found",

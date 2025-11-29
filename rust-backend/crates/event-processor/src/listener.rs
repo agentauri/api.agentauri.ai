@@ -8,6 +8,7 @@ use serde::Deserialize;
 use shared::models::{Event, Trigger, TriggerAction, TriggerCondition};
 use shared::{ActionJob, ActionType, DbPool};
 use sqlx::postgres::PgListener;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::queue::{JobQueue, RedisJobQueue};
@@ -163,20 +164,33 @@ async fn process_event<Q: JobQueue>(
 
     tracing::debug!("Found {} triggers to evaluate", triggers.len());
 
+    // Batch load all conditions and actions for these triggers (fixes N+1 query problem)
+    let trigger_ids: Vec<String> = triggers.iter().map(|t| t.id.clone()).collect();
+    let (conditions_map, actions_map) =
+        fetch_trigger_relations(&trigger_ids, db_pool).await?;
+
+    tracing::debug!(
+        "Batch loaded conditions and actions for {} triggers (3 queries total)",
+        triggers.len()
+    );
+
     // Evaluate each trigger
     let mut matched_count = 0;
     let trigger_count = triggers.len();
     for trigger in &triggers {
-        // Fetch conditions for this trigger
-        let conditions = fetch_conditions(&trigger.id, db_pool).await?;
+        // Get conditions for this trigger from the batch-loaded map
+        let conditions = conditions_map
+            .get(&trigger.id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
 
         // Evaluate conditions against the event
         // Use stateful evaluation if trigger is stateful, otherwise use stateless
         let matches = if trigger.is_stateful {
-            trigger_engine::evaluate_trigger_stateful(trigger, &conditions, &event, state_manager)
+            trigger_engine::evaluate_trigger_stateful(trigger, conditions, &event, state_manager)
                 .await?
         } else {
-            trigger_engine::evaluate_trigger(&conditions, &event)?
+            trigger_engine::evaluate_trigger(conditions, &event)?
         };
 
         if matches {
@@ -187,8 +201,11 @@ async fn process_event<Q: JobQueue>(
                 "Trigger matched"
             );
 
-            // Fetch actions for this trigger and enqueue jobs
-            let actions = fetch_actions(&trigger.id, db_pool).await?;
+            // Get actions for this trigger from the batch-loaded map
+            let actions = actions_map
+                .get(&trigger.id)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[]);
 
             for action in actions {
                 // Parse action_type string to ActionType enum
@@ -266,7 +283,96 @@ async fn fetch_triggers(chain_id: i32, registry: &str, db_pool: &DbPool) -> Resu
     .context("Failed to fetch triggers from database")
 }
 
+/// Batch fetch conditions and actions for multiple triggers
+///
+/// This function solves the N+1 query problem by loading all conditions and actions
+/// in just 2 queries instead of 2N queries (where N = number of triggers).
+///
+/// # Performance
+///
+/// - Before: 1 + N + N queries (for N triggers)
+/// - After: 1 + 2 queries (regardless of N)
+/// - Example with 100 triggers: 201 queries → 3 queries (66x reduction)
+///
+/// # Arguments
+///
+/// * `trigger_ids` - List of trigger IDs to fetch relations for
+/// * `db_pool` - Database connection pool
+///
+/// # Returns
+///
+/// Returns a tuple of (conditions_map, actions_map) where:
+/// - conditions_map: HashMap<trigger_id, Vec<TriggerCondition>>
+/// - actions_map: HashMap<trigger_id, Vec<TriggerAction>>
+///
+/// Triggers with no conditions/actions will not have entries in the maps.
+async fn fetch_trigger_relations(
+    trigger_ids: &[String],
+    db_pool: &DbPool,
+) -> Result<(
+    HashMap<String, Vec<TriggerCondition>>,
+    HashMap<String, Vec<TriggerAction>>,
+)> {
+    if trigger_ids.is_empty() {
+        return Ok((HashMap::new(), HashMap::new()));
+    }
+
+    // Batch fetch all conditions with a single query using IN clause
+    let conditions = sqlx::query_as::<_, TriggerCondition>(
+        r#"
+        SELECT id, trigger_id, condition_type, field, operator, value, config, created_at
+        FROM trigger_conditions
+        WHERE trigger_id = ANY($1)
+        ORDER BY trigger_id, id
+        "#,
+    )
+    .bind(trigger_ids)
+    .fetch_all(db_pool)
+    .await
+    .context("Failed to batch fetch trigger conditions")?;
+
+    // Batch fetch all actions with a single query using IN clause
+    let actions = sqlx::query_as::<_, TriggerAction>(
+        r#"
+        SELECT id, trigger_id, action_type, priority, config, created_at
+        FROM trigger_actions
+        WHERE trigger_id = ANY($1)
+        ORDER BY trigger_id, priority DESC, id
+        "#,
+    )
+    .bind(trigger_ids)
+    .fetch_all(db_pool)
+    .await
+    .context("Failed to batch fetch trigger actions")?;
+
+    // Group conditions by trigger_id
+    let mut conditions_map: HashMap<String, Vec<TriggerCondition>> = HashMap::new();
+    for condition in conditions {
+        conditions_map
+            .entry(condition.trigger_id.clone())
+            .or_insert_with(Vec::new)
+            .push(condition);
+    }
+
+    // Group actions by trigger_id
+    let mut actions_map: HashMap<String, Vec<TriggerAction>> = HashMap::new();
+    for action in actions {
+        actions_map
+            .entry(action.trigger_id.clone())
+            .or_insert_with(Vec::new)
+            .push(action);
+    }
+
+    Ok((conditions_map, actions_map))
+}
+
 /// Fetch conditions for a trigger
+///
+/// # Deprecated
+///
+/// This function is deprecated in favor of `fetch_trigger_relations` for batch loading.
+/// It's kept for backward compatibility and single-trigger use cases.
+#[allow(dead_code)]
 async fn fetch_conditions(trigger_id: &str, db_pool: &DbPool) -> Result<Vec<TriggerCondition>> {
     sqlx::query_as::<_, TriggerCondition>(
         r#"
@@ -283,6 +389,12 @@ async fn fetch_conditions(trigger_id: &str, db_pool: &DbPool) -> Result<Vec<Trig
 }
 
 /// Fetch actions for a trigger
+///
+/// # Deprecated
+///
+/// This function is deprecated in favor of `fetch_trigger_relations` for batch loading.
+/// It's kept for backward compatibility and single-trigger use cases.
+#[allow(dead_code)]
 async fn fetch_actions(trigger_id: &str, db_pool: &DbPool) -> Result<Vec<TriggerAction>> {
     sqlx::query_as::<_, TriggerAction>(
         r#"

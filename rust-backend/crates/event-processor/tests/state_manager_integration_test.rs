@@ -8,10 +8,8 @@ use sqlx::PgPool;
 
 // Test helper to setup test database
 async fn setup_test_db() -> Result<PgPool> {
-    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgresql://postgres:2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=@localhost:5432/erc8004_backend"
-            .to_string()
-    });
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set for integration tests. See database/README.md for setup instructions.");
 
     let pool = PgPool::connect(&database_url).await?;
 

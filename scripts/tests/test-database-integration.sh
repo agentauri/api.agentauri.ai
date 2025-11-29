@@ -16,9 +16,19 @@ DB_HOST="localhost"
 DB_PORT="5432"
 DB_USER="postgres"
 DB_NAME="erc8004_backend"
-DB_PASSWORD="${PGPASSWORD:-2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=}"
 
-export PGPASSWORD="$DB_PASSWORD"
+# Database password MUST be set via PGPASSWORD environment variable
+# Do NOT hardcode passwords in this script for security reasons
+if [ -z "$PGPASSWORD" ]; then
+    echo -e "${RED}ERROR: PGPASSWORD environment variable is not set${NC}"
+    echo "Please set your database password:"
+    echo "  export PGPASSWORD='your_password'"
+    echo ""
+    echo "For local development, see database/README.md for setup instructions."
+    exit 1
+fi
+
+DB_PASSWORD="$PGPASSWORD"
 
 # Test counter
 TESTS_RUN=0

@@ -140,6 +140,53 @@ Test data includes:
 - **Referential Integrity**: Foreign keys with appropriate CASCADE rules
 - **Performance Indexes**: Optimized indexes for common query patterns
 
+## Running Integration Tests
+
+Integration tests require a properly configured test database with environment variables set.
+
+### Setup Test Environment
+
+```bash
+# 1. Create a separate test database (IMPORTANT: Do NOT use production database!)
+createdb erc8004_backend_test
+
+# 2. Run migrations on test database
+export DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend_test"
+sqlx migrate run --source database/migrations
+
+# 3. Copy and configure test environment file
+cp .env.test.example .env.test
+# Edit .env.test with your actual test database credentials
+
+# 4. Source the test environment
+source .env.test
+
+# 5. Run integration tests
+cargo test
+```
+
+### Security Best Practices for Tests
+
+**CRITICAL**: Never hardcode database credentials in test files or scripts!
+
+- Use `DATABASE_URL` environment variable for all database connections
+- Use `PGPASSWORD` environment variable for psql-based scripts
+- Keep credentials in `.env.test` file (already in .gitignore)
+- For CI/CD, use secret management (GitHub Secrets, etc.)
+
+**Example (SECURE)**:
+```rust
+// ✅ CORRECT: Require environment variable
+let database_url = std::env::var("DATABASE_URL")
+    .expect("DATABASE_URL must be set for integration tests");
+```
+
+**Example (INSECURE - DO NOT USE)**:
+```rust
+// ❌ WRONG: Hardcoded credentials
+let database_url = "postgresql://postgres:password123@localhost/db".to_string();
+```
+
 ## Development Workflow
 
 ### Creating a New Migration

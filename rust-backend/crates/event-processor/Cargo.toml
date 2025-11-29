@@ -48,5 +48,16 @@ chrono = { workspace = true }
 # UUID
 uuid = { workspace = true }
 
+# Metrics (optional feature)
+metrics = { workspace = true, optional = true }
+
 [dev-dependencies]
 mockall = { workspace = true }
+
+[[bench]]
+name = "state_cache_benchmark"
+harness = false
+
+[features]
+default = []
+metrics = ["dep:metrics"]

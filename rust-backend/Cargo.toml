@@ -25,7 +25,10 @@ actix-cors = "0.7"
 actix-rt = "2.10"
 
 # Database
-sqlx = { version = "0.8", features = [
+# NOTE: MySQL and SQLite features explicitly disabled to avoid RUSTSEC-2023-0071 (RSA crate vulnerability)
+# This project only uses PostgreSQL, so MySQL/SQLite support is not needed
+# IMPORTANT: default-features = false prevents pulling in mysql/sqlite dependencies
+sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",
     "postgres",
     "macros",

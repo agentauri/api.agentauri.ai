@@ -11,6 +11,55 @@ and this project follows phases and weeks for versioning during development.
 
 ---
 
+## Security Update (November 29, 2024) - Ponder Indexers Vite Vulnerability Fix
+
+### Security Fixes
+- **Vite Security Vulnerabilities Resolved** (4 vulnerabilities patched)
+  - Updated Vite from 5.0.7 → 6.4.1 (workspace-level override)
+  - Fixed GHSA-c24v-8rfc-w8vw: `server.fs.deny` bypass on case-insensitive filesystems (HIGH)
+  - Fixed GHSA-8jhw-289h-jh2g: Pattern directory denial bypass (MODERATE)
+  - Fixed GHSA-9cwx-2883-4wfx: `?import&raw` bypass (MODERATE)
+  - Fixed GHSA-64vr-g452-qvp3: DOM Clobbering XSS (MODERATE)
+  - All vulnerabilities now resolved: **0 high, 0 moderate, 0 critical**
+
+### Changed
+- **ponder-indexers Dependencies**
+  - vite: 5.0.7 → 6.4.1 (devDependency)
+  - vitest: 1.6.0 → 2.1.9 (devDependency)
+  - @vitest/coverage-v8: 1.6.0 → 2.1.9 (devDependency)
+  - Workspace-level pnpm override for all transitive Vite dependencies
+- **TypeScript Configuration**
+  - Added `**/*.test.ts` and `**/__tests__/**` to exclude list
+  - Prevents test files from being loaded by Ponder dev server
+- **Vitest Configuration**
+  - Added explicit `include: ["src/**/*.test.ts"]` pattern
+  - Ensures tests are properly discovered by Vitest
+
+### Testing
+- **38 tests passing** (2 test files)
+  - src/__tests__/handlers.test.ts: 15 tests
+  - src/__tests__/env-validation.test.ts: 23 tests
+- TypeScript compilation: ✓ Passed
+- ESLint linting: ✓ Passed
+- Ponder dev server: ✓ Starts successfully
+- **0 vulnerabilities** after update
+
+### Compatibility
+- Vite 6.4.1 verified compatible with:
+  - Ponder 0.7.17
+  - Vitest 2.1.9
+  - Node.js 20+
+  - All existing Ponder event handlers
+
+### Files Modified
+- `/package.json` - Added pnpm.overrides for Vite
+- `/ponder-indexers/package.json` - Updated dev dependencies
+- `/ponder-indexers/tsconfig.json` - Excluded test files
+- `/ponder-indexers/vitest.config.ts` - Added explicit test include pattern
+- `/pnpm-lock.yaml` - Updated dependency resolution
+
+---
+
 ## Week 14 (November 29, 2024) - Stateful Triggers (EMA + Rate Counters) + Integration Tests
 
 ### Added

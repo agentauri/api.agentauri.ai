@@ -60,6 +60,8 @@
     "dist",
     ".ponder",
     "src/index.ts",
-    "ponder.schema.ts"
+    "ponder.schema.ts",
+    "**/*.test.ts",
+    "**/__tests__/**"
   ]
 }

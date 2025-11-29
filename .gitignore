@@ -13,6 +13,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.test  # Test environment credentials (NEVER commit!)
 
 # Database
 *.db
