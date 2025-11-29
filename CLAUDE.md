@@ -15,6 +15,7 @@ cargo run --bin api-gateway           # Start API server
 ./scripts/local-lint.sh               # Pre-PR quality checks (3-5 min)
 ./scripts/local-security.sh           # Security audit (5-10 min)
 ./scripts/local-all.sh                # Complete validation (10-15 min)
+./scripts/pre-push-check.sh           # Pre-push validation (matches GitHub CI)
 cargo test                            # Rust unit/integration tests
 cd ponder-indexers && pnpm test       # TypeScript tests
 
@@ -894,6 +895,40 @@ The project includes comprehensive local testing scripts that replicate GitHub A
 - Comprehensive summary with timing
 - Use `--yes` or `-y` to skip confirmation
 - Runtime: 10-15 minutes
+
+### Pre-Push Validation
+
+**Automatic Pre-Push Hook** (`.git/hooks/pre-push`):
+
+The repository includes an automatic Git pre-push hook that validates code before pushing to GitHub. This ensures that **all code pushed matches GitHub CI requirements exactly**.
+
+**What it does**:
+1. Runs `cargo fmt -- --check` (formatting validation)
+2. Runs `cargo clippy --all-targets --all-features -- -D warnings` (linting, without DATABASE_URL)
+3. Runs `cargo test --workspace` (unit tests, excluding DB-dependent packages)
+4. **Blocks the push** if any check fails
+5. **Allows the push** only if all checks pass
+
+**Manual execution**:
+```bash
+# Run validation manually before committing
+./scripts/pre-push-check.sh
+```
+
+**Bypass hook** (NOT recommended):
+```bash
+# Only use this if you have a very good reason
+git push --no-verify
+```
+
+**Benefits**:
+- ✅ Prevents CI failures caused by formatting/linting issues
+- ✅ Catches errors locally before they reach GitHub
+- ✅ Saves CI/CD minutes and development time
+- ✅ Ensures consistent code quality across all pushes
+- ✅ Matches GitHub Actions environment (no DATABASE_URL during Clippy)
+
+**Note**: The hook was automatically installed when you cloned this repository. It runs every time you execute `git push`.
 
 ### Code Quality Tools
 
