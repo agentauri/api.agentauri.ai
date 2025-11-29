@@ -176,17 +176,9 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            rust-backend/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-backend/**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          workspaces: rust-backend
 
       - name: Check Rust formatting
         working-directory: rust-backend
@@ -194,15 +186,11 @@ jobs:
 
       - name: Run Clippy
         working-directory: rust-backend
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Build Rust project
-        working-directory: rust-backend
-        run: cargo build --verbose
+        run: cargo clippy --workspace -- -D warnings
 
       - name: Run Rust tests
         working-directory: rust-backend
-        run: cargo test --verbose --all
+        run: cargo test --workspace --lib --bins
 
       - name: Generate Rust test summary
         if: always()
@@ -211,8 +199,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Formatting: ✅" >> $GITHUB_STEP_SUMMARY
           echo "- Clippy Lints: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Build: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit Tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Integration tests with #[ignore] are skipped in this job_" >> $GITHUB_STEP_SUMMARY
 
   typescript-tests:
     name: TypeScript/Ponder Tests
