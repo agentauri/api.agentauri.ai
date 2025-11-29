@@ -596,8 +596,7 @@ pub async fn handle_stripe_webhook(
 /// # Security
 /// Validates that Stripe keys have the correct format to catch misconfiguration early.
 fn get_stripe_config(_config: &Config) -> Result<StripeConfig, &'static str> {
-    let secret_key =
-        std::env::var("STRIPE_SECRET_KEY").map_err(|_| "STRIPE_SECRET_KEY not set")?;
+    let secret_key = std::env::var("STRIPE_SECRET_KEY").map_err(|_| "STRIPE_SECRET_KEY not set")?;
 
     // SECURITY: Validate secret key format
     if !secret_key.starts_with("sk_test_") && !secret_key.starts_with("sk_live_") {

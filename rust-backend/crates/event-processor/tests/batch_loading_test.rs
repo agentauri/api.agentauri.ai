@@ -186,7 +186,11 @@ async fn test_batch_loading_correctness() -> Result<()> {
     .await?;
 
     // Verify we got the correct number of records
-    assert_eq!(conditions.len(), 20, "Expected 20 conditions (2 per trigger)");
+    assert_eq!(
+        conditions.len(),
+        20,
+        "Expected 20 conditions (2 per trigger)"
+    );
     assert_eq!(actions.len(), 10, "Expected 10 actions (1 per trigger)");
 
     // Verify conditions are correctly associated
@@ -196,7 +200,11 @@ async fn test_batch_loading_correctness() -> Result<()> {
             .filter(|c| &c.trigger_id == trigger_id)
             .collect();
 
-        assert_eq!(trigger_conditions.len(), 2, "Expected 2 conditions per trigger");
+        assert_eq!(
+            trigger_conditions.len(),
+            2,
+            "Expected 2 conditions per trigger"
+        );
         assert_eq!(trigger_conditions[0].condition_type, "agent_id_equals");
         assert_eq!(trigger_conditions[1].condition_type, "score_threshold");
     }
@@ -269,7 +277,11 @@ async fn test_batch_loading_with_triggers_without_conditions() -> Result<()> {
     .fetch_all(&pool)
     .await?;
 
-    assert_eq!(conditions.len(), 0, "Expected 0 conditions for trigger without conditions");
+    assert_eq!(
+        conditions.len(),
+        0,
+        "Expected 0 conditions for trigger without conditions"
+    );
 
     cleanup_test_data(&pool).await?;
     Ok(())
@@ -399,11 +411,18 @@ async fn test_batch_loading_vs_n_plus_one() -> Result<()> {
     let batch_duration = start.elapsed();
 
     // Calculate improvement
-    let improvement_ratio = n_plus_one_duration.as_millis() as f64 / batch_duration.as_millis() as f64;
+    let improvement_ratio =
+        n_plus_one_duration.as_millis() as f64 / batch_duration.as_millis() as f64;
 
     println!("\n📊 Performance Comparison (50 triggers):");
-    println!("   N+1 approach: {}ms (100 queries)", n_plus_one_duration.as_millis());
-    println!("   Batch loading: {}ms (2 queries)", batch_duration.as_millis());
+    println!(
+        "   N+1 approach: {}ms (100 queries)",
+        n_plus_one_duration.as_millis()
+    );
+    println!(
+        "   Batch loading: {}ms (2 queries)",
+        batch_duration.as_millis()
+    );
     println!("   Improvement: {:.1}x faster", improvement_ratio);
 
     // Batch loading should be at least 10x faster
@@ -510,7 +529,11 @@ async fn test_batch_loading_with_large_dataset() -> Result<()> {
     let batch_duration = start.elapsed();
 
     // Verify results
-    assert_eq!(conditions.len(), 400, "Expected 400 conditions (2 per trigger)");
+    assert_eq!(
+        conditions.len(),
+        400,
+        "Expected 400 conditions (2 per trigger)"
+    );
     assert_eq!(actions.len(), 200, "Expected 200 actions (1 per trigger)");
 
     // Should handle 200 triggers efficiently (< 200ms)

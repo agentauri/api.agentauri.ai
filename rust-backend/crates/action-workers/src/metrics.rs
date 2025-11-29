@@ -62,7 +62,8 @@ pub fn init_metrics_default() {
 /// * `duration_secs` - Job processing duration in seconds
 pub fn record_job_success(action_type: &str, duration_secs: f64) {
     counter!("action_worker_jobs_processed_total", "action_type" => action_type.to_string(), "status" => "success").increment(1);
-    histogram!("action_worker_job_duration_seconds", "action_type" => action_type.to_string()).record(duration_secs);
+    histogram!("action_worker_job_duration_seconds", "action_type" => action_type.to_string())
+        .record(duration_secs);
 }
 
 /// Record a job failure
@@ -73,7 +74,8 @@ pub fn record_job_success(action_type: &str, duration_secs: f64) {
 /// * `duration_secs` - Job processing duration in seconds
 pub fn record_job_failure(action_type: &str, duration_secs: f64) {
     counter!("action_worker_jobs_processed_total", "action_type" => action_type.to_string(), "status" => "failure").increment(1);
-    histogram!("action_worker_job_duration_seconds", "action_type" => action_type.to_string()).record(duration_secs);
+    histogram!("action_worker_job_duration_seconds", "action_type" => action_type.to_string())
+        .record(duration_secs);
 }
 
 /// Record a job moved to DLQ (Dead Letter Queue)

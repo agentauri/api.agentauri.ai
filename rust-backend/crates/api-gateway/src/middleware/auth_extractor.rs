@@ -184,9 +184,7 @@ impl AuthContext {
     /// Get the rate limit scope for Redis key
     pub fn get_scope(&self) -> shared::RateLimitScope {
         match self.layer {
-            AuthLayer::Anonymous => {
-                shared::RateLimitScope::Ip(self.ip_address.clone())
-            }
+            AuthLayer::Anonymous => shared::RateLimitScope::Ip(self.ip_address.clone()),
             AuthLayer::ApiKey | AuthLayer::WalletSignature => {
                 if let Some(org_id) = &self.organization_id {
                     shared::RateLimitScope::Organization(org_id.clone())
@@ -291,12 +289,10 @@ pub async fn extract_auth_context(req: &HttpRequest, pool: &DbPool) -> AuthConte
 ///
 /// The plan name, or `None` if the organization doesn't exist
 async fn get_organization_plan(pool: &DbPool, organization_id: &str) -> Option<String> {
-    match sqlx::query_as::<_, Organization>(
-        "SELECT * FROM organizations WHERE id = $1"
-    )
-    .bind(organization_id)
-    .fetch_optional(pool)
-    .await
+    match sqlx::query_as::<_, Organization>("SELECT * FROM organizations WHERE id = $1")
+        .bind(organization_id)
+        .fetch_optional(pool)
+        .await
     {
         Ok(Some(org)) => Some(org.plan),
         Ok(None) => None,

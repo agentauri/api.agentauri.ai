@@ -339,7 +339,10 @@ mod tests {
     fn test_parse_duration_invalid_unit() {
         let result = parse_duration("10x");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid time unit"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid time unit"));
     }
 
     #[test]
@@ -449,9 +452,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition(">", "10");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert_eq!(new_state.count, 12); // 11 + 1
         assert!(matches); // 12 > 10
@@ -482,9 +483,7 @@ mod tests {
         let event = create_test_event(now.timestamp());
         let condition = create_test_condition("=", "1");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         // Old timestamps should be pruned, only new event remains
         assert_eq!(new_state.count, 1);
@@ -513,9 +512,7 @@ mod tests {
         let event = create_test_event(now.timestamp());
         let condition = create_test_condition("=", "3");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         // Recent timestamps should be kept + new event
         assert_eq!(new_state.count, 3);
@@ -531,7 +528,7 @@ mod tests {
         let now = Utc::now();
         // Mix of old and recent timestamps
         let timestamps = vec![
-            (now - Duration::hours(2)).timestamp(),  // too old
+            (now - Duration::hours(2)).timestamp(),    // too old
             (now - Duration::minutes(45)).timestamp(), // too old
             (now - Duration::minutes(20)).timestamp(), // keep
             (now - Duration::minutes(10)).timestamp(), // keep
@@ -546,9 +543,7 @@ mod tests {
         let event = create_test_event(now.timestamp());
         let condition = create_test_condition("=", "3");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         // Should keep 2 recent + 1 new = 3
         assert_eq!(new_state.count, 3);
@@ -568,9 +563,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition(">", "5");
 
-        let (matches, _) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, _) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 6 > 5
     }
@@ -584,9 +577,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition("<", "10");
 
-        let (matches, _) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, _) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 4 < 10
     }
@@ -600,9 +591,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition(">=", "5");
 
-        let (matches, _) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, _) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 5 >= 5
     }
@@ -616,9 +605,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition("<=", "5");
 
-        let (matches, _) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, _) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 5 <= 5
     }
@@ -644,9 +631,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition("!=", "10");
 
-        let (matches, _) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, _) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 6 != 10
     }
@@ -681,9 +666,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition(">", "10");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 11 > 10 triggers
         assert_eq!(new_state.count, 0); // RESET after trigger
@@ -702,9 +685,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition(">", "10");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(!matches); // 6 is NOT > 10, no trigger
         assert_eq!(new_state.count, 6); // NOT reset
@@ -723,9 +704,7 @@ mod tests {
         let event = create_test_event(Utc::now().timestamp());
         let condition = create_test_condition(">", "10");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         assert!(matches); // 11 > 10 triggers
         assert_eq!(new_state.count, 11); // NOT reset (disabled)
@@ -757,9 +736,7 @@ mod tests {
         let event = create_test_event(now.timestamp());
         let condition = create_test_condition(">", "0");
 
-        let (_, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (_, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         // Should be truncated to MAX_TIMESTAMPS
         assert_eq!(new_state.recent_timestamps.len(), MAX_TIMESTAMPS);
@@ -777,7 +754,10 @@ mod tests {
 
         let result = evaluator.evaluate(&event, &condition, None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid threshold"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid threshold"));
     }
 
     #[test]
@@ -817,9 +797,7 @@ mod tests {
         let event = create_test_event(now.timestamp());
         let condition = create_test_condition("=", "1");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         // Old event pruned, only new event
         assert_eq!(new_state.count, 1);
@@ -844,9 +822,7 @@ mod tests {
         let event = create_test_event(now.timestamp());
         let condition = create_test_condition("=", "2");
 
-        let (matches, new_state) = evaluator
-            .evaluate(&event, &condition, Some(state))
-            .unwrap();
+        let (matches, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
 
         // Old event kept, plus new event = 2
         assert_eq!(new_state.count, 2);

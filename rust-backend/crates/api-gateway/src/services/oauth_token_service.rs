@@ -314,7 +314,9 @@ mod tests {
         let service = OAuthTokenService::new();
         let generated = service.generate_access_token().unwrap();
 
-        let verified = service.verify_token(&generated.token, &generated.hash).unwrap();
+        let verified = service
+            .verify_token(&generated.token, &generated.hash)
+            .unwrap();
         assert!(verified);
     }
 
@@ -409,7 +411,10 @@ mod tests {
         let mut tokens: Vec<String> = Vec::new();
         for _ in 0..10 {
             let generated = service.generate_access_token().unwrap();
-            assert!(!tokens.contains(&generated.token), "Token collision detected!");
+            assert!(
+                !tokens.contains(&generated.token),
+                "Token collision detected!"
+            );
             tokens.push(generated.token);
         }
     }

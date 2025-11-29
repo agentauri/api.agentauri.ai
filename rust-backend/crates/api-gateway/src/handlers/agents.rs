@@ -143,15 +143,15 @@ pub async fn link_agent(
     let nonce = match extract_nonce_from_challenge(&req.challenge) {
         Ok(n) => n,
         Err(e) => {
-            return HttpResponse::BadRequest().json(ErrorResponse::new(
-                "invalid_challenge",
-                e,
-            ))
+            return HttpResponse::BadRequest().json(ErrorResponse::new("invalid_challenge", e))
         }
     };
 
     // SECURITY: Check if nonce was already used (replay attack prevention)
-    match handle_db_error(NonceRepository::is_nonce_used(&pool, &nonce).await, "check nonce") {
+    match handle_db_error(
+        NonceRepository::is_nonce_used(&pool, &nonce).await,
+        "check nonce",
+    ) {
         Ok(true) => {
             return HttpResponse::BadRequest().json(ErrorResponse::new(
                 "nonce_reused",
@@ -166,10 +166,7 @@ pub async fn link_agent(
     let expires_at = match extract_expiration_from_challenge(&req.challenge) {
         Ok(exp) => exp,
         Err(e) => {
-            return HttpResponse::BadRequest().json(ErrorResponse::new(
-                "invalid_challenge",
-                e,
-            ))
+            return HttpResponse::BadRequest().json(ErrorResponse::new("invalid_challenge", e))
         }
     };
 

@@ -134,9 +134,11 @@ where
                 None => {
                     // If no AuthContext, this means the middleware chain is misconfigured
                     // In production, this should never happen
-                    error!("Missing AuthContext in rate limiter middleware - check middleware order");
+                    error!(
+                        "Missing AuthContext in rate limiter middleware - check middleware order"
+                    );
                     return Err(actix_web::error::ErrorInternalServerError(
-                        "Authentication context missing"
+                        "Authentication context missing",
                     ));
                 }
             };
@@ -189,7 +191,8 @@ where
             // Check if rate limit exceeded
             if !result.allowed {
                 // Check rate limit mode (shadow or enforcing)
-                let mode = std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string());
+                let mode =
+                    std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string());
 
                 if mode == "shadow" {
                     // Shadow mode: Log violation but allow request
@@ -272,10 +275,7 @@ where
             );
             // Use configured window size instead of hardcoded value
             if let Ok(window_str) = HeaderValue::try_from(window_seconds.to_string()) {
-                headers.insert(
-                    HeaderName::from_static("x-ratelimit-window"),
-                    window_str,
-                );
+                headers.insert(HeaderName::from_static("x-ratelimit-window"), window_str);
             }
 
             Ok(res)

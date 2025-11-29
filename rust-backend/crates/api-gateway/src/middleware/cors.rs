@@ -137,8 +137,8 @@ pub fn cors() -> Cors {
         .expose_headers(vec![header::CONTENT_TYPE])
         // Max age for preflight requests (1 hour)
         .max_age(3600);
-        // Note: We don't call supports_credentials() which means credentials are disabled by default
-        // This is correct for stateless JWT authentication (no cookies)
+    // Note: We don't call supports_credentials() which means credentials are disabled by default
+    // This is correct for stateless JWT authentication (no cookies)
 
     cors
 }

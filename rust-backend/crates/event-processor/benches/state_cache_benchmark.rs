@@ -18,8 +18,8 @@ use std::time::Instant;
 
 // Setup helpers
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set for benchmarks");
+    let database_url =
+        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for benchmarks");
 
     let pool = PgPool::connect(&database_url)
         .await
@@ -131,8 +131,16 @@ async fn bench_single_read_latency() {
 
     let speedup = uncached_avg as f64 / cached_avg as f64;
 
-    println!("Uncached (PostgreSQL): {}μs ({:.2}ms)", uncached_avg, uncached_avg as f64 / 1000.0);
-    println!("Cached (Redis):        {}μs ({:.2}ms)", cached_avg, cached_avg as f64 / 1000.0);
+    println!(
+        "Uncached (PostgreSQL): {}μs ({:.2}ms)",
+        uncached_avg,
+        uncached_avg as f64 / 1000.0
+    );
+    println!(
+        "Cached (Redis):        {}μs ({:.2}ms)",
+        cached_avg,
+        cached_avg as f64 / 1000.0
+    );
     println!("Speedup:               {:.1}x", speedup);
 
     // Cleanup
@@ -176,8 +184,16 @@ async fn bench_write_latency() {
 
     let overhead = (cached_avg as f64 - uncached_avg as f64) / uncached_avg as f64 * 100.0;
 
-    println!("Uncached (PostgreSQL only): {}μs ({:.2}ms)", uncached_avg, uncached_avg as f64 / 1000.0);
-    println!("Cached (PostgreSQL + Redis): {}μs ({:.2}ms)", cached_avg, cached_avg as f64 / 1000.0);
+    println!(
+        "Uncached (PostgreSQL only): {}μs ({:.2}ms)",
+        uncached_avg,
+        uncached_avg as f64 / 1000.0
+    );
+    println!(
+        "Cached (PostgreSQL + Redis): {}μs ({:.2}ms)",
+        cached_avg,
+        cached_avg as f64 / 1000.0
+    );
     println!("Overhead:                    {:.1}%", overhead);
 
     // Cleanup
@@ -244,8 +260,14 @@ async fn bench_mixed_workload() {
 
     let improvement = (cached_throughput - uncached_throughput) / uncached_throughput * 100.0;
 
-    println!("Uncached: {:?} ({:.0} ops/sec)", uncached_duration, uncached_throughput);
-    println!("Cached:   {:?} ({:.0} ops/sec)", cached_duration, cached_throughput);
+    println!(
+        "Uncached: {:?} ({:.0} ops/sec)",
+        uncached_duration, uncached_throughput
+    );
+    println!(
+        "Cached:   {:?} ({:.0} ops/sec)",
+        cached_duration, cached_throughput
+    );
     println!("Improvement: {:.1}%", improvement);
 
     // Cleanup
@@ -338,8 +360,14 @@ async fn bench_concurrent_access() {
 
     let improvement = (cached_throughput - uncached_throughput) / uncached_throughput * 100.0;
 
-    println!("Uncached: {:?} ({:.0} events/sec)", uncached_duration, uncached_throughput);
-    println!("Cached:   {:?} ({:.0} events/sec)", cached_duration, cached_throughput);
+    println!(
+        "Uncached: {:?} ({:.0} events/sec)",
+        uncached_duration, uncached_throughput
+    );
+    println!(
+        "Cached:   {:?} ({:.0} events/sec)",
+        cached_duration, cached_throughput
+    );
     println!("Improvement: {:.1}%", improvement);
 
     // Cleanup
@@ -356,9 +384,7 @@ async fn bench_cache_hit_rate() {
     let redis = setup_test_redis().await;
 
     // Create 50 triggers
-    let trigger_ids: Vec<String> = (0..50)
-        .map(|i| format!("bench_hit_rate_{}", i))
-        .collect();
+    let trigger_ids: Vec<String> = (0..50).map(|i| format!("bench_hit_rate_{}", i)).collect();
 
     for trigger_id in &trigger_ids {
         create_test_trigger(&pool, trigger_id).await;
@@ -397,7 +423,8 @@ async fn bench_cache_hit_rate() {
         if i % 10 == 0 {
             let mut conn = redis.clone();
             use redis::AsyncCommands;
-            let _: Result<(), redis::RedisError> = conn.del(format!("trigger:state:{}", trigger_id)).await;
+            let _: Result<(), redis::RedisError> =
+                conn.del(format!("trigger:state:{}", trigger_id)).await;
             cache_misses += 1;
         } else {
             cache_hits += 1;
@@ -412,7 +439,11 @@ async fn bench_cache_hit_rate() {
 
     println!("Total operations: {}", total_ops);
     println!("Cache hits:       {} ({:.1}%)", cache_hits, hit_rate);
-    println!("Cache misses:     {} ({:.1}%)", cache_misses, 100.0 - hit_rate);
+    println!(
+        "Cache misses:     {} ({:.1}%)",
+        cache_misses,
+        100.0 - hit_rate
+    );
     println!("Throughput:       {:.0} ops/sec", throughput);
     println!("Duration:         {:?}", duration);
 

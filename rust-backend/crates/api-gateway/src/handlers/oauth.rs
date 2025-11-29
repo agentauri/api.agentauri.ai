@@ -43,7 +43,9 @@ use crate::{
         can_manage_org, CreateOAuthClientRequest, CreateOAuthClientResponse, ErrorResponse,
         OAuthClientListResponse, OAuthClientResponse, SuccessResponse, TokenRequest, TokenResponse,
     },
-    repositories::{MemberRepository, OAuthClientRepository, OAuthTokenRepository, OrganizationRepository},
+    repositories::{
+        MemberRepository, OAuthClientRepository, OAuthTokenRepository, OrganizationRepository,
+    },
     services::{OAuthClientService, OAuthTokenService},
 };
 
@@ -91,8 +93,10 @@ pub async fn create_oauth_client(
     ) {
         Ok(Some(o)) => o,
         Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "Personal organization not found"))
+            return HttpResponse::NotFound().json(ErrorResponse::new(
+                "not_found",
+                "Personal organization not found",
+            ))
         }
         Err(resp) => return resp,
     };
@@ -189,8 +193,10 @@ pub async fn list_oauth_clients(
     ) {
         Ok(Some(o)) => o,
         Ok(None) => {
-            return HttpResponse::NotFound()
-                .json(ErrorResponse::new("not_found", "Personal organization not found"))
+            return HttpResponse::NotFound().json(ErrorResponse::new(
+                "not_found",
+                "Personal organization not found",
+            ))
         }
         Err(resp) => return resp,
     };
@@ -202,8 +208,10 @@ pub async fn list_oauth_clients(
     ) {
         Ok(Some(_)) => {} // Any member can view
         Ok(None) => {
-            return HttpResponse::Forbidden()
-                .json(ErrorResponse::new("forbidden", "Not a member of this organization"))
+            return HttpResponse::Forbidden().json(ErrorResponse::new(
+                "forbidden",
+                "Not a member of this organization",
+            ))
         }
         Err(resp) => return resp,
     }
@@ -331,10 +339,7 @@ pub async fn token_endpoint(
 ///
 /// This is the standard OAuth 2.0 authorization code flow.
 /// For now, we return an error as the full flow requires an authorization server.
-async fn handle_authorization_code_grant(
-    _pool: &DbPool,
-    _req: &TokenRequest,
-) -> HttpResponse {
+async fn handle_authorization_code_grant(_pool: &DbPool, _req: &TokenRequest) -> HttpResponse {
     // TODO: Implement authorization code flow with PKCE
     // This requires:
     // 1. Authorization endpoint to get the code
@@ -350,10 +355,7 @@ async fn handle_authorization_code_grant(
 ///
 /// This grant type is for machine-to-machine authentication.
 /// The client authenticates with client_id and client_secret.
-async fn handle_client_credentials_grant(
-    pool: &DbPool,
-    req: &TokenRequest,
-) -> HttpResponse {
+async fn handle_client_credentials_grant(pool: &DbPool, req: &TokenRequest) -> HttpResponse {
     // Verify client_id is provided
     if req.client_id.is_empty() {
         return bad_request("client_id is required");
@@ -373,7 +375,10 @@ async fn handle_client_credentials_grant(
     };
 
     // Verify grant_type is allowed
-    if !client.grant_types.contains(&"client_credentials".to_string()) {
+    if !client
+        .grant_types
+        .contains(&"client_credentials".to_string())
+    {
         return bad_request("client_credentials grant type not allowed for this client");
     }
 
@@ -459,10 +464,7 @@ async fn handle_client_credentials_grant(
 /// Handle refresh_token grant
 ///
 /// This grant type is used to refresh an expired access token using a valid refresh token.
-async fn handle_refresh_token_grant(
-    pool: &DbPool,
-    req: &TokenRequest,
-) -> HttpResponse {
+async fn handle_refresh_token_grant(pool: &DbPool, req: &TokenRequest) -> HttpResponse {
     // Verify refresh_token is provided
     let refresh_token_str = match &req.refresh_token {
         Some(t) if !t.is_empty() => t,
@@ -495,36 +497,40 @@ async fn handle_refresh_token_grant(
     };
 
     // Find the token in database and verify it's still valid
-    let stored_token = match OAuthTokenRepository::find_by_refresh_token_hash(pool, &refresh_token_hash).await {
-        Ok(Some(t)) => {
-            // Verify the token with constant-time comparison
-            match oauth_token_service.verify_token(refresh_token_str, &t.refresh_token_hash.clone().unwrap_or_default()) {
-                Ok(true) => t,
-                Ok(false) => {
-                    oauth_token_service.dummy_verify(); // Timing attack mitigation
-                    return unauthorized("Invalid refresh token");
-                }
-                Err(e) => {
-                    tracing::error!("Failed to verify refresh token: {}", e);
-                    return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                        "internal_error",
-                        "Failed to verify refresh token",
-                    ));
+    let stored_token =
+        match OAuthTokenRepository::find_by_refresh_token_hash(pool, &refresh_token_hash).await {
+            Ok(Some(t)) => {
+                // Verify the token with constant-time comparison
+                match oauth_token_service.verify_token(
+                    refresh_token_str,
+                    &t.refresh_token_hash.clone().unwrap_or_default(),
+                ) {
+                    Ok(true) => t,
+                    Ok(false) => {
+                        oauth_token_service.dummy_verify(); // Timing attack mitigation
+                        return unauthorized("Invalid refresh token");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to verify refresh token: {}", e);
+                        return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                            "internal_error",
+                            "Failed to verify refresh token",
+                        ));
+                    }
                 }
             }
-        }
-        Ok(None) => {
-            oauth_token_service.dummy_verify(); // Timing attack mitigation
-            return unauthorized("Invalid refresh token");
-        }
-        Err(e) => {
-            tracing::error!("Failed to find refresh token: {}", e);
-            return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to process refresh token",
-            ));
-        }
-    };
+            Ok(None) => {
+                oauth_token_service.dummy_verify(); // Timing attack mitigation
+                return unauthorized("Invalid refresh token");
+            }
+            Err(e) => {
+                tracing::error!("Failed to find refresh token: {}", e);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to process refresh token",
+                ));
+            }
+        };
 
     // Verify the token belongs to the client
     if stored_token.client_id != client.client_id {

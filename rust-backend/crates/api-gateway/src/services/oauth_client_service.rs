@@ -368,8 +368,12 @@ mod tests {
         assert!(OAuthClientService::is_valid_client_secret_format(
             "cs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         ));
-        assert!(!OAuthClientService::is_valid_client_secret_format("invalid"));
-        assert!(!OAuthClientService::is_valid_client_secret_format("cs_short"));
+        assert!(!OAuthClientService::is_valid_client_secret_format(
+            "invalid"
+        ));
+        assert!(!OAuthClientService::is_valid_client_secret_format(
+            "cs_short"
+        ));
     }
 
     #[test]
@@ -401,7 +405,10 @@ mod tests {
         for _ in 0..10 {
             let generated = service.generate_client().unwrap();
             assert!(!ids.contains(&generated.client_id), "Client ID collision!");
-            assert!(!secrets.contains(&generated.client_secret), "Client secret collision!");
+            assert!(
+                !secrets.contains(&generated.client_secret),
+                "Client secret collision!"
+            );
             ids.push(generated.client_id);
             secrets.push(generated.client_secret);
         }

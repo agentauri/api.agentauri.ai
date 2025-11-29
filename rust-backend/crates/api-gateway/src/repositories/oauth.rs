@@ -71,24 +71,24 @@ impl OAuthClientRepository {
 
     /// Find OAuth client by client_id
     pub async fn find_by_client_id(pool: &DbPool, client_id: &str) -> Result<Option<OAuthClient>> {
-        let client = sqlx::query_as::<_, OAuthClient>(
-            r#"SELECT * FROM oauth_clients WHERE client_id = $1"#,
-        )
-        .bind(client_id)
-        .fetch_optional(pool)
-        .await
-        .context("Failed to find OAuth client by client_id")?;
+        let client =
+            sqlx::query_as::<_, OAuthClient>(r#"SELECT * FROM oauth_clients WHERE client_id = $1"#)
+                .bind(client_id)
+                .fetch_optional(pool)
+                .await
+                .context("Failed to find OAuth client by client_id")?;
 
         Ok(client)
     }
 
     /// Find OAuth client by internal ID
     pub async fn find_by_id(pool: &DbPool, id: &str) -> Result<Option<OAuthClient>> {
-        let client = sqlx::query_as::<_, OAuthClient>(r#"SELECT * FROM oauth_clients WHERE id = $1"#)
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-            .context("Failed to find OAuth client by ID")?;
+        let client =
+            sqlx::query_as::<_, OAuthClient>(r#"SELECT * FROM oauth_clients WHERE id = $1"#)
+                .bind(id)
+                .fetch_optional(pool)
+                .await
+                .context("Failed to find OAuth client by ID")?;
 
         Ok(client)
     }

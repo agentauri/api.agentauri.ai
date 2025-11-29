@@ -30,9 +30,7 @@ pub use billing::{
 };
 
 // Explicitly re-export OAuth handlers
-pub use oauth::{
-    create_oauth_client, delete_oauth_client, list_oauth_clients, token_endpoint,
-};
+pub use oauth::{create_oauth_client, delete_oauth_client, list_oauth_clients, token_endpoint};
 
 // Note: helpers module is not re-exported to avoid polluting the namespace
 // Import helpers directly: use crate::handlers::helpers::{...}

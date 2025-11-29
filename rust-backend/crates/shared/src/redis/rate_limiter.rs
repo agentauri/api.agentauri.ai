@@ -245,12 +245,13 @@ impl RateLimiter {
         let now = Instant::now();
         let limit = self.fallback_limit;
 
-        let mut entry = self.fallback_limiter.entry(key.clone()).or_insert_with(|| {
-            FallbackEntry {
+        let mut entry = self
+            .fallback_limiter
+            .entry(key.clone())
+            .or_insert_with(|| FallbackEntry {
                 count: 0,
                 window_start: now,
-            }
-        });
+            });
 
         // Check if window has expired
         if now.duration_since(entry.window_start) >= self.fallback_window {
@@ -273,7 +274,11 @@ impl RateLimiter {
             .unwrap_or(0);
 
         let reset_at = current_time + self.fallback_window.as_secs() as i64;
-        let retry_after = if allowed { 0 } else { self.fallback_window.as_secs() as i64 };
+        let retry_after = if allowed {
+            0
+        } else {
+            self.fallback_window.as_secs() as i64
+        };
         let remaining = (limit - new_count).max(0);
 
         RateLimitResult {
@@ -294,9 +299,8 @@ impl RateLimiter {
         let now = Instant::now();
         let expiry = self.fallback_window * 2;
 
-        self.fallback_limiter.retain(|_, entry| {
-            now.duration_since(entry.window_start) < expiry
-        });
+        self.fallback_limiter
+            .retain(|_, entry| now.duration_since(entry.window_start) < expiry);
 
         debug!(
             entries_remaining = self.fallback_limiter.len(),
@@ -596,10 +600,12 @@ mod tests {
         let cost: i64 = 1;
 
         // First request should be allowed
-        let mut entry = fallback_limiter.entry(key.clone()).or_insert_with(|| FallbackEntry {
-            count: 0,
-            window_start: now,
-        });
+        let mut entry = fallback_limiter
+            .entry(key.clone())
+            .or_insert_with(|| FallbackEntry {
+                count: 0,
+                window_start: now,
+            });
 
         let new_count = entry.count + cost;
         let allowed = new_count <= fallback_limit;
@@ -677,9 +683,7 @@ mod tests {
         );
 
         // Cleanup
-        fallback_limiter.retain(|_, entry| {
-            now.duration_since(entry.window_start) < expiry
-        });
+        fallback_limiter.retain(|_, entry| now.duration_since(entry.window_start) < expiry);
 
         // Fresh entry should remain
         assert!(fallback_limiter.contains_key("fresh"));

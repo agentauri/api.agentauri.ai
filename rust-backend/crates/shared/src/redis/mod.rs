@@ -15,7 +15,8 @@ use redis::{aio::ConnectionManager, Client};
 
 /// Create a Redis client from configuration
 pub async fn create_client(url: &str) -> Result<ConnectionManager> {
-    let client = Client::open(url).map_err(|e| Error::config(format!("Invalid Redis URL: {}", e)))?;
+    let client =
+        Client::open(url).map_err(|e| Error::config(format!("Invalid Redis URL: {}", e)))?;
 
     ConnectionManager::new(client)
         .await

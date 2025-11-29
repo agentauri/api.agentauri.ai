@@ -15,8 +15,8 @@ use std::time::{Duration, Instant};
 
 // Helper to setup test database
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set for integration tests");
+    let database_url =
+        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests");
 
     let pool = PgPool::connect(&database_url)
         .await
@@ -233,7 +233,10 @@ async fn test_redis_failure_graceful_degradation() {
 
     // Update should succeed even with cache disabled
     let state_data = json!({"ema": 95.0, "count": 25});
-    manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+    manager
+        .update_state(trigger_id, state_data.clone())
+        .await
+        .unwrap();
 
     // Load should succeed from DB
     let loaded = manager.load_state(trigger_id).await.unwrap();
@@ -330,7 +333,10 @@ async fn test_cache_ttl_behavior() {
 
     // Create state
     let state_data = json!({"ema": 60.0, "count": 10});
-    manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+    manager
+        .update_state(trigger_id, state_data.clone())
+        .await
+        .unwrap();
 
     // First load should hit cache
     let start = Instant::now();
@@ -410,7 +416,10 @@ async fn test_multiple_managers_consistency() {
 
     // Manager 1 writes
     let state_data = json!({"ema": 88.0, "count": 20});
-    manager1.update_state(trigger_id, state_data.clone()).await.unwrap();
+    manager1
+        .update_state(trigger_id, state_data.clone())
+        .await
+        .unwrap();
 
     // Manager 2 reads (should see Manager 1's write via shared cache)
     let loaded = manager2.load_state(trigger_id).await.unwrap();
@@ -443,7 +452,10 @@ async fn test_large_state_caching() {
     });
 
     // Write large state
-    manager.update_state(trigger_id, large_state.clone()).await.unwrap();
+    manager
+        .update_state(trigger_id, large_state.clone())
+        .await
+        .unwrap();
 
     // Load from cache
     let loaded = manager.load_state(trigger_id).await.unwrap().unwrap();
@@ -481,7 +493,10 @@ async fn test_cleanup_expired_with_cache() {
     let manager = CachedStateManager::new(pool.clone(), redis.clone(), 300);
 
     // Create fresh state
-    manager.update_state(trigger_fresh, json!({"ema": 80.0})).await.unwrap();
+    manager
+        .update_state(trigger_fresh, json!({"ema": 80.0}))
+        .await
+        .unwrap();
 
     // Create old state by manually setting last_updated
     sqlx::query!(

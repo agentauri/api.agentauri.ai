@@ -205,10 +205,7 @@ where
                 }
 
                 if let Ok(value) = HeaderValue::try_from(hsts_value) {
-                    headers.insert(
-                        HeaderName::from_static("strict-transport-security"),
-                        value,
-                    );
+                    headers.insert(HeaderName::from_static("strict-transport-security"), value);
                 }
 
                 debug!("HSTS header added");
@@ -217,10 +214,7 @@ where
             // Content-Security-Policy (optional)
             if let Some(csp) = &config.content_security_policy {
                 if let Ok(value) = HeaderValue::try_from(csp.as_str()) {
-                    headers.insert(
-                        HeaderName::from_static("content-security-policy"),
-                        value,
-                    );
+                    headers.insert(HeaderName::from_static("content-security-policy"), value);
                 }
             }
 
@@ -312,11 +306,11 @@ mod tests {
         let req = test::TestRequest::get().uri("/test").to_request();
         let resp = test::call_service(&app, req).await;
 
+        assert_eq!(resp.headers().get("x-frame-options").unwrap(), "SAMEORIGIN");
         assert_eq!(
-            resp.headers().get("x-frame-options").unwrap(),
-            "SAMEORIGIN"
+            resp.headers().get("referrer-policy").unwrap(),
+            "no-referrer"
         );
-        assert_eq!(resp.headers().get("referrer-policy").unwrap(), "no-referrer");
         assert!(!resp.headers().contains_key("strict-transport-security"));
     }
 
@@ -328,9 +322,6 @@ mod tests {
         assert!(config.hsts_include_subdomains);
         assert!(!config.hsts_preload);
         assert_eq!(config.frame_options, "DENY");
-        assert_eq!(
-            config.referrer_policy,
-            "strict-origin-when-cross-origin"
-        );
+        assert_eq!(config.referrer_policy, "strict-origin-when-cross-origin");
     }
 }

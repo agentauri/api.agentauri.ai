@@ -141,10 +141,7 @@ impl TriggerStateManager {
     ///
     /// Returns error if database query fails
     pub async fn cleanup_expired(&self, retention_days: i32) -> Result<u64> {
-        debug!(
-            retention_days = retention_days,
-            "Starting state cleanup"
-        );
+        debug!(retention_days = retention_days, "Starting state cleanup");
 
         let result = sqlx::query!(
             r#"
@@ -205,7 +202,9 @@ mod tests {
         let database_url = std::env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set for integration tests. See database/README.md for setup instructions.");
 
-        let pool = PgPool::connect(&database_url).await.expect("Failed to connect to test database");
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("Failed to connect to test database");
 
         // Clean up any existing test data
         sqlx::query!("DELETE FROM trigger_state WHERE trigger_id LIKE 'test_%'")
@@ -305,7 +304,10 @@ mod tests {
         let manager = TriggerStateManager::new(pool);
 
         let result = manager.load_state("test_nonexistent").await.unwrap();
-        assert!(result.is_none(), "Should return None for non-existent state");
+        assert!(
+            result.is_none(),
+            "Should return None for non-existent state"
+        );
     }
 
     #[tokio::test]
@@ -321,7 +323,10 @@ mod tests {
         });
 
         // Create new state
-        manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state_data.clone())
+            .await
+            .unwrap();
 
         // Verify it was created
         let loaded = manager.load_state(trigger_id).await.unwrap();
@@ -346,7 +351,10 @@ mod tests {
 
         // Overwrite with new state
         let state2 = json!({"ema": 75.5, "count": 2});
-        manager.update_state(trigger_id, state2.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state2.clone())
+            .await
+            .unwrap();
 
         // Verify new state
         let loaded = manager.load_state(trigger_id).await.unwrap().unwrap();
@@ -378,7 +386,10 @@ mod tests {
 
         // Verify it's gone
         let after_delete = manager.load_state(trigger_id).await.unwrap();
-        assert!(after_delete.is_none(), "State should not exist after deletion");
+        assert!(
+            after_delete.is_none(),
+            "State should not exist after deletion"
+        );
     }
 
     #[tokio::test]
@@ -402,7 +413,10 @@ mod tests {
         let manager = TriggerStateManager::new(pool.clone());
 
         // Create fresh state (should NOT be deleted)
-        manager.update_state(trigger_fresh, json!({"ema": 80.0})).await.unwrap();
+        manager
+            .update_state(trigger_fresh, json!({"ema": 80.0}))
+            .await
+            .unwrap();
 
         // Create old state by manually setting last_updated to 31 days ago
         sqlx::query!(
@@ -465,9 +479,18 @@ mod tests {
         let manager = TriggerStateManager::new(pool.clone());
 
         // Create 3 state records
-        manager.update_state("test_count_1", json!({"ema": 70.0})).await.unwrap();
-        manager.update_state("test_count_2", json!({"ema": 75.0})).await.unwrap();
-        manager.update_state("test_count_3", json!({"ema": 80.0})).await.unwrap();
+        manager
+            .update_state("test_count_1", json!({"ema": 70.0}))
+            .await
+            .unwrap();
+        manager
+            .update_state("test_count_2", json!({"ema": 75.0}))
+            .await
+            .unwrap();
+        manager
+            .update_state("test_count_3", json!({"ema": 80.0}))
+            .await
+            .unwrap();
 
         // Count only test_count_* records by querying manually
         let count = sqlx::query_scalar!(
@@ -495,7 +518,10 @@ mod tests {
         let manager = TriggerStateManager::new(pool.clone());
 
         // Create initial state
-        manager.update_state(trigger_id, json!({"count": 1})).await.unwrap();
+        manager
+            .update_state(trigger_id, json!({"count": 1}))
+            .await
+            .unwrap();
 
         // Multiple concurrent updates (simulating race condition)
         let handles: Vec<_> = (0..10)
@@ -537,7 +563,10 @@ mod tests {
             "recent_timestamps": timestamps
         });
 
-        manager.update_state(trigger_id, large_state.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, large_state.clone())
+            .await
+            .unwrap();
 
         // Verify it can be loaded
         let loaded = manager.load_state(trigger_id).await.unwrap().unwrap();
@@ -578,14 +607,22 @@ mod tests {
             }
         });
 
-        manager.update_state(trigger_id, complex_state.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, complex_state.clone())
+            .await
+            .unwrap();
 
         let loaded = manager.load_state(trigger_id).await.unwrap().unwrap();
-        assert_eq!(loaded["ema"]["value"], 75.5, "Nested EMA value should match");
-        assert_eq!(loaded["rate_counter"]["count"], 15, "Nested count should match");
         assert_eq!(
-            loaded["metadata"]["total_evaluations"],
-            100,
+            loaded["ema"]["value"], 75.5,
+            "Nested EMA value should match"
+        );
+        assert_eq!(
+            loaded["rate_counter"]["count"], 15,
+            "Nested count should match"
+        );
+        assert_eq!(
+            loaded["metadata"]["total_evaluations"], 100,
             "Metadata should match"
         );
 

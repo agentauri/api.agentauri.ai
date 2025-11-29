@@ -210,8 +210,13 @@ fn validate_redirect_uris(uris: &[String]) -> Result<(), validator::ValidationEr
 
         // Must use HTTPS (except localhost for development)
         let url = Url::parse(uri).unwrap();
-        if url.scheme() != "https" && url.host_str() != Some("localhost") && url.host_str() != Some("127.0.0.1") {
-            return Err(validator::ValidationError::new("redirect_uri_must_use_https"));
+        if url.scheme() != "https"
+            && url.host_str() != Some("localhost")
+            && url.host_str() != Some("127.0.0.1")
+        {
+            return Err(validator::ValidationError::new(
+                "redirect_uri_must_use_https",
+            ));
         }
     }
 
@@ -332,7 +337,10 @@ mod tests {
 
     #[test]
     fn test_validate_grant_types_valid() {
-        let grant_types = vec!["authorization_code".to_string(), "refresh_token".to_string()];
+        let grant_types = vec![
+            "authorization_code".to_string(),
+            "refresh_token".to_string(),
+        ];
         assert!(validate_grant_types(&grant_types).is_ok());
     }
 

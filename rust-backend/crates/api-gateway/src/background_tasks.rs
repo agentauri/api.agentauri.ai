@@ -133,7 +133,11 @@ impl BackgroundTaskRunner {
 }
 
 /// Run the nonce cleanup task
-async fn run_nonce_cleanup(pool: DbPool, cleanup_interval: Duration, cancel_token: CancellationToken) {
+async fn run_nonce_cleanup(
+    pool: DbPool,
+    cleanup_interval: Duration,
+    cancel_token: CancellationToken,
+) {
     let mut interval = interval(cleanup_interval);
 
     // Skip the first tick (which fires immediately)
@@ -178,7 +182,11 @@ pub async fn cleanup_nonces_once(pool: &DbPool) -> Result<u64, anyhow::Error> {
 }
 
 /// Run the OAuth token cleanup task
-async fn run_oauth_token_cleanup(pool: DbPool, cleanup_interval: Duration, cancel_token: CancellationToken) {
+async fn run_oauth_token_cleanup(
+    pool: DbPool,
+    cleanup_interval: Duration,
+    cancel_token: CancellationToken,
+) {
     let mut interval = interval(cleanup_interval);
 
     // Skip the first tick (which fires immediately)
@@ -229,7 +237,9 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = BackgroundTaskConfig::default();
-        assert!(config.nonce_cleanup_interval >= Duration::from_secs(MIN_NONCE_CLEANUP_INTERVAL_SECS));
+        assert!(
+            config.nonce_cleanup_interval >= Duration::from_secs(MIN_NONCE_CLEANUP_INTERVAL_SECS)
+        );
     }
 
     #[test]

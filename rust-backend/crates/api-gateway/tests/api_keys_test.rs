@@ -780,8 +780,10 @@ mod unit_tests {
             "Timing difference too large: {}ms (max allowed: {}ms). \
              This indicates a potential timing attack vulnerability. \
              avg_dummy={}ms, avg_real={}ms",
-            difference, max_allowed_diff,
-            avg_dummy.as_millis(), avg_real.as_millis()
+            difference,
+            max_allowed_diff,
+            avg_dummy.as_millis(),
+            avg_real.as_millis()
         );
     }
 
@@ -840,8 +842,10 @@ mod unit_tests {
             difference as f64 <= max_allowed_diff,
             "Timing difference too large: {}ms (max: {}ms). \
              correct={}ms, incorrect={}ms",
-            difference, max_allowed_diff,
-            correct_time.as_millis(), incorrect_time.as_millis()
+            difference,
+            max_allowed_diff,
+            correct_time.as_millis(),
+            incorrect_time.as_millis()
         );
     }
 }

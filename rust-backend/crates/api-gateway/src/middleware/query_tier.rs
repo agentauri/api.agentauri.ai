@@ -130,7 +130,7 @@ where
 
     fn new_transform(&self, service: S) -> Self::Future {
         ready(Ok(QueryTierExtractorMiddleware {
-            service: std::rc::Rc::new(service)
+            service: std::rc::Rc::new(service),
         }))
     }
 }
@@ -160,9 +160,7 @@ where
             let tier = QueryTier::from_path(path)
                 .or_else(|| {
                     // Fallback: check query parameters
-                    req.uri()
-                        .query()
-                        .and_then(|q| QueryTier::from_query(q))
+                    req.uri().query().and_then(|q| QueryTier::from_query(q))
                 })
                 .unwrap_or(QueryTier::Tier0); // Default to Tier 0
 

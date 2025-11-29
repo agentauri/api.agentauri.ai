@@ -283,10 +283,7 @@ impl CachedStateManager {
     ///
     /// Returns error if database query fails
     pub async fn cleanup_expired(&self, retention_days: i32) -> Result<u64> {
-        debug!(
-            retention_days = retention_days,
-            "Starting state cleanup"
-        );
+        debug!(retention_days = retention_days, "Starting state cleanup");
 
         let result = sqlx::query!(
             r#"
@@ -378,8 +375,8 @@ impl CachedStateManager {
         let key = self.cache_key(trigger_id);
         let mut conn = self.redis.clone();
 
-        let json_str = serde_json::to_string(state)
-            .context("Failed to serialize state for caching")?;
+        let json_str =
+            serde_json::to_string(state).context("Failed to serialize state for caching")?;
 
         conn.set_ex::<_, _, ()>(&key, json_str, self.cache_ttl.as_secs())
             .await
@@ -465,7 +462,9 @@ mod tests {
         let database_url = std::env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set for integration tests. See database/README.md for setup instructions.");
 
-        let pool = PgPool::connect(&database_url).await.expect("Failed to connect to test database");
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("Failed to connect to test database");
 
         // Clean up any existing test data
         sqlx::query!("DELETE FROM trigger_state WHERE trigger_id LIKE 'test_cached_%'")
@@ -483,13 +482,13 @@ mod tests {
 
     // Helper to setup test Redis
     async fn setup_test_redis() -> ConnectionManager {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
-        let client = redis::Client::open(redis_url)
-            .expect("Failed to create Redis client");
+        let client = redis::Client::open(redis_url).expect("Failed to create Redis client");
 
-        let manager = ConnectionManager::new(client).await
+        let manager = ConnectionManager::new(client)
+            .await
             .expect("Failed to create Redis connection manager");
 
         // Clean up any existing test cache keys
@@ -583,7 +582,10 @@ mod tests {
 
         // First load: Create state in DB
         let state_data = json!({"ema": 75.5, "count": 10});
-        manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state_data.clone())
+            .await
+            .unwrap();
 
         // Clear Redis cache to simulate cold start
         let mut conn = redis.clone();
@@ -614,7 +616,10 @@ mod tests {
 
         // Update state (should write to both DB and cache)
         let state_data = json!({"ema": 80.0, "count": 5});
-        manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state_data.clone())
+            .await
+            .unwrap();
 
         // Verify it's in cache
         let cached = manager.load_from_cache(trigger_id).await.unwrap();
@@ -645,7 +650,10 @@ mod tests {
 
         // Overwrite with new state
         let state2 = json!({"ema": 85.0, "count": 2});
-        manager.update_state(trigger_id, state2.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state2.clone())
+            .await
+            .unwrap();
 
         // Verify cache has new state
         let cached = manager.load_from_cache(trigger_id).await.unwrap().unwrap();
@@ -694,7 +702,10 @@ mod tests {
 
         // Update state (should only go to DB)
         let state_data = json!({"ema": 90.0, "count": 7});
-        manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state_data.clone())
+            .await
+            .unwrap();
 
         // Verify it's in DB
         let from_db = manager.load_from_db(trigger_id).await.unwrap();
@@ -719,7 +730,10 @@ mod tests {
         let manager = CachedStateManager::new(pool, redis, 300);
 
         let result = manager.load_state("test_cached_nonexistent").await.unwrap();
-        assert!(result.is_none(), "Should return None for non-existent state");
+        assert!(
+            result.is_none(),
+            "Should return None for non-existent state"
+        );
     }
 
     #[tokio::test]
@@ -734,7 +748,10 @@ mod tests {
 
         // Create state
         let state_data = json!({"ema": 50.0, "count": 1});
-        manager.update_state(trigger_id, state_data.clone()).await.unwrap();
+        manager
+            .update_state(trigger_id, state_data.clone())
+            .await
+            .unwrap();
 
         // Verify it's in cache
         let cached = manager.load_from_cache(trigger_id).await.unwrap();
@@ -804,7 +821,10 @@ mod tests {
         let manager = CachedStateManager::new(pool.clone(), redis.clone(), 300);
 
         // Create fresh state
-        manager.update_state(trigger_fresh, json!({"ema": 80.0})).await.unwrap();
+        manager
+            .update_state(trigger_fresh, json!({"ema": 80.0}))
+            .await
+            .unwrap();
 
         // Create old state by manually setting last_updated
         sqlx::query!(
@@ -849,9 +869,18 @@ mod tests {
         let manager = CachedStateManager::new(pool.clone(), redis.clone(), 300);
 
         // Create 3 state records
-        manager.update_state("test_cached_count_1", json!({"ema": 70.0})).await.unwrap();
-        manager.update_state("test_cached_count_2", json!({"ema": 75.0})).await.unwrap();
-        manager.update_state("test_cached_count_3", json!({"ema": 80.0})).await.unwrap();
+        manager
+            .update_state("test_cached_count_1", json!({"ema": 70.0}))
+            .await
+            .unwrap();
+        manager
+            .update_state("test_cached_count_2", json!({"ema": 75.0}))
+            .await
+            .unwrap();
+        manager
+            .update_state("test_cached_count_3", json!({"ema": 80.0}))
+            .await
+            .unwrap();
 
         // Count only test_cached_count_* records
         let count = sqlx::query_scalar!(

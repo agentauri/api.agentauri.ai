@@ -121,10 +121,7 @@ impl EmaEvaluator {
         current_state: Option<EmaState>,
     ) -> Result<(bool, EmaState)> {
         // Extract score from event
-        let score = event
-            .score
-            .context("Event has no score field")?
-            as f64;
+        let score = event.score.context("Event has no score field")? as f64;
 
         tracing::trace!(
             score = score,
@@ -539,7 +536,10 @@ mod tests {
 
         let result = evaluator.evaluate(&event, &condition, None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid threshold"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid threshold"));
     }
 
     // ========================================================================

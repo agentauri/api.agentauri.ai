@@ -37,16 +37,16 @@ use api_gateway::{
     },
     services::ApiKeyService,
 };
-use futures_util::future::LocalBoxFuture;
-use std::{
-    future::{ready, Ready},
-    rc::Rc,
-};
 use chrono::Utc;
+use futures_util::future::LocalBoxFuture;
 use serde_json::json;
 use shared::{DbPool, RateLimiter};
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::{
+    future::{ready, Ready},
+    rc::Rc,
+};
 use uuid::Uuid;
 
 // ============================================================================
@@ -161,8 +161,8 @@ async fn create_test_pool() -> DbPool {
 
 /// Create a test Redis connection
 async fn create_test_redis() -> redis::aio::ConnectionManager {
-    let redis_url = std::env::var("TEST_REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("TEST_REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     shared::redis::create_client(&redis_url)
         .await
@@ -714,11 +714,7 @@ async fn test_rate_limit_headers_present_on_success() {
     );
 
     // Verify header values
-    let limit = headers
-        .get("x-ratelimit-limit")
-        .unwrap()
-        .to_str()
-        .unwrap();
+    let limit = headers.get("x-ratelimit-limit").unwrap().to_str().unwrap();
     assert_eq!(limit, "10", "Limit should be 10 for anonymous");
 
     let remaining = headers
@@ -728,13 +724,12 @@ async fn test_rate_limit_headers_present_on_success() {
         .unwrap()
         .parse::<i64>()
         .unwrap();
-    assert!(remaining >= 0 && remaining < 10, "Remaining should decrease");
+    assert!(
+        remaining >= 0 && remaining < 10,
+        "Remaining should decrease"
+    );
 
-    let window = headers
-        .get("x-ratelimit-window")
-        .unwrap()
-        .to_str()
-        .unwrap();
+    let window = headers.get("x-ratelimit-window").unwrap().to_str().unwrap();
     assert_eq!(window, "3600", "Window should be 3600 seconds (1 hour)");
 }
 

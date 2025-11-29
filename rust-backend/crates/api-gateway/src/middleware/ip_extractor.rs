@@ -338,10 +338,7 @@ mod tests {
         // Our proxy adds their actual IP: "fake-innocent-ip, attacker-ip, proxy1-ip"
         let req = TestRequest::default()
             .peer_addr("127.0.0.1:8080".parse().unwrap())
-            .insert_header((
-                "X-Forwarded-For",
-                "1.2.3.4, 5.6.7.8, 10.0.0.1, 192.168.1.1",
-            ))
+            .insert_header(("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 10.0.0.1, 192.168.1.1"))
             .to_http_request();
 
         let ip = extract_ip(&req);

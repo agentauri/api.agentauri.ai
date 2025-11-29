@@ -238,8 +238,9 @@ pub async fn evaluate_trigger_stateful(
                     .as_ref()
                     .context("EMA condition missing config")?;
 
-                let evaluator = EmaEvaluator::from_config(config)
-                    .with_context(|| format!("Invalid EMA config for condition {}", condition.id))?;
+                let evaluator = EmaEvaluator::from_config(config).with_context(|| {
+                    format!("Invalid EMA config for condition {}", condition.id)
+                })?;
 
                 // Extract EMA state from current_state
                 let ema_state = current_state

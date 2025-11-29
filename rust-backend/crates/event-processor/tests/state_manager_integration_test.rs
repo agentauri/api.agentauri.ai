@@ -99,8 +99,12 @@ async fn test_state_manager_update_overwrites() -> Result<()> {
 
     let manager = TriggerStateManager::new(pool);
 
-    manager.update_state(trigger_id, json!({"count": 1})).await?;
-    manager.update_state(trigger_id, json!({"count": 2})).await?;
+    manager
+        .update_state(trigger_id, json!({"count": 1}))
+        .await?;
+    manager
+        .update_state(trigger_id, json!({"count": 2}))
+        .await?;
 
     let loaded = manager.load_state(trigger_id).await?;
     assert_eq!(loaded.unwrap()["count"], 2);
@@ -117,7 +121,9 @@ async fn test_state_manager_delete() -> Result<()> {
 
     let manager = TriggerStateManager::new(pool);
 
-    manager.update_state(trigger_id, json!({"count": 1})).await?;
+    manager
+        .update_state(trigger_id, json!({"count": 1}))
+        .await?;
     manager.delete_state(trigger_id).await?;
 
     let loaded = manager.load_state(trigger_id).await?;
@@ -136,7 +142,9 @@ async fn test_state_manager_cleanup_expired() -> Result<()> {
 
     let manager = TriggerStateManager::new(pool.clone());
 
-    manager.update_state(trigger_fresh, json!({"ema": 80.0})).await?;
+    manager
+        .update_state(trigger_fresh, json!({"ema": 80.0}))
+        .await?;
 
     sqlx::query!(
         r#"
@@ -174,9 +182,15 @@ async fn test_state_manager_get_count() -> Result<()> {
 
     let manager = TriggerStateManager::new(pool.clone());
 
-    manager.update_state("test_count_1", json!({"ema": 70.0})).await?;
-    manager.update_state("test_count_2", json!({"ema": 75.0})).await?;
-    manager.update_state("test_count_3", json!({"ema": 80.0})).await?;
+    manager
+        .update_state("test_count_1", json!({"ema": 70.0}))
+        .await?;
+    manager
+        .update_state("test_count_2", json!({"ema": 75.0}))
+        .await?;
+    manager
+        .update_state("test_count_3", json!({"ema": 80.0}))
+        .await?;
 
     // Count only test_count_* records to avoid interference from other tests
     let count = sqlx::query_scalar!(
@@ -208,7 +222,9 @@ async fn test_state_manager_large_jsonb() -> Result<()> {
         "recent_timestamps": timestamps
     });
 
-    manager.update_state(trigger_id, large_state.clone()).await?;
+    manager
+        .update_state(trigger_id, large_state.clone())
+        .await?;
 
     let loaded = manager.load_state(trigger_id).await?;
     assert!(loaded.is_some());
@@ -226,7 +242,9 @@ async fn test_state_manager_concurrent_updates() -> Result<()> {
 
     let manager = TriggerStateManager::new(pool.clone());
 
-    manager.update_state(trigger_id, json!({"count": 0})).await?;
+    manager
+        .update_state(trigger_id, json!({"count": 0}))
+        .await?;
 
     let handles: Vec<_> = (0..10)
         .map(|i| {

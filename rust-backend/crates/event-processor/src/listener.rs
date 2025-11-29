@@ -92,7 +92,9 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
                     // Create state manager for this event processing
                     let state_manager = TriggerStateManager::new(db_pool.clone());
 
-                    if let Err(e) = process_event(&event_id, &db_pool, &job_queue, &state_manager).await {
+                    if let Err(e) =
+                        process_event(&event_id, &db_pool, &job_queue, &state_manager).await
+                    {
                         tracing::error!("Error processing event {}: {}", event_id, e);
                     }
                 });
@@ -166,8 +168,7 @@ async fn process_event<Q: JobQueue>(
 
     // Batch load all conditions and actions for these triggers (fixes N+1 query problem)
     let trigger_ids: Vec<String> = triggers.iter().map(|t| t.id.clone()).collect();
-    let (conditions_map, actions_map) =
-        fetch_trigger_relations(&trigger_ids, db_pool).await?;
+    let (conditions_map, actions_map) = fetch_trigger_relations(&trigger_ids, db_pool).await?;
 
     tracing::debug!(
         "Batch loaded conditions and actions for {} triggers (3 queries total)",
