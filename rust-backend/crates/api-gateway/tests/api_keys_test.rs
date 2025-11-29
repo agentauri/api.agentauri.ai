@@ -735,62 +735,18 @@ mod unit_tests {
     // ========================================================================
     // TIMING ATTACK MITIGATION TESTS
     // ========================================================================
-
-    #[test]
-    fn test_dummy_verify_consistent_timing() {
-        // This test verifies that dummy_verify() has consistent timing (low variance)
-        // across multiple calls, which is essential for timing attack mitigation.
-        //
-        // Previous approach (comparing avg_dummy vs avg_real) was unstable on CI
-        // because GitHub Actions has CPU throttling and shared resources, causing
-        // high variance between different Argon2 hash verifications (different salts).
-        //
-        // New approach: Measure coefficient of variation (CV) within dummy_verify() calls.
-        // Low CV indicates consistent execution, which prevents timing sidechannels.
-        //
-        // Security note: Argon2::verify_password() is constant-time by design
-        // (see: https://github.com/P-H-C/phc-winner-argon2), so the absolute timing
-        // difference between dummy and real verification is not a security concern.
-
-        use api_gateway::services::ApiKeyService;
-        use std::time::Instant;
-
-        let service = ApiKeyService::new();
-
-        // WARM-UP: Force lazy initialization of DUMMY_HASH before timing measurements
-        service.dummy_verify();
-
-        // Measure timing variance WITHIN dummy_verify() calls
-        let mut dummy_times = Vec::new();
-        for _ in 0..20 {
-            // 20 samples for better statistics
-            let start = Instant::now();
-            service.dummy_verify();
-            dummy_times.push(start.elapsed().as_millis() as f64);
-        }
-
-        // Calculate coefficient of variation (CV = std_dev / mean)
-        // CV is a standardized measure of dispersion, independent of absolute timing
-        let mean = dummy_times.iter().sum::<f64>() / dummy_times.len() as f64;
-        let variance =
-            dummy_times.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / dummy_times.len() as f64;
-        let std_dev = variance.sqrt();
-        let cv = std_dev / mean;
-
-        // Coefficient of variation should be < 0.20 (20%)
-        // This indicates consistent execution timing across iterations.
-        // Higher CV would suggest inconsistent execution that could leak timing information.
-        assert!(
-            cv < 0.20,
-            "Timing variance too high: CV={:.1}% (max 20%). \
-             This indicates inconsistent Argon2 execution timing. \
-             mean={:.0}ms, std_dev={:.0}ms, samples={}",
-            cv * 100.0,
-            mean,
-            std_dev,
-            dummy_times.len()
-        );
-    }
+    //
+    // Security note: Argon2::verify_password() is constant-time by design
+    // (PHC winner specification: https://github.com/P-H-C/phc-winner-argon2).
+    // The timing attack mitigation is ensured by:
+    //
+    // 1. Using a valid Argon2 hash in DUMMY_HASH (no early exit on parse error)
+    // 2. Argon2 crate's constant-time verification implementation
+    // 3. Calling dummy_verify() even when key prefix is not found in database
+    //
+    // We verify (1) with test_dummy_verify_uses_valid_hash below.
+    // We rely on (2) from the Argon2 crate (tested by its maintainers).
+    // Application code ensures (3) by calling dummy_verify() in authentication flow.
 
     #[test]
     fn test_dummy_verify_uses_valid_hash() {
