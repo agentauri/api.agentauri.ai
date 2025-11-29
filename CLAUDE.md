@@ -1190,14 +1190,24 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 - ✅ Complete documentation (QUICK_START.md, AUTHENTICATION.md, RATE_LIMITING.md)
 - 340 tests passing (315 unit + 25 integration)
 
-**Week 14: REST Worker + Discovery**
+**Week 14: Stateful Triggers (EMA + Rate Counters)** ✅ COMPLETE
+- ✅ Exponential Moving Average (EMA) evaluator with configurable window size
+- ✅ Rate Counter evaluator with sliding time window and memory limits
+- ✅ Trigger State Manager with PostgreSQL JSONB persistence
+- ✅ Stateful trigger evaluation in Event Processor
+- ✅ Comprehensive test suite (119+ tests passing):
+  - 8 integration tests (state_manager_integration_test.rs)
+  - 15 state manager tests (CRUD, cleanup, concurrency, performance)
+  - 43 EMA evaluator tests
+  - 54 Rate Counter evaluator tests
+- ✅ Database migration for trigger_state index
+- 119+ tests passing (all lib tests + 8 integration tests)
+
+**Week 15: REST Worker + Discovery + Circuit Breaker**
 - REST/HTTP action worker
 - Discovery endpoint (`/.well-known/agent.json`)
 - Agent Card generation
-
-**Week 15: Circuit Breaker + Stateful Triggers**
 - Circuit breaker implementation
-- Stateful trigger support (EMA, counters)
 - Result Logger with analytics views
 
 ### Phase 5: MCP + A2A Integration (Weeks 16-18) - EXTENDED
@@ -1276,6 +1286,6 @@ Agent registration files (at tokenURI) contain MCP endpoint information:
 
 ---
 
-**Last Updated**: November 28, 2024
-**Version**: 1.2.0 (Phase 3.5 Complete - Week 12)
+**Last Updated**: November 29, 2024
+**Version**: 1.3.0 (Phase 4 Week 14 Complete - Stateful Triggers)
 **Maintainers**: Development Team

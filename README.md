@@ -68,7 +68,7 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
    # Should show: All 7 test suites passing (352 tests)
    ```
 
-**Note**: Phase 3 and Phase 3.5 are complete (Week 12). Ready for Phase 4 development. See roadmap for details.
+**Note**: Phase 3, Phase 3.5, and Phase 4 Week 14 (Stateful Triggers) are complete. Ready for Week 15 development. See roadmap for details.
 
 ### 6. Run Rust Services (optional)
 
@@ -155,7 +155,7 @@ cd ponder-indexers
 pnpm test
 ```
 
-**Current Status**: ✅ 352 tests passing (108 database, 244 Rust across all crates)
+**Current Status**: ✅ 119+ tests passing in event-processor (Week 14 integration tests), 352 tests total across workspace
 
 ### Local Testing
 
@@ -374,10 +374,12 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 - 352 tests passing
 
 ### Phase 4: Advanced Triggers & Actions (Weeks 13-15)
-- ⏳ Stateful triggers (EMA, counters, rate limiting)
-- ⏳ REST/HTTP action worker
-- ⏳ Discovery endpoint (`/.well-known/agent.json`)
-- ⏳ Circuit breaker implementation
+- ✅ Auth Completion + Rate Limiting + OAuth 2.0 (Week 13)
+- ✅ Stateful Triggers (EMA + Rate Counters) (Week 14)
+  - 119+ tests passing (integration + unit)
+  - Comprehensive test coverage for state management
+- ⏳ REST/HTTP action worker (Week 15)
+- ⏳ Discovery endpoint + Circuit breaker (Week 15)
 
 ### Phase 5: MCP + A2A Integration (Weeks 16-18)
 - ⏳ A2A Protocol (Google Agent-to-Agent)
