@@ -26,12 +26,12 @@ async fn setup_test_db() -> PgPool {
         .expect("Failed to connect to test database");
 
     // Clean up any existing benchmark data
-    sqlx::query!("DELETE FROM trigger_state WHERE trigger_id LIKE 'bench_%'")
+    sqlx::query("DELETE FROM trigger_state WHERE trigger_id LIKE 'bench_%'")
         .execute(&pool)
         .await
         .expect("Failed to clean up benchmark data");
 
-    sqlx::query!("DELETE FROM triggers WHERE id LIKE 'bench_%'")
+    sqlx::query("DELETE FROM triggers WHERE id LIKE 'bench_%'")
         .execute(&pool)
         .await
         .expect("Failed to clean up benchmark triggers");
@@ -51,7 +51,7 @@ async fn setup_test_redis() -> ConnectionManager {
 }
 
 async fn ensure_test_user_and_org(pool: &PgPool) {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO users (id, username, email, password_hash)
         VALUES ('bench_user', 'benchuser', 'bench@example.com', '$argon2id$v=19$m=65536,t=3,p=1$salt$hash')
@@ -62,7 +62,7 @@ async fn ensure_test_user_and_org(pool: &PgPool) {
     .await
     .expect("Failed to create benchmark user");
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO organizations (id, name, slug, owner_id, plan, is_personal)
         VALUES ('bench_org', 'Bench Org', 'bench-org', 'bench_user', 'free', true)
@@ -77,7 +77,7 @@ async fn ensure_test_user_and_org(pool: &PgPool) {
 async fn create_test_trigger(pool: &PgPool, trigger_id: &str) {
     ensure_test_user_and_org(pool).await;
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO triggers (id, organization_id, user_id, name, chain_id, registry, enabled, is_stateful)
         VALUES ($1, 'bench_org', 'bench_user', 'Bench Trigger', 84532, 'reputation', true, true)
