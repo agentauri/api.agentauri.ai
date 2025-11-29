@@ -592,7 +592,7 @@ mod tests {
         // Create a minimal fallback limiter for testing
         let fallback_limiter: Arc<DashMap<String, FallbackEntry>> = Arc::new(DashMap::new());
         let fallback_limit: i64 = 10;
-        let fallback_window = Duration::from_secs(60);
+        let _fallback_window = Duration::from_secs(60);
 
         let scope = RateLimitScope::Ip("192.168.1.1".to_string());
         let key = scope.key_prefix();

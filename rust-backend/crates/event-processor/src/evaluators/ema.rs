@@ -42,6 +42,7 @@ pub struct EmaState {
 /// EMA evaluator for score-based conditions
 #[derive(Debug)]
 pub struct EmaEvaluator {
+    #[allow(dead_code)] // Used in Debug impl and construction
     window_size: usize,
     alpha: f64, // smoothing factor (0.0 to 1.0)
 }
@@ -384,7 +385,7 @@ mod tests {
         for i in 0..10 {
             let event = create_test_event(100);
             let (_, new_state) = evaluator
-                .evaluate(&event, &condition, Some(state.clone()))
+                .evaluate(&event, &condition, Some(state))
                 .unwrap();
             state = new_state;
 

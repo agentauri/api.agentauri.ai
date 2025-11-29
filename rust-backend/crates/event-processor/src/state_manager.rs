@@ -178,9 +178,9 @@ impl TriggerStateManager {
     ///
     /// Returns error if database query fails
     pub async fn get_state_count(&self) -> Result<i64> {
-        let result = sqlx::query!(
+        let count = sqlx::query_scalar!(
             r#"
-            SELECT COUNT(*) as count
+            SELECT COUNT(*) as "count!"
             FROM trigger_state
             "#
         )
@@ -188,7 +188,7 @@ impl TriggerStateManager {
         .await
         .context("Failed to get state count")?;
 
-        Ok(result.count.unwrap_or(0))
+        Ok(count)
     }
 }
 
@@ -541,7 +541,7 @@ mod tests {
         // Final state should be one of the updates (not corrupted)
         let final_state = manager.load_state(trigger_id).await.unwrap().unwrap();
         let count = final_state["count"].as_i64().unwrap();
-        assert!(count >= 0 && count < 10, "Final count should be valid");
+        assert!((0..10).contains(&count), "Final count should be valid");
 
         // Cleanup
         manager.delete_state(trigger_id).await.unwrap();
