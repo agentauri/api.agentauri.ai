@@ -93,6 +93,7 @@ async fn create_test_trigger(pool: &PgPool, trigger_id: &str) {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_cache_hit_performance() {
     // Verify cache hits are 8-100x faster than database reads
     let pool = setup_test_db().await;
@@ -139,6 +140,7 @@ async fn test_cache_hit_performance() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_cache_miss_fallback() {
     // Verify cache misses correctly fall back to PostgreSQL
     let pool = setup_test_db().await;
@@ -171,6 +173,7 @@ async fn test_cache_miss_fallback() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_write_through_consistency() {
     // Verify writes go to both PostgreSQL and Redis atomically
     let pool = setup_test_db().await;
@@ -210,6 +213,7 @@ async fn test_write_through_consistency() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_redis_failure_graceful_degradation() {
     // Verify system continues working even if Redis is unavailable
     let pool = setup_test_db().await;
@@ -248,6 +252,7 @@ async fn test_redis_failure_graceful_degradation() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_high_throughput_scenario() {
     // Simulate high-load scenario with many concurrent reads/writes
     let pool = setup_test_db().await;
@@ -320,6 +325,7 @@ async fn test_high_throughput_scenario() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_cache_ttl_behavior() {
     // Verify cache entries expire after TTL
     let pool = setup_test_db().await;
@@ -367,6 +373,7 @@ async fn test_cache_ttl_behavior() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_cache_invalidation_on_delete() {
     // Verify delete removes from both cache and DB
     let pool = setup_test_db().await;
@@ -403,6 +410,7 @@ async fn test_cache_invalidation_on_delete() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_multiple_managers_consistency() {
     // Verify multiple manager instances share same cache
     let pool = setup_test_db().await;
@@ -430,6 +438,7 @@ async fn test_multiple_managers_consistency() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_large_state_caching() {
     // Verify large state data (1000 timestamps) can be cached
     let pool = setup_test_db().await;
@@ -466,6 +475,7 @@ async fn test_large_state_caching() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_cache_stats() {
     // Verify cache stats are correct
     let pool = setup_test_db().await;
@@ -480,6 +490,7 @@ async fn test_cache_stats() {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL and REDIS_URL (integration test)
 async fn test_cleanup_expired_with_cache() {
     // Verify cleanup works correctly with caching enabled
     let pool = setup_test_db().await;

@@ -71,6 +71,7 @@ async fn create_test_trigger(pool: &PgPool, trigger_id: &str) -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_create_and_load() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_id = "test_create_load";
@@ -92,6 +93,7 @@ async fn test_state_manager_create_and_load() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_update_overwrites() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_id = "test_update";
@@ -114,6 +116,7 @@ async fn test_state_manager_update_overwrites() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_delete() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_id = "test_delete";
@@ -133,6 +136,7 @@ async fn test_state_manager_delete() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_cleanup_expired() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_fresh = "test_cleanup_fresh";
@@ -174,6 +178,7 @@ async fn test_state_manager_cleanup_expired() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_get_count() -> Result<()> {
     let pool = setup_test_db().await?;
     create_test_trigger(&pool, "test_count_1").await?;
@@ -209,6 +214,7 @@ async fn test_state_manager_get_count() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_large_jsonb() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_id = "test_large_state";
@@ -235,6 +241,7 @@ async fn test_state_manager_large_jsonb() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_concurrent_updates() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_id = "test_concurrent";
@@ -270,6 +277,7 @@ async fn test_state_manager_concurrent_updates() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_state_manager_performance() -> Result<()> {
     let pool = setup_test_db().await?;
     let trigger_id = "test_performance";

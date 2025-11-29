@@ -154,6 +154,7 @@ async fn create_test_event(pool: &PgPool, event_id: &str) -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_correctness() -> Result<()> {
     let pool = setup_test_db().await?;
 
@@ -225,6 +226,7 @@ async fn test_batch_loading_correctness() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_with_empty_list() -> Result<()> {
     let pool = setup_test_db().await?;
 
@@ -249,6 +251,7 @@ async fn test_batch_loading_with_empty_list() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_with_triggers_without_conditions() -> Result<()> {
     let pool = setup_test_db().await?;
     ensure_test_user_and_org(&pool).await?;
@@ -288,6 +291,7 @@ async fn test_batch_loading_with_triggers_without_conditions() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_performance() -> Result<()> {
     let pool = setup_test_db().await?;
 
@@ -344,6 +348,7 @@ async fn test_batch_loading_performance() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_vs_n_plus_one() -> Result<()> {
     let pool = setup_test_db().await?;
 
@@ -437,6 +442,7 @@ async fn test_batch_loading_vs_n_plus_one() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_preserves_ordering() -> Result<()> {
     let pool = setup_test_db().await?;
     ensure_test_user_and_org(&pool).await?;
@@ -495,6 +501,7 @@ async fn test_batch_loading_preserves_ordering() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore] // Requires DATABASE_URL (integration test)
 async fn test_batch_loading_with_large_dataset() -> Result<()> {
     let pool = setup_test_db().await?;
 
