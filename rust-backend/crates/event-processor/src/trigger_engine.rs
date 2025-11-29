@@ -1,21 +1,34 @@
 //! Trigger matching engine
 //!
 //! Evaluates events against user-defined trigger conditions.
-//! Implements 4 condition types for Phase 3:
+//!
+//! # Stateless Conditions (Phase 3)
 //! - agent_id_equals: Match specific agent ID
 //! - score_threshold: Compare score with threshold
 //! - tag_equals: Match tag1 or tag2
 //! - event_type_equals: Match event type
+//!
+//! # Stateful Conditions (Week 14)
+//! - ema_threshold: Exponential moving average of scores
+//! - rate_limit: Event count in sliding time window
 
 use anyhow::{bail, Context, Result};
-use shared::models::{Event, TriggerCondition};
+use shared::models::{Event, Trigger, TriggerCondition};
+
+use crate::evaluators::{EmaEvaluator, EmaState, RateCounterEvaluator, RateCounterState};
+use crate::state_manager::TriggerStateManager;
 
 /// Supported condition types
 pub mod condition_types {
+    // Stateless conditions
     pub const AGENT_ID_EQUALS: &str = "agent_id_equals";
     pub const SCORE_THRESHOLD: &str = "score_threshold";
     pub const TAG_EQUALS: &str = "tag_equals";
     pub const EVENT_TYPE_EQUALS: &str = "event_type_equals";
+
+    // Stateful conditions
+    pub const EMA_THRESHOLD: &str = "ema_threshold";
+    pub const RATE_LIMIT: &str = "rate_limit";
 }
 
 /// Evaluate a single condition against an event
@@ -130,7 +143,7 @@ fn evaluate_event_type_equals(condition: &TriggerCondition, event: &Event) -> Re
     Ok(event.event_type == condition.value)
 }
 
-/// Evaluate all conditions against an event (AND logic)
+/// Evaluate all conditions against an event (AND logic) - STATELESS ONLY
 ///
 /// # Arguments
 ///
@@ -140,6 +153,11 @@ fn evaluate_event_type_equals(condition: &TriggerCondition, event: &Event) -> Re
 /// # Returns
 ///
 /// `true` if ALL conditions match, `false` if any condition fails
+///
+/// # Note
+///
+/// This function only handles stateless conditions. For stateful triggers,
+/// use `evaluate_trigger_stateful` instead.
 pub fn evaluate_trigger(conditions: &[TriggerCondition], event: &Event) -> Result<bool> {
     // Empty conditions list matches all events
     if conditions.is_empty() {
@@ -160,6 +178,152 @@ pub fn evaluate_trigger(conditions: &[TriggerCondition], event: &Event) -> Resul
     }
 
     tracing::debug!("All {} conditions matched", conditions.len());
+    Ok(true)
+}
+
+/// Evaluate all conditions against an event with state management (AND logic)
+///
+/// # Arguments
+///
+/// * `trigger` - The trigger being evaluated
+/// * `conditions` - List of conditions to evaluate
+/// * `event` - The event to evaluate against
+/// * `state_manager` - State manager for loading/updating stateful condition state
+///
+/// # Returns
+///
+/// `true` if ALL conditions match, `false` if any condition fails
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Condition evaluation fails
+/// - State loading/updating fails
+/// - Invalid condition configuration
+pub async fn evaluate_trigger_stateful(
+    trigger: &Trigger,
+    conditions: &[TriggerCondition],
+    event: &Event,
+    state_manager: &TriggerStateManager,
+) -> Result<bool> {
+    // Empty conditions list matches all events
+    if conditions.is_empty() {
+        tracing::warn!(
+            trigger_id = %trigger.id,
+            "Trigger has no conditions - will match ALL events"
+        );
+        return Ok(true);
+    }
+
+    // Load current state if trigger is stateful
+    let current_state = if trigger.is_stateful {
+        state_manager
+            .load_state(&trigger.id)
+            .await
+            .with_context(|| format!("Failed to load state for trigger {}", trigger.id))?
+    } else {
+        None
+    };
+
+    // Track if we need to update state
+    let mut new_state: Option<serde_json::Value> = None;
+
+    // Evaluate each condition
+    for condition in conditions {
+        let matches = match condition.condition_type.as_str() {
+            condition_types::EMA_THRESHOLD => {
+                // EMA evaluation
+                let config = condition
+                    .config
+                    .as_ref()
+                    .context("EMA condition missing config")?;
+
+                let evaluator = EmaEvaluator::from_config(config)
+                    .with_context(|| format!("Invalid EMA config for condition {}", condition.id))?;
+
+                // Extract EMA state from current_state
+                let ema_state = current_state
+                    .as_ref()
+                    .and_then(|s| serde_json::from_value::<EmaState>(s.clone()).ok());
+
+                let (condition_matches, updated_state) =
+                    evaluator.evaluate(event, condition, ema_state)?;
+
+                // Store updated state for persistence
+                new_state = Some(serde_json::to_value(updated_state)?);
+
+                condition_matches
+            }
+            condition_types::RATE_LIMIT => {
+                // Rate counter evaluation
+                let config = condition
+                    .config
+                    .as_ref()
+                    .context("Rate limit condition missing config")?;
+
+                let evaluator = RateCounterEvaluator::from_config(config).with_context(|| {
+                    format!("Invalid rate counter config for condition {}", condition.id)
+                })?;
+
+                // Extract rate counter state from current_state
+                let counter_state = current_state
+                    .as_ref()
+                    .and_then(|s| serde_json::from_value::<RateCounterState>(s.clone()).ok());
+
+                let (condition_matches, updated_state) =
+                    evaluator.evaluate(event, condition, counter_state)?;
+
+                // Store updated state for persistence
+                new_state = Some(serde_json::to_value(updated_state)?);
+
+                condition_matches
+            }
+            // Stateless conditions
+            _ => evaluate_condition(condition, event)?,
+        };
+
+        if !matches {
+            tracing::debug!(
+                trigger_id = %trigger.id,
+                condition_id = condition.id,
+                condition_type = %condition.condition_type,
+                "Condition did not match"
+            );
+
+            // Still update state even if condition doesn't match
+            // (state should reflect all events, not just matches)
+            if let Some(state) = new_state {
+                state_manager
+                    .update_state(&trigger.id, state)
+                    .await
+                    .with_context(|| {
+                        format!("Failed to update state for trigger {}", trigger.id)
+                    })?;
+            }
+
+            return Ok(false);
+        }
+    }
+
+    // All conditions matched - update state
+    if let Some(state) = new_state {
+        state_manager
+            .update_state(&trigger.id, state)
+            .await
+            .with_context(|| format!("Failed to update state for trigger {}", trigger.id))?;
+
+        tracing::debug!(
+            trigger_id = %trigger.id,
+            "Updated trigger state after successful match"
+        );
+    }
+
+    tracing::debug!(
+        trigger_id = %trigger.id,
+        conditions_count = conditions.len(),
+        "All conditions matched"
+    );
+
     Ok(true)
 }
 

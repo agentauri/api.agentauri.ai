@@ -11,6 +11,7 @@ use sqlx::postgres::PgListener;
 use std::str::FromStr;
 
 use crate::queue::{JobQueue, RedisJobQueue};
+use crate::state_manager::TriggerStateManager;
 use crate::trigger_engine;
 
 /// Event notification payload from PostgreSQL NOTIFY
@@ -87,7 +88,10 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
                 let db_pool = db_pool.clone();
                 let job_queue = job_queue.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = process_event(&event_id, &db_pool, &job_queue).await {
+                    // Create state manager for this event processing
+                    let state_manager = TriggerStateManager::new(db_pool.clone());
+
+                    if let Err(e) = process_event(&event_id, &db_pool, &job_queue, &state_manager).await {
                         tracing::error!("Error processing event {}: {}", event_id, e);
                     }
                 });
@@ -127,7 +131,13 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
 /// * `event_id` - The ID of the event to process
 /// * `db_pool` - Database connection pool
 /// * `job_queue` - Job queue for enqueueing actions
-async fn process_event<Q: JobQueue>(event_id: &str, db_pool: &DbPool, job_queue: &Q) -> Result<()> {
+/// * `state_manager` - State manager for stateful triggers
+async fn process_event<Q: JobQueue>(
+    event_id: &str,
+    db_pool: &DbPool,
+    job_queue: &Q,
+    state_manager: &TriggerStateManager,
+) -> Result<()> {
     // Fetch event from database
     let event = fetch_event(event_id, db_pool).await?;
 
@@ -161,7 +171,13 @@ async fn process_event<Q: JobQueue>(event_id: &str, db_pool: &DbPool, job_queue:
         let conditions = fetch_conditions(&trigger.id, db_pool).await?;
 
         // Evaluate conditions against the event
-        let matches = trigger_engine::evaluate_trigger(&conditions, &event)?;
+        // Use stateful evaluation if trigger is stateful, otherwise use stateless
+        let matches = if trigger.is_stateful {
+            trigger_engine::evaluate_trigger_stateful(trigger, &conditions, &event, state_manager)
+                .await?
+        } else {
+            trigger_engine::evaluate_trigger(&conditions, &event)?
+        };
 
         if matches {
             matched_count += 1;
