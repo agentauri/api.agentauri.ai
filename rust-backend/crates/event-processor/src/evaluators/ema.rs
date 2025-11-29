@@ -56,6 +56,8 @@ impl EmaEvaluator {
     /// # Examples
     ///
     /// ```
+    /// use event_processor::evaluators::ema::EmaEvaluator;
+    ///
     /// let evaluator = EmaEvaluator::new(10); // 10-period EMA
     /// ```
     pub fn new(window_size: usize) -> Self {
