@@ -351,7 +351,7 @@ async fn fetch_trigger_relations(
     for condition in conditions {
         conditions_map
             .entry(condition.trigger_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(condition);
     }
 
@@ -360,7 +360,7 @@ async fn fetch_trigger_relations(
     for action in actions {
         actions_map
             .entry(action.trigger_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(action);
     }
 

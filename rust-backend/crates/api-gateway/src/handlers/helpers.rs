@@ -240,6 +240,7 @@ pub fn unauthorized(message: &str) -> HttpResponse {
 ///     return safe_internal_error();
 /// }
 /// ```
+#[allow(dead_code)] // Used in handlers for security-sensitive errors
 pub fn safe_internal_error() -> HttpResponse {
     HttpResponse::InternalServerError().json(ErrorResponse::new(
         "internal_error",
@@ -269,6 +270,7 @@ pub fn safe_internal_error() -> HttpResponse {
 ///     Err(resp) => return resp,
 /// };
 /// ```
+#[allow(dead_code)] // Used in handlers for security-sensitive database errors
 pub fn handle_db_error_safe<T, E: std::fmt::Display>(
     result: Result<T, E>,
     context: &str,

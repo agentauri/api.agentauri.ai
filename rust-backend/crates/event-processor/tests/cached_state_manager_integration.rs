@@ -214,9 +214,8 @@ async fn test_redis_failure_graceful_degradation() {
     // Verify system continues working even if Redis is unavailable
     let pool = setup_test_db().await;
 
-    // Create invalid Redis connection
-    let invalid_redis_url = "redis://invalid-host:6379";
-    let client = redis::Client::open(invalid_redis_url).unwrap();
+    // Create invalid Redis connection (not actually used in this test)
+    let _invalid_redis_url = "redis://invalid-host:6379";
 
     // This will create a connection manager, but operations will fail
     // In production, we'd want to handle this more gracefully at startup
@@ -261,7 +260,7 @@ async fn test_high_throughput_scenario() {
         .map(|i| format!("test_cached_integ_throughput_{}", i))
         .collect();
 
-    for trigger_id in &trigger_ids {
+    for (i, trigger_id) in trigger_ids.iter().enumerate() {
         create_test_trigger(&pool, trigger_id).await;
         // Initialize with state
         manager

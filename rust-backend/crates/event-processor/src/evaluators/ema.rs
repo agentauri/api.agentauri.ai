@@ -384,9 +384,7 @@ mod tests {
         // Feed 10 events with score = 100
         for i in 0..10 {
             let event = create_test_event(100);
-            let (_, new_state) = evaluator
-                .evaluate(&event, &condition, Some(state))
-                .unwrap();
+            let (_, new_state) = evaluator.evaluate(&event, &condition, Some(state)).unwrap();
             state = new_state;
 
             tracing::debug!("Iteration {}: EMA = {}", i, state.ema);

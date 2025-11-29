@@ -263,7 +263,7 @@ async fn test_state_manager_concurrent_updates() -> Result<()> {
     let final_state = manager.load_state(trigger_id).await?;
     assert!(final_state.is_some());
     let count = final_state.unwrap()["count"].as_i64().unwrap();
-    assert!(count >= 0 && count < 10);
+    assert!((0..10).contains(&count));
 
     manager.delete_state(trigger_id).await?;
     Ok(())

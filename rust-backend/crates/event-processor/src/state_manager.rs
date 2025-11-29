@@ -106,6 +106,7 @@ impl TriggerStateManager {
     /// # Errors
     ///
     /// Returns error if database query fails
+    #[allow(dead_code)] // Used in tests and cached state manager
     pub async fn delete_state(&self, trigger_id: &str) -> Result<()> {
         debug!(trigger_id = trigger_id, "Deleting trigger state");
 
@@ -140,6 +141,7 @@ impl TriggerStateManager {
     /// # Errors
     ///
     /// Returns error if database query fails
+    #[allow(dead_code)] // Used in tests and background cleanup
     pub async fn cleanup_expired(&self, retention_days: i32) -> Result<u64> {
         debug!(retention_days = retention_days, "Starting state cleanup");
 
@@ -177,6 +179,7 @@ impl TriggerStateManager {
     /// # Errors
     ///
     /// Returns error if database query fails
+    #[allow(dead_code)] // Used in tests and monitoring
     pub async fn get_state_count(&self) -> Result<i64> {
         let count = sqlx::query_scalar!(
             r#"

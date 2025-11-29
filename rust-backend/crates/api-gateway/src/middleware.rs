@@ -60,7 +60,6 @@ use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use shared::models::ApiKey;
 use shared::DbPool;
 use std::{
-    env,
     future::{ready, Ready},
     rc::Rc,
 };
@@ -72,9 +71,12 @@ use crate::repositories::{
 use crate::services::{ApiKeyService, AuthRateLimiter};
 
 // Re-export middleware components
+#[allow(unused_imports)] // Used in integration tests
 pub use auth_extractor::{AuthContext, AuthLayer};
 pub use cors::cors;
+#[allow(unused_imports)] // Used in integration tests
 pub use query_tier::{QueryTier, QueryTierExtractor};
+#[allow(unused_imports)] // Used in integration tests
 pub use unified_rate_limiter::UnifiedRateLimiter;
 
 // ============================================================================

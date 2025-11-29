@@ -25,12 +25,12 @@ mod common;
 
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
-    http::{header, StatusCode},
+    http::StatusCode,
     test, web, App, Error, HttpMessage, HttpResponse,
 };
 use api_gateway::{
     middleware::{
-        auth_extractor::{AuthContext, AuthLayer},
+        auth_extractor::AuthContext,
         ip_extractor,
         query_tier::{QueryTier, QueryTierExtractor},
         unified_rate_limiter::UnifiedRateLimiter,
@@ -236,7 +236,7 @@ async fn create_test_api_key(
     .bind(&generated.prefix)
     .bind(environment)
     .bind("standard")
-    .bind(&vec!["read", "write"])
+    .bind(vec!["read", "write"])
     .bind(user_id)
     .bind(Utc::now())
     .execute(pool)
@@ -265,6 +265,7 @@ async fn success_handler(_req: actix_web::HttpRequest) -> HttpResponse {
 }
 
 /// Handler that extracts and returns auth context info
+#[allow(dead_code)] // Used in future tests for auth context verification
 async fn auth_info_handler(req: actix_web::HttpRequest) -> HttpResponse {
     let auth_ctx = req.extensions().get::<AuthContext>().cloned();
     let query_tier = req.extensions().get::<QueryTier>().copied();
@@ -725,7 +726,7 @@ async fn test_rate_limit_headers_present_on_success() {
         .parse::<i64>()
         .unwrap();
     assert!(
-        remaining >= 0 && remaining < 10,
+        (0..10).contains(&remaining),
         "Remaining should decrease"
     );
 

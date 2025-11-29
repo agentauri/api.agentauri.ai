@@ -25,7 +25,9 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 // Re-export database models from shared crate
-pub use shared::models::{OAuthClient, OAuthToken};
+pub use shared::models::OAuthClient;
+#[allow(unused_imports)] // Used in OAuth token handlers (not yet implemented)
+pub use shared::models::OAuthToken;
 
 // ============================================================================
 // Request DTOs

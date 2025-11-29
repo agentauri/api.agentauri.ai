@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM trigger_state\n            WHERE last_updated < NOW() - INTERVAL '1 day' * $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "183a45ac3da661bc3c576e618c5d89c98ebde4efc811a2fefc132d3b8d964749"
+}

@@ -10,9 +10,11 @@ use shared::DbPool;
 use sqlx::PgPool;
 
 // Test configuration constants
+#[allow(dead_code)] // Used in JWT test utilities
 pub const TEST_JWT_SECRET: &str = "test_jwt_secret_for_integration_tests";
 
 /// Claims structure for JWT tokens (matching the production Claims struct)
+#[allow(dead_code)] // Used in JWT test utilities
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TestClaims {
     pub sub: String,      // User ID
@@ -86,6 +88,7 @@ pub async fn create_test_app(pool: DbPool) {
 ///     .insert_header(("Authorization", format!("Bearer {}", token)))
 ///     .to_request();
 /// ```
+#[allow(dead_code)] // Used in auth integration tests
 pub fn create_test_jwt(user_id: &str, username: &str) -> String {
     let now = Utc::now().timestamp();
     let exp = now + 3600; // 1 hour from now
@@ -117,6 +120,7 @@ pub fn create_test_jwt(user_id: &str, username: &str) -> String {
 /// # Returns
 ///
 /// An expired JWT token string
+#[allow(dead_code)] // Used in auth failure tests
 pub fn create_expired_jwt(user_id: &str, username: &str) -> String {
     let now = Utc::now().timestamp();
     let exp = now - 3600; // 1 hour in the past
@@ -177,6 +181,7 @@ pub async fn create_test_pool() -> DbPool {
 }
 
 /// Test organization data for consistent test setup
+#[allow(dead_code)] // Used in organization integration tests
 #[derive(Debug, Clone)]
 pub struct TestOrganization {
     pub id: String,
@@ -187,6 +192,7 @@ pub struct TestOrganization {
 
 impl TestOrganization {
     /// Create a new test organization with default values
+    #[allow(dead_code)] // Used in organization integration tests
     pub fn new(owner_id: &str) -> Self {
         Self {
             id: format!("test_org_{}", uuid::Uuid::new_v4()),
@@ -197,6 +203,7 @@ impl TestOrganization {
     }
 
     /// Create an organization with custom values
+    #[allow(dead_code)] // Used in organization integration tests
     pub fn with_name(owner_id: &str, name: &str, slug: &str) -> Self {
         Self {
             id: format!("test_org_{}", uuid::Uuid::new_v4()),
@@ -230,6 +237,7 @@ impl TestUser {
     }
 
     /// Create a user with custom username and email
+    #[allow(dead_code)] // Used in user integration tests
     pub fn with_credentials(username: &str, email: &str) -> Self {
         Self {
             id: format!("test_user_{}", uuid::Uuid::new_v4()),
@@ -240,6 +248,7 @@ impl TestUser {
     }
 
     /// Generate a JWT token for this user
+    #[allow(dead_code)] // Used in auth integration tests
     pub fn jwt_token(&self) -> String {
         create_test_jwt(&self.id, &self.username)
     }
@@ -262,6 +271,7 @@ pub struct TestMember {
 
 impl TestMember {
     /// Create an admin member
+    #[allow(dead_code)] // Used in member integration tests
     pub fn admin(organization_id: &str, user_id: &str) -> Self {
         Self {
             organization_id: organization_id.to_string(),
@@ -271,6 +281,7 @@ impl TestMember {
     }
 
     /// Create a member (standard role)
+    #[allow(dead_code)] // Used in member integration tests
     pub fn member(organization_id: &str, user_id: &str) -> Self {
         Self {
             organization_id: organization_id.to_string(),
@@ -280,6 +291,7 @@ impl TestMember {
     }
 
     /// Create a viewer
+    #[allow(dead_code)] // Used in member integration tests
     pub fn viewer(organization_id: &str, user_id: &str) -> Self {
         Self {
             organization_id: organization_id.to_string(),
@@ -289,6 +301,7 @@ impl TestMember {
     }
 
     /// Create an owner
+    #[allow(dead_code)] // Used in member integration tests
     pub fn owner(organization_id: &str, user_id: &str) -> Self {
         Self {
             organization_id: organization_id.to_string(),

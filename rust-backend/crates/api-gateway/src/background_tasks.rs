@@ -177,6 +177,7 @@ async fn cleanup_expired_nonces(pool: &DbPool) {
 /// Standalone function to run nonce cleanup once
 ///
 /// Useful for manual cleanup or testing.
+#[allow(dead_code)] // Used in tests and manual cleanup scripts
 pub async fn cleanup_nonces_once(pool: &DbPool) -> Result<u64, anyhow::Error> {
     NonceRepository::cleanup_expired_nonces(pool).await
 }
@@ -226,6 +227,7 @@ async fn cleanup_expired_oauth_tokens(pool: &DbPool) {
 /// Standalone function to run OAuth token cleanup once
 ///
 /// Useful for manual cleanup or testing.
+#[allow(dead_code)] // Used in tests and manual cleanup scripts
 pub async fn cleanup_oauth_tokens_once(pool: &DbPool) -> Result<u64, anyhow::Error> {
     OAuthTokenRepository::cleanup_expired_tokens(pool).await
 }

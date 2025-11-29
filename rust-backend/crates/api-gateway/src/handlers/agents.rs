@@ -171,7 +171,10 @@ pub async fn link_agent(
     };
 
     // SECURITY: Check if challenge has expired
-    if let Err(_) = wallet_service.validate_challenge_expiration(expires_at) {
+    if wallet_service
+        .validate_challenge_expiration(expires_at)
+        .is_err()
+    {
         return HttpResponse::BadRequest().json(ErrorResponse::new(
             "challenge_expired",
             "Challenge has expired. Please request a new one.",
@@ -188,7 +191,7 @@ pub async fn link_agent(
         Err(e) => {
             return HttpResponse::BadRequest().json(ErrorResponse::new(
                 "invalid_signature",
-                &format!("Signature verification failed: {}", e),
+                format!("Signature verification failed: {}", e),
             ))
         }
     };

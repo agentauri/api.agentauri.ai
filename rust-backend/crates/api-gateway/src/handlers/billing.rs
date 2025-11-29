@@ -258,7 +258,7 @@ pub async fn purchase_credits(
             warn!("Failed to create checkout session: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse::new(
                 "checkout_failed",
-                &format!("Failed to create checkout session: {}", e),
+                format!("Failed to create checkout session: {}", e),
             ));
         }
     };
