@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM triggers WHERE id LIKE 'batch_test_%'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "f2e6c66add2dbb09e6f3a9c8dc42db14e4d964bf2b33c326dbe67b315f4a66a2"
+}

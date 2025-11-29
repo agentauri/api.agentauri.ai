@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO users (id, username, email, password_hash)\n        VALUES ('test_user', 'testuser', 'test@example.com', '$argon2id$v=19$m=65536,t=3,p=1$salt$hash')\n        ON CONFLICT (id) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d1b49e53391747c7266e3f1ea867c1f079c957e11a4ca885bb57b9d89bef74d0"
+}

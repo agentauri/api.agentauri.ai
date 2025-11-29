@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO trigger_state (trigger_id, state_data, last_updated)\n        VALUES ($1, $2, NOW())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f1daf5eee94ecd424fa39ef4535bf2c469459ab383a37ea13b063733d62a6739"
+}

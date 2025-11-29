@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO trigger_actions (trigger_id, action_type, priority, config)\n            VALUES ($1, 'telegram', 1, $2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7ac72afcb210f6ae8b1e4a26a2ff7c7903888d12134230df72dd46b4ba59f4fa"
+}

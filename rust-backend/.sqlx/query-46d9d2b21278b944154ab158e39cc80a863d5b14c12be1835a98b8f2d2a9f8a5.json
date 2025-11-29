@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT trigger_id, action_type\n        FROM trigger_actions\n        WHERE trigger_id = ANY($1)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trigger_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "action_type",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "46d9d2b21278b944154ab158e39cc80a863d5b14c12be1835a98b8f2d2a9f8a5"
+}

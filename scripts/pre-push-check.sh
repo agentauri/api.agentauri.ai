@@ -48,7 +48,7 @@ else
 fi
 echo ""
 
-# 2. Clippy check (without DATABASE_URL to avoid SQLx compile-time verification)
+# 2. Clippy check (using SQLx offline mode via .sqlx cache)
 echo -e "${YELLOW}[2/3]${NC} Running Clippy linter..."
 if env -u DATABASE_URL cargo clippy --all-targets --all-features -- -D warnings > /dev/null 2>&1; then
     print_result "Clippy linter" 0
@@ -58,22 +58,23 @@ else
 fi
 echo ""
 
-# 3. Unit tests (excluding packages that require DATABASE_URL)
+# 3. Unit tests (excluding packages with integration tests requiring DATABASE_URL)
 echo -e "${YELLOW}[3/3]${NC} Running unit tests..."
-# Run tests excluding event-processor which has DB-dependent tests in lib.rs
-# Also exclude action-workers as it may have similar dependencies
+# event-processor and action-workers have integration tests that require real DB connection
+# These are tested in CI with DATABASE_URL available
 if env -u DATABASE_URL cargo test --workspace --lib --bins \
     --exclude event-processor \
     --exclude action-workers > /dev/null 2>&1; then
-    print_result "Unit tests (non-DB packages)" 0
+    print_result "Unit tests (excluding DB integration tests)" 0
 else
-    print_result "Unit tests (non-DB packages)" 1
+    print_result "Unit tests (excluding DB integration tests)" 1
     echo -e "${RED}      Run 'cargo test --workspace' to see failing tests${NC}"
 fi
 echo ""
 
-# Note about DB-dependent tests
-echo -e "${BLUE}Note:${NC} Tests requiring DATABASE_URL (event-processor, action-workers) are run in CI"
+# Note about excluded tests
+echo -e "${BLUE}Note:${NC} Integration tests requiring DATABASE_URL (event-processor, action-workers) are run in CI"
+echo -e "${BLUE}Note:${NC} SQLx compile-time verification uses cached metadata from .sqlx directory"
 echo ""
 
 # Summary

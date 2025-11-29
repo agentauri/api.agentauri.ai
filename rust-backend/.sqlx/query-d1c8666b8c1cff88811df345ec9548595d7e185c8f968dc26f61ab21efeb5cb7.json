@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO organizations (id, name, slug, owner_id, plan, is_personal)\n        VALUES ('batch_test_org', 'Batch Test Org', 'batch-test-org', 'batch_test_user', 'free', true)\n        ON CONFLICT (id) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d1c8666b8c1cff88811df345ec9548595d7e185c8f968dc26f61ab21efeb5cb7"
+}

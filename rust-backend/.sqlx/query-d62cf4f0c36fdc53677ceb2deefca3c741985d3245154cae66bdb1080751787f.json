@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM trigger_state WHERE trigger_id LIKE 'test_cached_integ_%'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d62cf4f0c36fdc53677ceb2deefca3c741985d3245154cae66bdb1080751787f"
+}

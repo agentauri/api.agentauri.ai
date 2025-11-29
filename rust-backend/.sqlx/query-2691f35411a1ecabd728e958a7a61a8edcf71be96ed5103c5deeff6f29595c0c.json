@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO trigger_state (trigger_id, state_data, last_updated)\n        VALUES ($1, $2, NOW() - INTERVAL '31 days')\n        ON CONFLICT (trigger_id) DO UPDATE SET\n            state_data = EXCLUDED.state_data,\n            last_updated = EXCLUDED.last_updated\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2691f35411a1ecabd728e958a7a61a8edcf71be96ed5103c5deeff6f29595c0c"
+}

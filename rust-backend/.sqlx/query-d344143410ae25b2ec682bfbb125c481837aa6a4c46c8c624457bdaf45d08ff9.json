@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO events (\n            id, chain_id, block_number, block_hash, transaction_hash, log_index,\n            registry, event_type, agent_id, timestamp, client_address, score\n        )\n        VALUES (\n            $1, 84532, 1000, '0xabc', '0xdef', 0,\n            'reputation', 'NewFeedback', 42, 1234567890, '0x123', 55\n        )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d344143410ae25b2ec682bfbb125c481837aa6a4c46c8c624457bdaf45d08ff9"
+}

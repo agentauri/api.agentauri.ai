@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO trigger_conditions (trigger_id, condition_type, field, operator, value)\n            VALUES\n                ($1, 'agent_id_equals', 'agent_id', '=', '42'),\n                ($1, 'score_threshold', 'score', '<', '60')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "84cf12340fb460abe92fca82e90ae0bf61b327327662117b27dc83a6d3ab6c2d"
+}

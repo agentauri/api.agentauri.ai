@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM events WHERE id LIKE 'batch_test_%'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "3b49dd301bd383e333bc8435cf9083198f2fd8a23263478d517ab09d485a443f"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO triggers (id, organization_id, user_id, name, chain_id, registry, enabled, is_stateful)\n        VALUES ($1, 'test_org_cached_integ', 'test_user_cached_integ', 'Test Trigger Cached Integ', 84532, 'reputation', true, true)\n        ON CONFLICT (id) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b73690ddcd3ac2fa92e19ee12ef0dbfa588e4bdb138d6d763046549ab8db1d81"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM organization_members WHERE organization_id = 'batch_test_org'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "a2e025dd18c30b964808edc3a18a308163f4c3052a7a634b5186c9b901a7ad3d"
+}
