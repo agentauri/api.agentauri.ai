@@ -7,7 +7,92 @@ and this project follows phases and weeks for versioning during development.
 
 ## [Unreleased]
 
-### Phase 4: Advanced Triggers & Actions - In Progress (Week 13 of 15)
+### Phase 4: Advanced Triggers & Actions - In Progress (Week 14 of 16)
+
+---
+
+## Week 14 (November 29, 2024) - Stateful Triggers (EMA + Rate Counters)
+
+### Added
+- **Exponential Moving Average (EMA) Evaluator**
+  - Smooths score trends to detect gradual reputation changes
+  - Configurable window size (alpha = 2 / (window_size + 1))
+  - Supports all comparison operators: `<`, `>`, `<=`, `>=`, `=`, `!=`
+  - 43 comprehensive unit tests covering edge cases
+  - Zero-cost abstractions with Copy trait
+  - Proper floating-point precision handling
+- **Rate Counter Evaluator**
+  - Counts events in sliding time window
+  - Automatic pruning of expired timestamps
+  - Memory protection (MAX_TIMESTAMPS = 10,000 limit)
+  - Optional reset-on-trigger behavior
+  - Supports time units: s (seconds), m (minutes), h (hours), d (days)
+  - 54 comprehensive unit tests
+- **Trigger State Manager**
+  - PostgreSQL JSONB storage for trigger state
+  - Atomic UPSERT operations (INSERT ... ON CONFLICT)
+  - State lifecycle management (load, update, delete, cleanup)
+  - State count statistics for monitoring
+  - Transaction-safe state updates
+- **Event Processor Stateful Integration**
+  - New `evaluate_trigger_stateful()` function
+  - Loads state before evaluation, updates after
+  - Handles mixed stateless + stateful conditions
+  - Proper error handling with anyhow::Context
+  - <10ms overhead per stateful condition
+
+### Database Migrations
+- `20251129000001_add_trigger_state_index.sql` - Index on `trigger_state.last_updated`
+
+### Testing
+- 99 total tests passing (0 failures)
+- EMA Evaluator: 43 tests
+- Rate Counter Evaluator: 54 tests
+- State Manager: 2 tests
+- All edge cases covered (extreme values, memory limits, concurrent updates)
+
+### Performance
+- <10ms overhead per stateful condition (measured in tests)
+- Efficient timestamp pruning with vector operations
+- State only loaded when needed (`is_stateful` flag check)
+- Zero unsafe code blocks
+
+### Files Modified/Created
+- New: `rust-backend/crates/event-processor/src/evaluators/mod.rs`
+- New: `rust-backend/crates/event-processor/src/evaluators/ema.rs` (618 lines)
+- New: `rust-backend/crates/event-processor/src/evaluators/rate_counter.rs` (855 lines)
+- New: `rust-backend/crates/event-processor/src/state_manager.rs` (238 lines)
+- Modified: `rust-backend/crates/event-processor/src/trigger_engine.rs` (+170 lines)
+- Modified: `rust-backend/crates/event-processor/src/listener.rs` (+22 lines)
+
+### Example Configurations
+
+**EMA Condition** (detect gradual score decline):
+```json
+{
+  "condition_type": "ema_threshold",
+  "field": "score",
+  "operator": "<",
+  "value": "70",
+  "config": {
+    "window_size": 10
+  }
+}
+```
+
+**Rate Counter Condition** (spam detection):
+```json
+{
+  "condition_type": "rate_limit",
+  "field": "event_count",
+  "operator": ">",
+  "value": "10",
+  "config": {
+    "time_window": "1h",
+    "reset_on_trigger": false
+  }
+}
+```
 
 ---
 
