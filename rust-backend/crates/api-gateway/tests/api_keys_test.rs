@@ -743,6 +743,11 @@ mod unit_tests {
 
         let service = ApiKeyService::new();
 
+        // WARM-UP: Force lazy initialization of DUMMY_HASH before timing measurements
+        // This ensures the first dummy_verify() call doesn't include hash computation cost (~4-5s)
+        // which would distort the average timing, especially on CI with limited CPU resources.
+        service.dummy_verify();
+
         // Measure timing for dummy_verify (when key not found)
         let mut dummy_times = Vec::new();
         for _ in 0..10 {
