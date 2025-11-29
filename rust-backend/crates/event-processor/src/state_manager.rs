@@ -302,6 +302,7 @@ mod tests {
     // Integration tests (require real database)
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_load_state_nonexistent() {
         let pool = setup_test_db().await;
         let manager = TriggerStateManager::new(pool);
@@ -314,6 +315,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_update_state_creates_new() {
         let pool = setup_test_db().await;
         let trigger_id = "test_create_new";
@@ -341,6 +343,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_update_state_overwrites_existing() {
         let pool = setup_test_db().await;
         let trigger_id = "test_overwrite";
@@ -369,6 +372,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_delete_state() {
         let pool = setup_test_db().await;
         let trigger_id = "test_delete";
@@ -396,6 +400,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_delete_state_nonexistent() {
         let pool = setup_test_db().await;
         let manager = TriggerStateManager::new(pool);
@@ -406,6 +411,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cleanup_expired() {
         let pool = setup_test_db().await;
         let trigger_fresh = "test_cleanup_fresh";
@@ -454,6 +460,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cleanup_expired_no_records() {
         let pool = setup_test_db().await;
         let manager = TriggerStateManager::new(pool);
@@ -464,6 +471,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_get_state_count_empty() {
         let pool = setup_test_db().await;
         let manager = TriggerStateManager::new(pool);
@@ -473,6 +481,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_get_state_count() {
         let pool = setup_test_db().await;
         create_test_trigger(&pool, "test_count_1").await;
@@ -512,6 +521,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_state_upsert_atomicity() {
         // Verify that UPSERT is atomic (no race condition between SELECT and INSERT)
         let pool = setup_test_db().await;
@@ -551,6 +561,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_large_state_data() {
         // Verify we can store large JSONB data (rate counter with many timestamps)
         let pool = setup_test_db().await;
@@ -585,6 +596,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_complex_state_structure() {
         // Verify we can store complex nested JSONB structures
         let pool = setup_test_db().await;

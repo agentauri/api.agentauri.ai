@@ -543,6 +543,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cache_key_format() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -560,6 +561,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cache_stats() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -572,6 +574,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_load_state_cache_miss_then_hit() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -606,6 +609,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_update_state_write_through() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -636,6 +640,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_update_state_overwrites_cache() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -665,6 +670,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_delete_state_removes_from_both() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -690,6 +696,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cache_disabled_fallback() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -723,6 +730,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_load_state_nonexistent() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -737,6 +745,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cache_ttl_expiration() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -773,6 +782,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_concurrent_updates() {
         // Verify write-through pattern handles concurrent updates correctly
         let pool = setup_test_db().await;
@@ -810,6 +820,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_cleanup_expired() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
@@ -859,6 +870,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires DATABASE_URL (integration test)
     async fn test_get_state_count() {
         let pool = setup_test_db().await;
         let redis = setup_test_redis().await;
