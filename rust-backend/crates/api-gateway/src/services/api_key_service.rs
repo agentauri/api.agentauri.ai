@@ -24,6 +24,7 @@ use argon2::{
     Argon2, Params,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use once_cell::sync::Lazy;
 use thiserror::Error;
 
 /// Length of random bytes for key generation (256 bits of entropy)
@@ -40,6 +41,35 @@ const ARGON2_TIME_COST: u32 = 3;
 
 /// Argon2 parallelism degree
 const ARGON2_PARALLELISM: u32 = 1;
+
+/// Dummy key used for timing attack mitigation
+const DUMMY_KEY: &str = "sk_test_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/// Pre-computed dummy hash for timing attack mitigation
+///
+/// This hash is computed ONCE for the entire process lifetime, not once per
+/// ApiKeyService instance. This ensures:
+/// 1. Consistent timing across all dummy_verify() calls
+/// 2. Reduced memory usage (one hash for entire process)
+/// 3. Better performance (no repeated hash computation)
+/// 4. More stable CI tests (less variance in timing)
+static DUMMY_HASH: Lazy<String> = Lazy::new(|| {
+    let params = Params::new(
+        ARGON2_MEMORY_COST,
+        ARGON2_TIME_COST,
+        ARGON2_PARALLELISM,
+        None,
+    )
+    .expect("Invalid Argon2 parameters");
+
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    let salt = SaltString::generate(&mut OsRng);
+
+    argon2
+        .hash_password(DUMMY_KEY.as_bytes(), &salt)
+        .expect("Failed to pre-compute dummy hash")
+        .to_string()
+});
 
 /// Errors that can occur during API key operations
 #[derive(Debug, Error)]
@@ -72,14 +102,11 @@ pub struct GeneratedApiKey {
 
 /// Service for API key operations
 ///
-/// This service holds pre-computed values for timing attack mitigation.
-/// The dummy hash is computed once at initialization.
+/// This service uses a globally pre-computed dummy hash (DUMMY_HASH static)
+/// for timing attack mitigation, ensuring consistent timing across all instances.
 #[derive(Clone)]
 pub struct ApiKeyService {
     argon2: Argon2<'static>,
-    /// Pre-computed valid hash for timing attack mitigation
-    /// This hash is computed once at service initialization
-    dummy_hash: String,
 }
 
 impl Default for ApiKeyService {
@@ -88,15 +115,11 @@ impl Default for ApiKeyService {
     }
 }
 
-/// Dummy key used for timing attack mitigation
-const DUMMY_KEY: &str = "sk_test_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-
 impl ApiKeyService {
     /// Create a new ApiKeyService with OWASP-recommended Argon2 parameters
     ///
-    /// This constructor pre-computes a valid Argon2 hash for timing attack
-    /// mitigation. This ensures that `dummy_verify()` takes the same time
-    /// as a real key verification.
+    /// The dummy hash for timing attack mitigation is pre-computed globally
+    /// (DUMMY_HASH static) once for the entire process, not per instance.
     pub fn new() -> Self {
         // Use Argon2id variant (recommended for password hashing)
         // Parameters: 64 MiB memory, 3 iterations, 1 parallelism
@@ -110,15 +133,7 @@ impl ApiKeyService {
 
         let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
 
-        // Pre-compute a valid hash for timing attack mitigation
-        // This hash is computed once at service initialization
-        let salt = SaltString::generate(&mut OsRng);
-        let dummy_hash = argon2
-            .hash_password(DUMMY_KEY.as_bytes(), &salt)
-            .expect("Failed to pre-compute dummy hash")
-            .to_string();
-
-        Self { argon2, dummy_hash }
+        Self { argon2 }
     }
 
     /// Generate a new API key with secure random entropy
@@ -219,20 +234,21 @@ impl ApiKeyService {
     ///
     /// # Security
     ///
-    /// This method uses a pre-computed **valid** Argon2 hash (computed at
-    /// service initialization). This ensures:
+    /// This method uses a globally pre-computed **valid** Argon2 hash
+    /// (DUMMY_HASH static, computed once for the entire process). This ensures:
     ///
     /// 1. The hash parsing succeeds (no early exit)
     /// 2. Full Argon2 verification is performed (same 300-500ms as real keys)
     /// 3. Timing is consistent regardless of whether the key exists
+    /// 4. Minimal variance in CI environments (same hash used across all calls)
     ///
     /// **Previous vulnerability**: The old implementation used an invalid
     /// hash format that could fail during parsing, causing early exit and
     /// revealing key existence via timing differences.
     pub fn dummy_verify(&self) {
-        // Use the pre-computed valid hash from service initialization
-        // This ensures full Argon2 verification is performed
-        let _ = self.verify_key(DUMMY_KEY, &self.dummy_hash);
+        // Use the globally pre-computed valid hash (initialized once per process)
+        // This ensures full Argon2 verification is performed with consistent timing
+        let _ = self.verify_key(DUMMY_KEY, &DUMMY_HASH);
     }
 
     /// Extract the prefix from a full API key
