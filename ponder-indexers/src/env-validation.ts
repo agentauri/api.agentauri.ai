@@ -34,6 +34,7 @@ const ethereumAddress = z.string().regex(
  * RPC Provider URLs for each chain (all optional, but at least one chain must be configured)
  */
 const rpcProviderSchema = {
+  // Testnets
   // Ethereum Sepolia
   ETHEREUM_SEPOLIA_RPC_ALCHEMY: httpsUrl.optional(),
   ETHEREUM_SEPOLIA_RPC_INFURA: httpsUrl.optional(),
@@ -60,12 +61,34 @@ const rpcProviderSchema = {
   POLYGON_AMOY_RPC_QUIKNODE: httpsUrl.optional(),
   POLYGON_AMOY_RPC_ANKR: httpsUrl.optional(),
   POLYGON_AMOY_RPC_URL: httpsUrl.optional(),
+
+  // Mainnets
+  // Ethereum Mainnet
+  ETHEREUM_MAINNET_RPC_ALCHEMY: httpsUrl.optional(),
+  ETHEREUM_MAINNET_RPC_INFURA: httpsUrl.optional(),
+  ETHEREUM_MAINNET_RPC_QUIKNODE: httpsUrl.optional(),
+  ETHEREUM_MAINNET_RPC_ANKR: httpsUrl.optional(),
+  ETHEREUM_MAINNET_RPC_URL: httpsUrl.optional(),
+
+  // Base Mainnet
+  BASE_MAINNET_RPC_ALCHEMY: httpsUrl.optional(),
+  BASE_MAINNET_RPC_INFURA: httpsUrl.optional(),
+  BASE_MAINNET_RPC_QUIKNODE: httpsUrl.optional(),
+  BASE_MAINNET_RPC_ANKR: httpsUrl.optional(),
+  BASE_MAINNET_RPC_URL: httpsUrl.optional(),
+
+  // Linea Mainnet
+  LINEA_MAINNET_RPC_ALCHEMY: httpsUrl.optional(),
+  LINEA_MAINNET_RPC_INFURA: httpsUrl.optional(),
+  LINEA_MAINNET_RPC_QUIKNODE: httpsUrl.optional(),
+  LINEA_MAINNET_RPC_URL: httpsUrl.optional(),
 };
 
 /**
  * Contract addresses for each chain
  */
 const contractAddressSchema = {
+  // Testnets
   // Ethereum Sepolia
   ETHEREUM_SEPOLIA_IDENTITY_ADDRESS: ethereumAddress.optional(),
   ETHEREUM_SEPOLIA_REPUTATION_ADDRESS: ethereumAddress.optional(),
@@ -89,6 +112,25 @@ const contractAddressSchema = {
   POLYGON_AMOY_REPUTATION_ADDRESS: ethereumAddress.optional(),
   POLYGON_AMOY_VALIDATION_ADDRESS: ethereumAddress.optional(),
   POLYGON_AMOY_START_BLOCK: z.coerce.number().int().min(0).optional(),
+
+  // Mainnets
+  // Ethereum Mainnet
+  ETHEREUM_MAINNET_IDENTITY_ADDRESS: ethereumAddress.optional(),
+  ETHEREUM_MAINNET_REPUTATION_ADDRESS: ethereumAddress.optional(),
+  ETHEREUM_MAINNET_VALIDATION_ADDRESS: ethereumAddress.optional(),
+  ETHEREUM_MAINNET_START_BLOCK: z.coerce.number().int().min(0).optional(),
+
+  // Base Mainnet
+  BASE_MAINNET_IDENTITY_ADDRESS: ethereumAddress.optional(),
+  BASE_MAINNET_REPUTATION_ADDRESS: ethereumAddress.optional(),
+  BASE_MAINNET_VALIDATION_ADDRESS: ethereumAddress.optional(),
+  BASE_MAINNET_START_BLOCK: z.coerce.number().int().min(0).optional(),
+
+  // Linea Mainnet
+  LINEA_MAINNET_IDENTITY_ADDRESS: ethereumAddress.optional(),
+  LINEA_MAINNET_REPUTATION_ADDRESS: ethereumAddress.optional(),
+  LINEA_MAINNET_VALIDATION_ADDRESS: ethereumAddress.optional(),
+  LINEA_MAINNET_START_BLOCK: z.coerce.number().int().min(0).optional(),
 };
 
 /**
@@ -146,6 +188,7 @@ const envSchema = z.object({
  */
 function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
   const chains = [
+    // Testnets
     {
       prefix: "ETHEREUM_SEPOLIA",
       hasRpc: Boolean(
@@ -185,6 +228,36 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.POLYGON_AMOY_RPC_URL
       ),
     },
+    // Mainnets
+    {
+      prefix: "ETHEREUM_MAINNET",
+      hasRpc: Boolean(
+        env.ETHEREUM_MAINNET_RPC_ALCHEMY ??
+        env.ETHEREUM_MAINNET_RPC_INFURA ??
+        env.ETHEREUM_MAINNET_RPC_QUIKNODE ??
+        env.ETHEREUM_MAINNET_RPC_ANKR ??
+        env.ETHEREUM_MAINNET_RPC_URL
+      ),
+    },
+    {
+      prefix: "BASE_MAINNET",
+      hasRpc: Boolean(
+        env.BASE_MAINNET_RPC_ALCHEMY ??
+        env.BASE_MAINNET_RPC_INFURA ??
+        env.BASE_MAINNET_RPC_QUIKNODE ??
+        env.BASE_MAINNET_RPC_ANKR ??
+        env.BASE_MAINNET_RPC_URL
+      ),
+    },
+    {
+      prefix: "LINEA_MAINNET",
+      hasRpc: Boolean(
+        env.LINEA_MAINNET_RPC_ALCHEMY ??
+        env.LINEA_MAINNET_RPC_INFURA ??
+        env.LINEA_MAINNET_RPC_QUIKNODE ??
+        env.LINEA_MAINNET_RPC_URL
+      ),
+    },
   ];
 
   return chains.some((chain) => chain.hasRpc);
@@ -196,6 +269,7 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
 export function getConfiguredChains(env: EnvConfig): string[] {
   const chains: string[] = [];
 
+  // Testnets
   if (
     env.ETHEREUM_SEPOLIA_RPC_ALCHEMY ??
     env.ETHEREUM_SEPOLIA_RPC_INFURA ??
@@ -235,6 +309,36 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     chains.push("polygonAmoy");
   }
 
+  // Mainnets
+  if (
+    env.ETHEREUM_MAINNET_RPC_ALCHEMY ??
+    env.ETHEREUM_MAINNET_RPC_INFURA ??
+    env.ETHEREUM_MAINNET_RPC_QUIKNODE ??
+    env.ETHEREUM_MAINNET_RPC_ANKR ??
+    env.ETHEREUM_MAINNET_RPC_URL
+  ) {
+    chains.push("ethereumMainnet");
+  }
+
+  if (
+    env.BASE_MAINNET_RPC_ALCHEMY ??
+    env.BASE_MAINNET_RPC_INFURA ??
+    env.BASE_MAINNET_RPC_QUIKNODE ??
+    env.BASE_MAINNET_RPC_ANKR ??
+    env.BASE_MAINNET_RPC_URL
+  ) {
+    chains.push("baseMainnet");
+  }
+
+  if (
+    env.LINEA_MAINNET_RPC_ALCHEMY ??
+    env.LINEA_MAINNET_RPC_INFURA ??
+    env.LINEA_MAINNET_RPC_QUIKNODE ??
+    env.LINEA_MAINNET_RPC_URL
+  ) {
+    chains.push("lineaMainnet");
+  }
+
   return chains;
 }
 
@@ -265,11 +369,15 @@ export function validateEnv(): EnvConfig {
   if (!hasAtLeastOneChainConfigured(result.data)) {
     throw new Error(
       "At least one blockchain network must have an RPC provider configured.\n" +
-      "Please set at least one of:\n" +
+      "Testnets:\n" +
       "  - ETHEREUM_SEPOLIA_RPC_ALCHEMY (or other providers)\n" +
       "  - BASE_SEPOLIA_RPC_ALCHEMY (or other providers)\n" +
       "  - LINEA_SEPOLIA_RPC_ALCHEMY (or other providers)\n" +
-      "  - POLYGON_AMOY_RPC_ALCHEMY (or other providers)"
+      "  - POLYGON_AMOY_RPC_ALCHEMY (or other providers)\n" +
+      "Mainnets:\n" +
+      "  - ETHEREUM_MAINNET_RPC_ALCHEMY (or other providers)\n" +
+      "  - BASE_MAINNET_RPC_ALCHEMY (or other providers)\n" +
+      "  - LINEA_MAINNET_RPC_ALCHEMY (or other providers)"
     );
   }
 

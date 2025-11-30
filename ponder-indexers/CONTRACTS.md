@@ -4,20 +4,25 @@ This document explains how to configure ERC-8004 contract addresses for the Pond
 
 ## Overview
 
-The Ponder indexers monitor three types of ERC-8004 registries across four testnets:
+The Ponder indexers monitor three types of ERC-8004 registries across multiple networks:
 
 **Registries:**
 - Identity Registry
 - Reputation Registry
 - Validation Registry
 
-**Networks:**
+**Testnets:**
 - Ethereum Sepolia (Chain ID: 11155111)
 - Base Sepolia (Chain ID: 84532)
 - Linea Sepolia (Chain ID: 59141)
 - Polygon Amoy (Chain ID: 80002)
 
-**Total:** 12 contract addresses (3 registries × 4 networks)
+**Mainnets:**
+- Ethereum Mainnet (Chain ID: 1)
+- Base Mainnet (Chain ID: 8453)
+- Linea Mainnet (Chain ID: 59144)
+
+**Total:** 21 contract addresses (3 registries × 7 networks)
 
 ## Configuration Method
 
@@ -42,7 +47,7 @@ Open your `.env` file in the project root and update the contract addresses:
 
 ```bash
 # ============================================================================
-# ERC-8004 CONTRACT ADDRESSES
+# ERC-8004 CONTRACT ADDRESSES - TESTNETS
 # ============================================================================
 
 # Ethereum Sepolia Contract Addresses
@@ -68,6 +73,28 @@ POLYGON_AMOY_IDENTITY_ADDRESS=0x345...
 POLYGON_AMOY_REPUTATION_ADDRESS=0x678...
 POLYGON_AMOY_VALIDATION_ADDRESS=0x9ab...
 POLYGON_AMOY_START_BLOCK=3000000
+
+# ============================================================================
+# ERC-8004 CONTRACT ADDRESSES - MAINNETS
+# ============================================================================
+
+# Ethereum Mainnet Contract Addresses
+ETHEREUM_MAINNET_IDENTITY_ADDRESS=0x0000000000000000000000000000000000000000
+ETHEREUM_MAINNET_REPUTATION_ADDRESS=0x0000000000000000000000000000000000000000
+ETHEREUM_MAINNET_VALIDATION_ADDRESS=0x0000000000000000000000000000000000000000
+ETHEREUM_MAINNET_START_BLOCK=0
+
+# Base Mainnet Contract Addresses
+BASE_MAINNET_IDENTITY_ADDRESS=0x0000000000000000000000000000000000000000
+BASE_MAINNET_REPUTATION_ADDRESS=0x0000000000000000000000000000000000000000
+BASE_MAINNET_VALIDATION_ADDRESS=0x0000000000000000000000000000000000000000
+BASE_MAINNET_START_BLOCK=0
+
+# Linea Mainnet Contract Addresses
+LINEA_MAINNET_IDENTITY_ADDRESS=0x0000000000000000000000000000000000000000
+LINEA_MAINNET_REPUTATION_ADDRESS=0x0000000000000000000000000000000000000000
+LINEA_MAINNET_VALIDATION_ADDRESS=0x0000000000000000000000000000000000000000
+LINEA_MAINNET_START_BLOCK=0
 ```
 
 ### Step 3: Verify Configuration
@@ -89,12 +116,22 @@ Check the logs for contract loading confirmation.
 
 Each network has three registry addresses:
 
+**Testnets:**
+
 | Network | Variable Name Pattern |
 |---------|----------------------|
 | Ethereum Sepolia | `ETHEREUM_SEPOLIA_{REGISTRY}_ADDRESS` |
 | Base Sepolia | `BASE_SEPOLIA_{REGISTRY}_ADDRESS` |
 | Linea Sepolia | `LINEA_SEPOLIA_{REGISTRY}_ADDRESS` |
 | Polygon Amoy | `POLYGON_AMOY_{REGISTRY}_ADDRESS` |
+
+**Mainnets:**
+
+| Network | Variable Name Pattern |
+|---------|----------------------|
+| Ethereum Mainnet | `ETHEREUM_MAINNET_{REGISTRY}_ADDRESS` |
+| Base Mainnet | `BASE_MAINNET_{REGISTRY}_ADDRESS` |
+| Linea Mainnet | `LINEA_MAINNET_{REGISTRY}_ADDRESS` |
 
 Where `{REGISTRY}` is one of:
 - `IDENTITY`
@@ -105,6 +142,8 @@ Where `{REGISTRY}` is one of:
 
 Each network has one start block variable:
 
+**Testnets:**
+
 | Network | Variable Name |
 |---------|---------------|
 | Ethereum Sepolia | `ETHEREUM_SEPOLIA_START_BLOCK` |
@@ -112,11 +151,21 @@ Each network has one start block variable:
 | Linea Sepolia | `LINEA_SEPOLIA_START_BLOCK` |
 | Polygon Amoy | `POLYGON_AMOY_START_BLOCK` |
 
+**Mainnets:**
+
+| Network | Variable Name |
+|---------|---------------|
+| Ethereum Mainnet | `ETHEREUM_MAINNET_START_BLOCK` |
+| Base Mainnet | `BASE_MAINNET_START_BLOCK` |
+| Linea Mainnet | `LINEA_MAINNET_START_BLOCK` |
+
 **Important:** Set the start block to the deployment block number for faster initial sync. If set to `0`, Ponder will index from genesis (very slow).
 
 ## Complete Example
 
 Here's a complete example with all addresses configured:
+
+**Testnets:**
 
 ```bash
 # Ethereum Sepolia
@@ -143,6 +192,30 @@ POLYGON_AMOY_REPUTATION_ADDRESS=0x8901234567890123456789012345678901234567
 POLYGON_AMOY_VALIDATION_ADDRESS=0x9012345678901234567890123456789012345678
 POLYGON_AMOY_START_BLOCK=3000000
 ```
+
+**Mainnets:**
+
+```bash
+# Ethereum Mainnet
+ETHEREUM_MAINNET_IDENTITY_ADDRESS=0x0000000000000000000000000000000000000000
+ETHEREUM_MAINNET_REPUTATION_ADDRESS=0x0000000000000000000000000000000000000000
+ETHEREUM_MAINNET_VALIDATION_ADDRESS=0x0000000000000000000000000000000000000000
+ETHEREUM_MAINNET_START_BLOCK=0
+
+# Base Mainnet
+BASE_MAINNET_IDENTITY_ADDRESS=0x0000000000000000000000000000000000000000
+BASE_MAINNET_REPUTATION_ADDRESS=0x0000000000000000000000000000000000000000
+BASE_MAINNET_VALIDATION_ADDRESS=0x0000000000000000000000000000000000000000
+BASE_MAINNET_START_BLOCK=0
+
+# Linea Mainnet
+LINEA_MAINNET_IDENTITY_ADDRESS=0x0000000000000000000000000000000000000000
+LINEA_MAINNET_REPUTATION_ADDRESS=0x0000000000000000000000000000000000000000
+LINEA_MAINNET_VALIDATION_ADDRESS=0x0000000000000000000000000000000000000000
+LINEA_MAINNET_START_BLOCK=0
+```
+
+**Note:** Mainnet contracts are not yet deployed. The addresses above are placeholders (null addresses). Update these when mainnet contracts are deployed.
 
 ## Default Behavior
 

@@ -167,6 +167,7 @@ interface NetworkConfig {
 }
 
 const networks: Record<string, NetworkConfig> = {
+  // Testnets
   ethereumSepolia: {
     chainId: 11155111,
     name: "Ethereum Sepolia",
@@ -183,6 +184,19 @@ const networks: Record<string, NetworkConfig> = {
     chainId: 80002,
     name: "Polygon Amoy",
   },
+  // Mainnets
+  ethereumMainnet: {
+    chainId: 1,
+    name: "Ethereum Mainnet",
+  },
+  baseMainnet: {
+    chainId: 8453,
+    name: "Base Mainnet",
+  },
+  lineaMainnet: {
+    chainId: 59144,
+    name: "Linea Mainnet",
+  },
 };
 
 // ============================================================================
@@ -198,6 +212,7 @@ function getContractAddress(key: keyof EnvConfig): `0x${string}` {
 }
 
 const contracts: Record<string, Record<string, `0x${string}`>> = {
+  // Testnets
   ethereumSepolia: {
     identity: getContractAddress("ETHEREUM_SEPOLIA_IDENTITY_ADDRESS"),
     reputation: getContractAddress("ETHEREUM_SEPOLIA_REPUTATION_ADDRESS"),
@@ -218,6 +233,22 @@ const contracts: Record<string, Record<string, `0x${string}`>> = {
     reputation: getContractAddress("POLYGON_AMOY_REPUTATION_ADDRESS"),
     validation: getContractAddress("POLYGON_AMOY_VALIDATION_ADDRESS"),
   },
+  // Mainnets
+  ethereumMainnet: {
+    identity: getContractAddress("ETHEREUM_MAINNET_IDENTITY_ADDRESS"),
+    reputation: getContractAddress("ETHEREUM_MAINNET_REPUTATION_ADDRESS"),
+    validation: getContractAddress("ETHEREUM_MAINNET_VALIDATION_ADDRESS"),
+  },
+  baseMainnet: {
+    identity: getContractAddress("BASE_MAINNET_IDENTITY_ADDRESS"),
+    reputation: getContractAddress("BASE_MAINNET_REPUTATION_ADDRESS"),
+    validation: getContractAddress("BASE_MAINNET_VALIDATION_ADDRESS"),
+  },
+  lineaMainnet: {
+    identity: getContractAddress("LINEA_MAINNET_IDENTITY_ADDRESS"),
+    reputation: getContractAddress("LINEA_MAINNET_REPUTATION_ADDRESS"),
+    validation: getContractAddress("LINEA_MAINNET_VALIDATION_ADDRESS"),
+  },
 };
 
 // ============================================================================
@@ -225,10 +256,15 @@ const contracts: Record<string, Record<string, `0x${string}`>> = {
 // ============================================================================
 
 const startBlocks: Record<string, number> = {
+  // Testnets
   ethereumSepolia: env.ETHEREUM_SEPOLIA_START_BLOCK ?? 0,
   baseSepolia: env.BASE_SEPOLIA_START_BLOCK ?? 0,
   lineaSepolia: env.LINEA_SEPOLIA_START_BLOCK ?? 0,
   polygonAmoy: env.POLYGON_AMOY_START_BLOCK ?? 0,
+  // Mainnets
+  ethereumMainnet: env.ETHEREUM_MAINNET_START_BLOCK ?? 0,
+  baseMainnet: env.BASE_MAINNET_START_BLOCK ?? 0,
+  lineaMainnet: env.LINEA_MAINNET_START_BLOCK ?? 0,
 };
 
 // ============================================================================
@@ -237,10 +273,15 @@ const startBlocks: Record<string, number> = {
 
 // Map of network key to env prefix
 const networkEnvPrefixes: Record<string, string> = {
+  // Testnets
   ethereumSepolia: "ETHEREUM_SEPOLIA",
   baseSepolia: "BASE_SEPOLIA",
   lineaSepolia: "LINEA_SEPOLIA",
   polygonAmoy: "POLYGON_AMOY",
+  // Mainnets
+  ethereumMainnet: "ETHEREUM_MAINNET",
+  baseMainnet: "BASE_MAINNET",
+  lineaMainnet: "LINEA_MAINNET",
 };
 
 // Build networks dynamically (only include those with RPC configured)
