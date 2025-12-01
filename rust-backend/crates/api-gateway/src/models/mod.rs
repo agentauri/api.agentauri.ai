@@ -6,6 +6,7 @@ pub mod auth;
 pub mod billing;
 pub mod common;
 pub mod conditions;
+pub mod discovery;
 pub mod oauth;
 pub mod organizations;
 pub mod triggers;

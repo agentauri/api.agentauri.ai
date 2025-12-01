@@ -51,6 +51,9 @@ uuid = { workspace = true }
 # Metrics (optional feature)
 metrics = { workspace = true, optional = true }
 
+# System utilities
+hostname = { workspace = true }
+
 [dev-dependencies]
 mockall = { workspace = true }
 

@@ -662,6 +662,134 @@ Check API and database health.
 
 ---
 
+### Discovery
+
+System metadata endpoint for discoverability.
+
+#### Agent Card
+
+Get system capabilities and metadata.
+
+**Endpoint**: `GET /.well-known/agent.json`
+
+**No authentication required** (public endpoint)
+
+**Caching**: Response is cached for 1 hour (Redis + HTTP Cache-Control header)
+
+**CORS**: Supports cross-origin requests (Access-Control-Allow-Origin: *)
+
+**Response** (200 OK):
+```json
+{
+  "name": "ERC-8004 Backend API",
+  "version": "1.0.0",
+  "description": "Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events",
+  "api_version": "v1",
+  "base_url": "https://api.8004.dev",
+  "capabilities": {
+    "push_layer": {
+      "enabled": true,
+      "features": [
+        "multi_chain_monitoring",
+        "programmable_triggers",
+        "telegram_notifications",
+        "rest_webhooks",
+        "mcp_updates"
+      ],
+      "supported_chains": [
+        {
+          "chain_id": 11155111,
+          "name": "Ethereum Sepolia",
+          "registries": ["identity", "reputation", "validation"]
+        },
+        {
+          "chain_id": 84532,
+          "name": "Base Sepolia",
+          "registries": ["identity", "reputation", "validation"]
+        },
+        {
+          "chain_id": 59141,
+          "name": "Linea Sepolia",
+          "registries": ["identity", "reputation", "validation"]
+        },
+        {
+          "chain_id": 80002,
+          "name": "Polygon Amoy",
+          "registries": ["identity", "reputation", "validation"]
+        }
+      ]
+    },
+    "pull_layer": {
+      "enabled": false,
+      "features": [],
+      "note": "Coming soon in Phase 5"
+    },
+    "authentication": {
+      "methods": ["jwt", "api_key", "wallet_signature"],
+      "oauth2_supported": false
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "tiers": [
+        {
+          "tier": "anonymous",
+          "rate_limit": "10 calls/hour",
+          "authentication": "none"
+        },
+        {
+          "tier": "starter",
+          "rate_limit": "100 calls/hour",
+          "authentication": "api_key"
+        },
+        {
+          "tier": "pro",
+          "rate_limit": "500 calls/hour",
+          "authentication": "api_key"
+        },
+        {
+          "tier": "enterprise",
+          "rate_limit": "2000 calls/hour",
+          "authentication": "api_key"
+        }
+      ]
+    }
+  },
+  "endpoints": {
+    "api_documentation": "https://api.8004.dev/docs",
+    "health_check": "https://api.8004.dev/api/v1/health",
+    "authentication": {
+      "register": "https://api.8004.dev/api/v1/auth/register",
+      "login": "https://api.8004.dev/api/v1/auth/login"
+    },
+    "triggers": "https://api.8004.dev/api/v1/triggers"
+  },
+  "contact": {
+    "email": "support@8004.dev",
+    "github": "https://github.com/erc-8004/api.8004.dev",
+    "documentation": "https://docs.8004.dev"
+  },
+  "protocol_version": "erc-8004-v1.0",
+  "generated_at": "2025-01-30T12:00:00Z"
+}
+```
+
+**Environment Variables**:
+
+The following values can be customized via environment variables:
+- `BASE_URL` - Base URL for the API (default: `https://api.8004.dev`)
+- `CONTACT_EMAIL` - Support email (default: `support@8004.dev`)
+- `CONTACT_GITHUB` - GitHub repository (default: `https://github.com/erc-8004/api.8004.dev`)
+- `DOCUMENTATION_URL` - Documentation site (default: `https://docs.8004.dev`)
+
+**Use Cases**:
+- Client discovery of API capabilities
+- Automated integration setup
+- Version compatibility checking
+- Support chain and registry information
+- Rate limit tier information for client-side planning
+
+---
+
 ### Organizations
 
 Organizations are the multi-tenant unit for grouping resources, members, and billing.

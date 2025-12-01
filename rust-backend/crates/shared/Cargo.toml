@@ -41,3 +41,20 @@ redis = { workspace = true }
 
 # Concurrent data structures for fallback rate limiting
 dashmap = { workspace = true }
+
+# Cryptographic utilities (for secret generation)
+base64 = { workspace = true }
+rand = { workspace = true }
+
+# Optional: AWS Secrets Manager (enable with --features aws-secrets)
+aws-config = { version = "1.0", optional = true }
+aws-sdk-secretsmanager = { version = "1.0", optional = true }
+
+# Optional: HashiCorp Vault (enable with --features vault-secrets)
+vaultrs = { version = "0.7", optional = true }
+
+[features]
+# Secrets management backends
+aws-secrets = ["aws-config", "aws-sdk-secretsmanager"]
+vault-secrets = ["vaultrs"]
+default = []

@@ -25,10 +25,11 @@ mod workers;
 use consumer::{JobConsumer, RedisJobConsumer};
 use dlq::RedisDlq;
 use rate_limiter::TelegramRateLimiter;
+use rest::ReqwestHttpClient;
 use result_logger::PostgresResultLogger;
 use retry::RetryPolicy;
 use telegram::TeloxideTelegramClient;
-use workers::TelegramWorker;
+use workers::{RestWorker, TelegramWorker};
 
 /// Number of concurrent workers
 const NUM_WORKERS: usize = 5;
@@ -93,6 +94,10 @@ async fn main() -> Result<()> {
         }
     };
 
+    // Create HTTP client for REST worker
+    let http_client = Arc::new(ReqwestHttpClient::new().context("Failed to create HTTP client")?);
+    tracing::info!("HTTP client initialized for REST worker");
+
     // Cancellation token for graceful shutdown
     let cancel_token = CancellationToken::new();
 
@@ -110,14 +115,17 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Create Telegram worker template
+    // Create Telegram worker
     let telegram_worker = TelegramWorker::new(
         telegram_client,
-        logger,
-        dlq,
+        logger.clone(),
+        dlq.clone(),
         rate_limiter,
         RetryPolicy::default(),
     );
+
+    // Create REST worker
+    let rest_worker = RestWorker::new(http_client, logger, dlq, RetryPolicy::default());
 
     // Spawn worker pool
     let mut handles = Vec::new();
@@ -125,11 +133,12 @@ async fn main() -> Result<()> {
 
     for worker_id in 0..NUM_WORKERS {
         let consumer = consumer.clone();
-        let worker = telegram_worker.clone();
+        let telegram_worker = telegram_worker.clone();
+        let rest_worker = rest_worker.clone();
         let token = cancel_token.clone();
 
         let handle = tokio::spawn(async move {
-            run_worker(worker_id, consumer, worker, token).await;
+            run_worker(worker_id, consumer, telegram_worker, rest_worker, token).await;
         });
         handles.push(handle);
     }
@@ -158,17 +167,21 @@ async fn main() -> Result<()> {
 }
 
 /// Run a single worker that consumes jobs from the queue
-async fn run_worker<C, T, L, D, R>(
+async fn run_worker<C, T, L1, D1, R, H, L2, D2>(
     worker_id: usize,
     consumer: Arc<C>,
-    worker: TelegramWorker<T, L, D, R>,
+    telegram_worker: TelegramWorker<T, L1, D1, R>,
+    rest_worker: RestWorker<H, L2, D2>,
     cancel_token: CancellationToken,
 ) where
     C: JobConsumer,
     T: telegram::TelegramClient + 'static,
-    L: result_logger::ResultLogger + 'static,
-    D: dlq::DeadLetterQueue + 'static,
+    L1: result_logger::ResultLogger + 'static,
+    D1: dlq::DeadLetterQueue + 'static,
     R: rate_limiter::RateLimiter + 'static,
+    H: rest::HttpClient + 'static,
+    L2: result_logger::ResultLogger + 'static,
+    D2: dlq::DeadLetterQueue + 'static,
 {
     tracing::info!(worker_id = worker_id, "Worker started");
 
@@ -184,29 +197,39 @@ async fn run_worker<C, T, L, D, R>(
             result = consumer.consume(CONSUME_TIMEOUT_SECS) => {
                 match result {
                     Ok(Some(job)) => {
-                        // Check if this is a Telegram job
-                        if job.action_type == ActionType::Telegram {
-                            // TODO: In Phase 4, fetch actual event data from database
-                            // For now, use the job config as event data
-                            let event_data = job.config.clone();
+                        // TODO: In Phase 4, fetch actual event data from database
+                        // For now, use the job config as event data
+                        let event_data = job.config.clone();
 
-                            if let Err(e) = worker.process(&job, &event_data).await {
-                                tracing::error!(
+                        match job.action_type {
+                            ActionType::Telegram => {
+                                if let Err(e) = telegram_worker.process(&job, &event_data).await {
+                                    tracing::error!(
+                                        worker_id = worker_id,
+                                        job_id = %job.id,
+                                        error = %e,
+                                        "Telegram job processing failed (already moved to DLQ)"
+                                    );
+                                }
+                            }
+                            ActionType::Rest => {
+                                if let Err(e) = rest_worker.process(&job, &event_data).await {
+                                    tracing::error!(
+                                        worker_id = worker_id,
+                                        job_id = %job.id,
+                                        error = %e,
+                                        "REST job processing failed (already moved to DLQ)"
+                                    );
+                                }
+                            }
+                            ActionType::Mcp => {
+                                tracing::debug!(
                                     worker_id = worker_id,
                                     job_id = %job.id,
-                                    error = %e,
-                                    "Job processing failed (already moved to DLQ)"
+                                    "Skipping MCP job (not implemented yet)"
                                 );
+                                // TODO: Implement MCP worker in Phase 5
                             }
-                        } else {
-                            tracing::debug!(
-                                worker_id = worker_id,
-                                action_type = %job.action_type,
-                                job_id = %job.id,
-                                "Skipping non-Telegram job (not implemented yet)"
-                            );
-                            // TODO: Route to appropriate worker based on action_type
-                            // For now, these jobs will be ignored
                         }
                     }
                     Ok(None) => {

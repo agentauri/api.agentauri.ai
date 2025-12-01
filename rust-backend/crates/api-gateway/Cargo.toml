@@ -79,6 +79,9 @@ once_cell = "1.19"
 # Cancellation tokens for background tasks
 tokio-util = { workspace = true }
 
+# Redis for caching
+redis = { workspace = true }
+
 [dev-dependencies]
 mockall = { workspace = true }
 actix-rt = { workspace = true }

@@ -10,6 +10,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     let jwt_secret = std::env::var("JWT_SECRET")
         .unwrap_or_else(|_| "dev_secret_change_in_production".to_string());
 
+    // Discovery endpoint (public, outside /api/v1 scope)
+    cfg.service(
+        web::resource("/.well-known/agent.json").route(web::get().to(handlers::get_agent_card)),
+    );
+
     cfg.service(
         web::scope("/api/v1")
             // Health check endpoint (no auth required)

@@ -15,6 +15,7 @@ pub mod error;
 pub mod jobs;
 pub mod models;
 pub mod redis;
+pub mod secrets;
 
 // Re-export commonly used types
 pub use config::Config;

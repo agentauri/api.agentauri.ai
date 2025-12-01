@@ -9,6 +9,9 @@
 //! - **Content-Security-Policy**: Controls resource loading (optional)
 //! - **Referrer-Policy**: Controls referrer information
 //! - **Permissions-Policy**: Controls browser feature permissions
+//! - **Cross-Origin-Embedder-Policy (COEP)**: Protects against Spectre attacks
+//! - **Cross-Origin-Opener-Policy (COOP)**: Isolates browsing context
+//! - **Cross-Origin-Resource-Policy (CORP)**: Controls resource sharing
 //!
 //! # Usage
 //!
@@ -194,6 +197,24 @@ where
                 ),
             );
 
+            // Cross-Origin-Embedder-Policy (COEP): Protect against Spectre attacks
+            headers.insert(
+                HeaderName::from_static("cross-origin-embedder-policy"),
+                HeaderValue::from_static("require-corp"),
+            );
+
+            // Cross-Origin-Opener-Policy (COOP): Isolate browsing context
+            headers.insert(
+                HeaderName::from_static("cross-origin-opener-policy"),
+                HeaderValue::from_static("same-origin"),
+            );
+
+            // Cross-Origin-Resource-Policy (CORP): Control resource sharing
+            headers.insert(
+                HeaderName::from_static("cross-origin-resource-policy"),
+                HeaderValue::from_static("same-origin"),
+            );
+
             // Strict-Transport-Security (HSTS) - only in production with HTTPS
             if config.enable_hsts {
                 let mut hsts_value = format!("max-age={}", config.hsts_max_age);
@@ -323,5 +344,255 @@ mod tests {
         assert!(!config.hsts_preload);
         assert_eq!(config.frame_options, "DENY");
         assert_eq!(config.referrer_policy, "strict-origin-when-cross-origin");
+    }
+
+    #[actix_web::test]
+    async fn test_cross_origin_policies() {
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::default())
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Verify Cross-Origin policies are present
+        assert!(resp.headers().contains_key("cross-origin-embedder-policy"));
+        assert_eq!(
+            resp.headers().get("cross-origin-embedder-policy").unwrap(),
+            "require-corp"
+        );
+
+        assert!(resp.headers().contains_key("cross-origin-opener-policy"));
+        assert_eq!(
+            resp.headers().get("cross-origin-opener-policy").unwrap(),
+            "same-origin"
+        );
+
+        assert!(resp.headers().contains_key("cross-origin-resource-policy"));
+        assert_eq!(
+            resp.headers().get("cross-origin-resource-policy").unwrap(),
+            "same-origin"
+        );
+    }
+
+    #[actix_web::test]
+    async fn test_all_security_headers_present() {
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::for_api())
+                .route("/api/test", web::get().to(test_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/api/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Verify all essential security headers are present
+        let headers = resp.headers();
+
+        // OWASP recommended headers
+        assert!(headers.contains_key("x-content-type-options"));
+        assert!(headers.contains_key("x-frame-options"));
+        assert!(headers.contains_key("x-xss-protection"));
+        assert!(headers.contains_key("referrer-policy"));
+        assert!(headers.contains_key("permissions-policy"));
+
+        // Cross-Origin Policies (Spectre/Meltdown mitigation)
+        assert!(headers.contains_key("cross-origin-embedder-policy"));
+        assert!(headers.contains_key("cross-origin-opener-policy"));
+        assert!(headers.contains_key("cross-origin-resource-policy"));
+
+        // Verify specific values
+        assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+        assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+        assert_eq!(headers.get("x-xss-protection").unwrap(), "1; mode=block");
+        assert_eq!(
+            headers.get("referrer-policy").unwrap(),
+            "strict-origin-when-cross-origin"
+        );
+    }
+
+    #[actix_web::test]
+    async fn test_headers_applied_to_all_routes() {
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::for_api())
+                .route("/", web::get().to(test_handler))
+                .route("/api/v1/health", web::get().to(test_handler))
+                .route("/api/v1/triggers", web::get().to(test_handler)),
+        )
+        .await;
+
+        // Test multiple routes
+        for uri in &["/", "/api/v1/health", "/api/v1/triggers"] {
+            let req = test::TestRequest::get().uri(uri).to_request();
+            let resp = test::call_service(&app, req).await;
+
+            assert!(
+                resp.headers().contains_key("x-content-type-options"),
+                "Missing security headers on {}",
+                uri
+            );
+            assert!(
+                resp.headers().contains_key("cross-origin-embedder-policy"),
+                "Missing COEP on {}",
+                uri
+            );
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_headers_do_not_break_json_responses() {
+        async fn json_handler() -> HttpResponse {
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "test",
+                "data": {"id": 123}
+            }))
+        }
+
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::for_api())
+                .route("/api/test", web::get().to(json_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/api/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Verify security headers are present
+        assert!(resp.headers().contains_key("x-content-type-options"));
+        assert!(resp.headers().contains_key("cross-origin-embedder-policy"));
+
+        // Verify JSON response is still correct
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+        assert!(resp
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("application/json"));
+    }
+
+    #[actix_web::test]
+    async fn test_custom_handler_headers_preserved() {
+        async fn custom_header_handler() -> HttpResponse {
+            HttpResponse::Ok()
+                .insert_header(("X-Custom-Header", "custom-value"))
+                .insert_header(("X-Request-ID", "req-123"))
+                .body("test")
+        }
+
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::for_api())
+                .route("/test", web::get().to(custom_header_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Verify custom headers are preserved
+        assert!(resp.headers().contains_key("x-custom-header"));
+        assert_eq!(resp.headers().get("x-custom-header").unwrap(), "custom-value");
+        assert!(resp.headers().contains_key("x-request-id"));
+
+        // Verify security headers are also present
+        assert!(resp.headers().contains_key("x-content-type-options"));
+        assert!(resp.headers().contains_key("cross-origin-embedder-policy"));
+    }
+
+    #[actix_web::test]
+    async fn test_hsts_enabled_in_production() {
+        let config = SecurityHeadersConfig {
+            enable_hsts: true,
+            hsts_max_age: 31_536_000,
+            hsts_include_subdomains: true,
+            hsts_preload: false,
+            frame_options: "DENY".to_string(),
+            content_security_policy: None,
+            referrer_policy: "strict-origin-when-cross-origin".to_string(),
+        };
+
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::new(config))
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert!(resp.headers().contains_key("strict-transport-security"));
+        assert_eq!(
+            resp.headers().get("strict-transport-security").unwrap(),
+            "max-age=31536000; includeSubDomains"
+        );
+    }
+
+    #[actix_web::test]
+    async fn test_hsts_with_preload() {
+        let config = SecurityHeadersConfig {
+            enable_hsts: true,
+            hsts_max_age: 31_536_000,
+            hsts_include_subdomains: true,
+            hsts_preload: true,
+            frame_options: "DENY".to_string(),
+            content_security_policy: None,
+            referrer_policy: "strict-origin-when-cross-origin".to_string(),
+        };
+
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::new(config))
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert!(resp.headers().contains_key("strict-transport-security"));
+        assert_eq!(
+            resp.headers()
+                .get("strict-transport-security")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "max-age=31536000; includeSubDomains; preload"
+        );
+    }
+
+    #[actix_web::test]
+    async fn test_permissions_policy_comprehensive() {
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::for_api())
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/test").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        let permissions = resp
+            .headers()
+            .get("permissions-policy")
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        // Verify dangerous features are disabled
+        assert!(permissions.contains("geolocation=()"));
+        assert!(permissions.contains("camera=()"));
+        assert!(permissions.contains("microphone=()"));
+        assert!(permissions.contains("payment=()"));
+        assert!(permissions.contains("usb=()"));
     }
 }
