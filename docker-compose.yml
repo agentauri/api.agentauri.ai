@@ -14,11 +14,19 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password must be set in .env file}
       POSTGRES_DB: ${DB_NAME:-erc8004_backend}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
       # SECURITY: Bind to localhost only to prevent external access
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./docker/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./docker/postgres/certs/root.crt:/var/lib/postgresql/root.crt:ro
+      - ./docker/postgres/certs/server.crt:/var/lib/postgresql/server.crt:ro
+      - ./docker/postgres/certs/server.key:/var/lib/postgresql/server.key:ro
+      - postgres_wal_archive:/var/lib/postgresql/wal_archive
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
@@ -120,8 +128,74 @@ services:
           cpus: '0.25'
           memory: 256M
 
+  # ==========================================================================
+  # HTTPS/TLS LAYER - Nginx Reverse Proxy + Let's Encrypt
+  # ==========================================================================
+  # Production-only services for HTTPS termination and certificate management
+  # Disable in development by commenting out or using docker-compose profiles
+  # ==========================================================================
+
+  nginx:
+    image: nginx:1.25-alpine  # Pinned version for security
+    container_name: erc8004-nginx
+    ports:
+      # Expose HTTP and HTTPS to the internet
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Nginx configuration
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      # SSL certificates (managed by Certbot)
+      - ./docker/certbot/conf:/etc/letsencrypt:ro
+      - ./docker/certbot/www:/var/www/certbot:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - default
+    profiles:
+      - production  # Only start in production (use: docker compose --profile production up)
+
+  certbot:
+    image: certbot/certbot:latest  # Always use latest for security patches
+    container_name: erc8004-certbot
+    volumes:
+      # Certificate storage (shared with nginx)
+      - ./docker/certbot/conf:/etc/letsencrypt
+      - ./docker/certbot/www:/var/www/certbot
+    # Auto-renewal loop: check every 12 hours, renew if <30 days until expiry
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+    restart: unless-stopped
+    # Resource limits (minimal, only runs briefly)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    networks:
+      - default
+    profiles:
+      - production  # Only start in production
+
 volumes:
   postgres_data:
+  postgres_wal_archive:  # WAL archive for PITR backups
   redis_data:
   prometheus_data:
   grafana_data:

@@ -1,0 +1,128 @@
+# Docker Compose configuration for HashiCorp Vault (Development)
+#
+# This configuration sets up a local Vault server for development and testing.
+# It includes Vault UI for easy secret management.
+#
+# IMPORTANT: This is for DEVELOPMENT ONLY
+# - Runs in dev mode (unsealed, in-memory storage)
+# - Root token is hardcoded (DO NOT use in production)
+# - TLS is disabled (DO NOT use in production)
+# - Data is not persisted (restarts clear all secrets)
+#
+# Usage:
+#   docker-compose -f docker-compose.vault.yml up -d
+#   docker-compose -f docker-compose.vault.yml down
+#
+# Access Vault UI: http://localhost:8200
+# Root token: dev-root-token
+
+version: '3.8'
+
+services:
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: erc8004_vault_dev
+    ports:
+      - "8200:8200"
+    environment:
+      # Dev mode configuration
+      VAULT_DEV_ROOT_TOKEN_ID: "dev-root-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    cap_add:
+      - IPC_LOCK
+    command:
+      - "server"
+      - "-dev"
+      - "-dev-root-token-id=dev-root-token"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - erc8004_network
+
+  # Vault initializer (runs once to set up secrets engine)
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: erc8004_vault_init
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "dev-root-token"
+    depends_on:
+      vault:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Vault to be ready..."
+        sleep 5
+
+        echo "Enabling KV v2 secrets engine at secret/..."
+        vault secrets enable -version=2 -path=secret kv || echo "KV v2 already enabled"
+
+        echo "Creating example secrets for development..."
+
+        # Tier 1: Critical secrets
+        vault kv put secret/erc8004/database_url \
+          value="postgresql://postgres:password@postgres:5432/erc8004_backend"
+
+        vault kv put secret/erc8004/redis_url \
+          value="redis://redis:6379"
+
+        vault kv put secret/erc8004/jwt_secret \
+          value="dev_vault_jwt_secret_32_characters_long"
+
+        vault kv put secret/erc8004/stripe_secret_key \
+          value="sk_test_dev_vault_stripe_key"
+
+        vault kv put secret/erc8004/stripe_webhook_secret \
+          value="whsec_dev_vault_webhook_secret"
+
+        # Tier 2: Important secrets
+        vault kv put secret/erc8004/ethereum_sepolia_rpc_url \
+          value="https://eth-sepolia.public.blastapi.io"
+
+        vault kv put secret/erc8004/base_sepolia_rpc_url \
+          value="https://base-sepolia.public.blastapi.io"
+
+        vault kv put secret/erc8004/linea_sepolia_rpc_url \
+          value="https://linea-sepolia.public.blastapi.io"
+
+        vault kv put secret/erc8004/api_encryption_key \
+          value="dev_vault_api_encryption_key_32_chars"
+
+        vault kv put secret/erc8004/telegram_bot_token \
+          value="123456:ABC-DEF1234ghIkl-dev-vault"
+
+        echo "Vault initialization complete!"
+        echo ""
+        echo "=== Vault Development Setup ==="
+        echo "Vault UI: http://localhost:8200"
+        echo "Root Token: dev-root-token"
+        echo ""
+        echo "To access secrets:"
+        echo "  export VAULT_ADDR='http://localhost:8200'"
+        echo "  export VAULT_TOKEN='dev-root-token'"
+        echo "  vault kv get secret/erc8004/database_url"
+        echo ""
+        echo "To use with application:"
+        echo "  export SECRETS_BACKEND=vault"
+        echo "  export VAULT_ADDR='http://localhost:8200'"
+        echo "  export VAULT_TOKEN='dev-root-token'"
+        echo ""
+    networks:
+      - erc8004_network
+    restart: "no"
+
+networks:
+  erc8004_network:
+    name: erc8004_network
+    driver: bridge
+
+# Volume for persistent storage (commented out for dev mode)
+# volumes:
+#   vault-data:
+#     driver: local
