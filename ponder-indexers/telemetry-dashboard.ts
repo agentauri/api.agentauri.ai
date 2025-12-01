@@ -10,6 +10,11 @@
 
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
+
+// Load environment variables from .env file
+const dotenv = require("dotenv");
+dotenv.config();
+
 const pg = require("pg");
 
 const { Pool } = pg;
@@ -66,33 +71,33 @@ async function fetchStats(): Promise<Map<number, ChainStats>> {
   try {
     // Get current block per chain from checkpoints
     const checkpointResult = await pool.query(`
-      SELECT "chainId", "lastBlockNumber"
+      SELECT chain_id, last_block_number
       FROM "Checkpoint"
     `);
 
     for (const row of checkpointResult.rows) {
-      const chain = stats.get(Number(row.chainId));
+      const chain = stats.get(Number(row.chain_id));
       if (chain) {
-        chain.currentBlock = Number(row.lastBlockNumber);
+        chain.currentBlock = Number(row.last_block_number);
       }
     }
 
     // Get event counts grouped by chain and event type
     const eventsResult = await pool.query(`
       SELECT
-        "chainId",
+        chain_id,
         registry,
-        "eventType",
+        event_type,
         COUNT(*) as count
       FROM "Event"
-      GROUP BY "chainId", registry, "eventType"
-      ORDER BY "chainId", registry, "eventType"
+      GROUP BY chain_id, registry, event_type
+      ORDER BY chain_id, registry, event_type
     `);
 
     for (const row of eventsResult.rows) {
-      const chain = stats.get(Number(row.chainId));
+      const chain = stats.get(Number(row.chain_id));
       if (chain) {
-        const eventName = `${row.registry}:${row.eventType}`;
+        const eventName = `${row.registry}:${row.event_type}`;
         chain.events[eventName] = { count: Number(row.count) };
         chain.totalEvents += Number(row.count);
       }
