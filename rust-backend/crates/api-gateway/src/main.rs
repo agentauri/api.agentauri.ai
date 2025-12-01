@@ -2,11 +2,6 @@
 //!
 //! REST API server providing trigger management and system queries.
 
-// TODO: Fix Clippy warnings in follow-up PR
-#![allow(clippy::all)]
-// Allow dead code for OAuth and wallet services (not yet fully implemented)
-#![allow(dead_code)]
-
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use anyhow::Context;
 use shared::{db, Config, RateLimiter};

@@ -233,7 +233,10 @@ pub async fn extract_auth_context(req: &HttpRequest, pool: &DbPool) -> AuthConte
     let ip_address = ip_extractor::extract_ip(req);
 
     // Check for API Key auth (Layer 1) - stored in request extensions by DualAuth middleware
-    if let Some(api_key_auth) = req.extensions().get::<ApiKeyAuth>() {
+    // Clone the api_key_auth to avoid holding RefCell borrow across await point
+    let api_key_auth_opt = req.extensions().get::<ApiKeyAuth>().cloned();
+
+    if let Some(api_key_auth) = api_key_auth_opt {
         // Look up organization plan
         let plan = get_organization_plan(pool, &api_key_auth.api_key.organization_id)
             .await
@@ -253,18 +256,16 @@ pub async fn extract_auth_context(req: &HttpRequest, pool: &DbPool) -> AuthConte
             "Extracted Layer 1 auth context"
         );
 
-        return AuthContext::api_key(api_key_auth, ip_address, plan);
+        return AuthContext::api_key(&api_key_auth, ip_address, plan);
     }
 
-    // Check for JWT claims (could be Layer 2 or just authenticated user)
+    // Check for JWT claims (Layer 1 authentication without API key)
+    // Note: Layer 2 (Wallet Signature) is handled via agent_links table
+    // and WalletService, not through JWT claims directly
     if let Some(claims) = req.extensions().get::<Claims>() {
-        // TODO: Check if this user has linked agents (Layer 2)
-        // For now, JWT auth without API key falls through to Layer 0
-        // In Week 12, we'll add agent linking checks here
-
         debug!(
             user_id = %claims.sub,
-            "JWT detected but no agent linking implemented yet (falling to Layer 0)"
+            "JWT detected without API key - falling back to Layer 0 (anonymous)"
         );
     }
 
