@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 /// Regex pattern for Ethereum address validation (0x + 40 hex chars)
+#[allow(dead_code)] // Future feature: ETH address validation for Layer 2 wallet authentication
 pub static ETH_ADDRESS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^0x[a-fA-F0-9]{40}$").expect("Invalid ETH address regex"));
 

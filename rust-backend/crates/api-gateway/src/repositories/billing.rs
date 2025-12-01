@@ -1,5 +1,9 @@
 //! Billing repository for credits and transactions
 //!
+//! **Note**: Some billing features are partially implemented but not yet integrated:
+//! - Credit deduction and balance checking (Phase 4-5: Query tier billing)
+//! - x402 crypto payment integration (Phase 5)
+//!
 //! Handles storage and retrieval of organization credits, transactions,
 //! and subscription data.
 
@@ -14,6 +18,7 @@ pub struct CreditRepository;
 
 impl CreditRepository {
     /// Initialize credits for an organization (called during org creation)
+    #[allow(dead_code)] // Future feature: Called during organization creation
     pub async fn initialize<'e, E>(executor: E, organization_id: &str) -> Result<Credit>
     where
         E: Executor<'e, Database = Postgres>,
@@ -79,6 +84,7 @@ impl CreditRepository {
     ///
     /// NOTE: This method is NOT safe for concurrent requests. Use `deduct_credits_atomic`
     /// instead when handling concurrent credit deductions.
+    #[allow(dead_code)] // Future feature: Query tier billing
     pub async fn deduct_credits<'e, E>(
         executor: E,
         organization_id: &str,
@@ -109,6 +115,7 @@ impl CreditRepository {
     ///
     /// This method uses SELECT ... FOR UPDATE to lock the row, preventing
     /// concurrent transactions from reading stale balance data.
+    #[allow(dead_code)] // Future feature: Query tier billing
     pub async fn deduct_credits_atomic(
         pool: &DbPool,
         organization_id: &str,
@@ -159,6 +166,7 @@ impl CreditRepository {
     }
 
     /// Check if organization has sufficient balance
+    #[allow(dead_code)] // Future feature: Query tier billing
     pub async fn has_sufficient_balance(
         pool: &DbPool,
         organization_id: &str,
@@ -180,6 +188,17 @@ impl CreditRepository {
 
         Ok(result)
     }
+}
+
+/// Parameters for creating a credit transaction
+pub struct CreateTransactionParams<'a> {
+    pub organization_id: &'a str,
+    pub amount: i64,
+    pub transaction_type: &'a str,
+    pub description: Option<&'a str>,
+    pub reference_id: Option<&'a str>,
+    pub balance_after: i64,
+    pub metadata: Option<serde_json::Value>,
 }
 
 pub struct TransactionRepository;
@@ -206,13 +225,7 @@ impl TransactionRepository {
     /// Record a credit transaction
     pub async fn create<'e, E>(
         executor: E,
-        organization_id: &str,
-        amount: i64,
-        transaction_type: &str,
-        description: Option<&str>,
-        reference_id: Option<&str>,
-        balance_after: i64,
-        metadata: Option<serde_json::Value>,
+        params: CreateTransactionParams<'_>,
     ) -> Result<CreditTransaction>
     where
         E: Executor<'e, Database = Postgres>,
@@ -227,13 +240,13 @@ impl TransactionRepository {
             RETURNING *
             "#,
         )
-        .bind(organization_id)
-        .bind(amount)
-        .bind(transaction_type)
-        .bind(description)
-        .bind(reference_id)
-        .bind(balance_after)
-        .bind(metadata)
+        .bind(params.organization_id)
+        .bind(params.amount)
+        .bind(params.transaction_type)
+        .bind(params.description)
+        .bind(params.reference_id)
+        .bind(params.balance_after)
+        .bind(params.metadata)
         .fetch_one(executor)
         .await
         .context("Failed to create transaction")?;
@@ -285,6 +298,7 @@ impl TransactionRepository {
     }
 
     /// Get transaction by ID
+    #[allow(dead_code)] // Future feature: GET /api/v1/billing/transactions/:id endpoint
     pub async fn find_by_id(pool: &DbPool, id: i64) -> Result<Option<CreditTransaction>> {
         let tx = sqlx::query_as::<_, CreditTransaction>(
             r#"
@@ -412,8 +426,11 @@ impl SubscriptionRepository {
     }
 }
 
+/// Repository for payment nonces (x402 crypto payment integration)
+#[allow(dead_code)] // Future feature: x402 crypto payment
 pub struct PaymentNonceRepository;
 
+#[allow(dead_code)] // Future feature: x402 crypto payment
 impl PaymentNonceRepository {
     /// Create a payment nonce (for x402 idempotency)
     pub async fn create<'e, E>(

@@ -64,13 +64,12 @@ pub async fn process_event<Q: JobQueue>(
     let start = Instant::now();
 
     // STEP 1: Check if this event has already been processed (idempotency check)
-    let already_processed: (bool,) = sqlx::query_as(
-        "SELECT is_event_processed($1) as already_processed"
-    )
-    .bind(event_id)
-    .fetch_one(db_pool)
-    .await
-    .context("Failed to check if event is already processed")?;
+    let already_processed: (bool,) =
+        sqlx::query_as("SELECT is_event_processed($1) as already_processed")
+            .bind(event_id)
+            .fetch_one(db_pool)
+            .await
+            .context("Failed to check if event is already processed")?;
 
     if already_processed.0 {
         tracing::debug!(
@@ -126,7 +125,7 @@ pub async fn process_event<Q: JobQueue>(
 
         // Emit metric for monitoring
         #[cfg(feature = "metrics")]
-        metrics::counter!("event_processor.trigger_count_exceeded", 1);
+        metrics::counter!("event_processor.trigger_count_exceeded").increment(1);
 
         // Truncate to max allowed (keeps first N triggers by creation order)
         triggers.truncate(MAX_TRIGGERS_PER_EVENT);
@@ -228,7 +227,8 @@ pub async fn process_event<Q: JobQueue>(
                     );
                     // Emit metric for monitoring
                     #[cfg(feature = "metrics")]
-                    metrics::counter!("event_processor.circuit_breaker_persistence_failures", 1);
+                    metrics::counter!("event_processor.circuit_breaker_persistence_failures")
+                        .increment(1);
                 }
 
                 matched_count += 1;
@@ -264,7 +264,8 @@ pub async fn process_event<Q: JobQueue>(
                             );
                             // Emit metric for monitoring
                             #[cfg(feature = "metrics")]
-                            metrics::counter!("event_processor.action_type_parse_failures", 1);
+                            metrics::counter!("event_processor.action_type_parse_failures")
+                                .increment(1);
 
                             continue; // Skip this action, process others
                         }
@@ -302,7 +303,7 @@ pub async fn process_event<Q: JobQueue>(
                             );
                             // Emit metric for monitoring
                             #[cfg(feature = "metrics")]
-                            metrics::counter!("event_processor.action_enqueue_failures", 1);
+                            metrics::counter!("event_processor.action_enqueue_failures").increment(1);
 
                             // Continue processing other actions
                         }
@@ -332,7 +333,8 @@ pub async fn process_event<Q: JobQueue>(
                     );
                     // Emit metric for monitoring
                     #[cfg(feature = "metrics")]
-                    metrics::counter!("event_processor.circuit_breaker_persistence_failures", 1);
+                    metrics::counter!("event_processor.circuit_breaker_persistence_failures")
+                        .increment(1);
                 }
 
                 tracing::debug!(
@@ -353,7 +355,8 @@ pub async fn process_event<Q: JobQueue>(
                     );
                     // Emit metric for monitoring
                     #[cfg(feature = "metrics")]
-                    metrics::counter!("event_processor.circuit_breaker_persistence_failures", 1);
+                    metrics::counter!("event_processor.circuit_breaker_persistence_failures")
+                        .increment(1);
                 }
 
                 tracing::error!(
@@ -543,7 +546,7 @@ mod tests {
         assert!(!hostname.is_empty(), "Hostname should not be empty");
         // Allow "unknown" as fallback
         assert!(
-            hostname != "" || hostname == "unknown",
+            !hostname.is_empty() || hostname == "unknown",
             "Hostname should be valid or 'unknown'"
         );
     }

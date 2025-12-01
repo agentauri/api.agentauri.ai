@@ -1,5 +1,7 @@
 //! Wallet repository for nonce management
 //!
+//! **Note**: Wallet authentication is a Layer 2 feature that will be completed in Phase 4-5.
+//!
 //! Handles storage and validation of wallet authentication nonces.
 
 use anyhow::{Context, Result};
@@ -57,6 +59,7 @@ impl NonceRepository {
     }
 
     /// Find a nonce by value
+    #[allow(dead_code)] // Future feature: Layer 2 wallet authentication
     pub async fn find_nonce(pool: &DbPool, nonce: &str) -> Result<Option<UsedNonce>> {
         let result = sqlx::query_as::<_, UsedNonce>(
             r#"

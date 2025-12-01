@@ -64,6 +64,7 @@ pub enum WebhookEvent {
     /// Checkout session completed successfully
     CheckoutCompleted {
         session_id: String,
+        #[allow(dead_code)] // Future feature: Link customer to organization
         customer_id: Option<String>,
         amount_paid: i64,
         organization_id: String,
@@ -85,11 +86,13 @@ pub enum WebhookEvent {
     SubscriptionUpdated {
         subscription_id: String,
         status: String,
+        #[allow(dead_code)] // Future feature: Track subscription billing cycles
         current_period_end: DateTime<Utc>,
     },
     /// Subscription canceled
     SubscriptionCanceled {
         subscription_id: String,
+        #[allow(dead_code)] // Future feature: Track cancellation history
         canceled_at: DateTime<Utc>,
     },
     /// Unknown event type (ignored)

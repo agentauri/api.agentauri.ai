@@ -323,13 +323,11 @@ mod tests {
     #[::core::prelude::v1::test]
     fn test_cors_configuration_parsing() {
         // Test that the cors() function can be called and returns valid middleware
+        // If this test completes without panicking, the configuration is valid
         env::set_var("ENVIRONMENT", "development");
         env::set_var("CORS_ALLOWED_ORIGINS", "http://localhost:3000");
 
         let _cors_middleware = cors();
-
-        // If we get here without panic, the function works correctly
-        assert!(true);
 
         // Clean up
         env::remove_var("ENVIRONMENT");

@@ -1,8 +1,14 @@
-//! OAuth DTOs and Models
+//! OAuth DTOs and Models (Future Feature)
+//!
+//! **Note**: This module is implemented but not yet fully integrated with the API Gateway.
+//! OAuth authorization code flow will be completed in a future phase. Some items have
+//! `#[allow(dead_code)]` annotations.
 //!
 //! This module provides:
 //! - Request/Response DTOs for OAuth endpoints
 //! - Validation helpers
+
+#![allow(dead_code)] // Future feature: OAuth authorization code flow
 //! - Re-exports of database models from shared crate
 //!
 //! # OAuth 2.0 Flow

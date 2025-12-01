@@ -1,6 +1,12 @@
-//! OAuth Database Repository
+//! OAuth Database Repository (Future Feature)
+//!
+//! **Note**: OAuth authorization code flow is partially implemented but not yet fully integrated.
+//! This will be completed in a future phase.
 //!
 //! This module provides database access for OAuth clients and tokens.
+
+#![allow(dead_code)] // Future feature: OAuth authorization code flow
+
 //!
 //! # Security Considerations
 //!
@@ -173,7 +179,7 @@ impl OAuthClientRepository {
             query.push_str(&format!(", scopes = ${}", param_count));
         }
 
-        query.push_str(&format!(" WHERE client_id = $1 RETURNING *"));
+        query.push_str(" WHERE client_id = $1 RETURNING *");
 
         let mut q = sqlx::query_as::<_, OAuthClient>(&query).bind(client_id);
 

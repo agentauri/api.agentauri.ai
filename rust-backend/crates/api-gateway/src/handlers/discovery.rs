@@ -64,8 +64,8 @@ pub async fn get_agent_card(config: web::Data<shared::Config>) -> Result<HttpRes
 
     // Generate fresh Agent Card
     let agent_card = generate_agent_card();
-    let json_body = serde_json::to_string(&agent_card)
-        .map_err(actix_web::error::ErrorInternalServerError)?;
+    let json_body =
+        serde_json::to_string(&agent_card).map_err(actix_web::error::ErrorInternalServerError)?;
 
     // Try to cache (non-blocking - don't fail if cache write fails)
     if let Err(e) = try_set_cache(&config.redis.connection_url(), &json_body).await {

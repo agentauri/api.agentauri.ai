@@ -104,9 +104,11 @@ impl SecurityHeaders {
 
     /// Create with API-friendly defaults (no CSP that might break JSON responses)
     pub fn for_api() -> Self {
-        let mut config = SecurityHeadersConfig::default();
         // APIs typically don't need CSP (no HTML/JS)
-        config.content_security_policy = None;
+        let config = SecurityHeadersConfig {
+            content_security_policy: None,
+            ..Default::default()
+        };
         Self::new(config)
     }
 }
@@ -499,7 +501,10 @@ mod tests {
 
         // Verify custom headers are preserved
         assert!(resp.headers().contains_key("x-custom-header"));
-        assert_eq!(resp.headers().get("x-custom-header").unwrap(), "custom-value");
+        assert_eq!(
+            resp.headers().get("x-custom-header").unwrap(),
+            "custom-value"
+        );
         assert!(resp.headers().contains_key("x-request-id"));
 
         // Verify security headers are also present

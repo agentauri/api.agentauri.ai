@@ -38,12 +38,14 @@ impl MockJobQueue {
             .block_on(async { *self.should_fail.lock().await = true });
     }
 
+    #[allow(dead_code)] // Used in some tests
     fn disable_failures(&self) {
         tokio::runtime::Runtime::new()
             .unwrap()
             .block_on(async { *self.should_fail.lock().await = false });
     }
 
+    #[allow(dead_code)] // Used in some tests
     async fn get_job_count(&self) -> usize {
         self.jobs.lock().await.len()
     }

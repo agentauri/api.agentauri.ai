@@ -59,7 +59,15 @@ impl QueryTier {
     }
 
     /// Parse tier from a string
-    pub fn from_str(s: &str) -> Option<Self> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use api_gateway::middleware::QueryTier;
+    /// assert_eq!(QueryTier::parse("tier0"), Some(QueryTier::Tier0));
+    /// assert_eq!(QueryTier::parse("2"), Some(QueryTier::Tier2));
+    /// ```
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "tier0" | "0" => Some(QueryTier::Tier0),
             "tier1" | "1" => Some(QueryTier::Tier1),
@@ -77,7 +85,7 @@ impl QueryTier {
         let segments: Vec<&str> = path.split('/').collect();
         for (i, segment) in segments.iter().enumerate() {
             if *segment == "queries" && i + 1 < segments.len() {
-                if let Some(tier) = Self::from_str(segments[i + 1]) {
+                if let Some(tier) = Self::parse(segments[i + 1]) {
                     return Some(tier);
                 }
             }
@@ -92,7 +100,7 @@ impl QueryTier {
         for param in query_string.split('&') {
             let parts: Vec<&str> = param.split('=').collect();
             if parts.len() == 2 && parts[0] == "tier" {
-                if let Some(tier) = Self::from_str(parts[1]) {
+                if let Some(tier) = Self::parse(parts[1]) {
                     return Some(tier);
                 }
             }
@@ -160,7 +168,7 @@ where
             let tier = QueryTier::from_path(path)
                 .or_else(|| {
                     // Fallback: check query parameters
-                    req.uri().query().and_then(|q| QueryTier::from_query(q))
+                    req.uri().query().and_then(QueryTier::from_query)
                 })
                 .unwrap_or(QueryTier::Tier0); // Default to Tier 0
 
@@ -202,17 +210,17 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_query_tier_from_str() {
-        assert_eq!(QueryTier::from_str("tier0"), Some(QueryTier::Tier0));
-        assert_eq!(QueryTier::from_str("tier1"), Some(QueryTier::Tier1));
-        assert_eq!(QueryTier::from_str("tier2"), Some(QueryTier::Tier2));
-        assert_eq!(QueryTier::from_str("tier3"), Some(QueryTier::Tier3));
-        assert_eq!(QueryTier::from_str("0"), Some(QueryTier::Tier0));
-        assert_eq!(QueryTier::from_str("1"), Some(QueryTier::Tier1));
-        assert_eq!(QueryTier::from_str("2"), Some(QueryTier::Tier2));
-        assert_eq!(QueryTier::from_str("3"), Some(QueryTier::Tier3));
-        assert_eq!(QueryTier::from_str("TIER0"), Some(QueryTier::Tier0));
-        assert_eq!(QueryTier::from_str("invalid"), None);
+    async fn test_query_tier_parse() {
+        assert_eq!(QueryTier::parse("tier0"), Some(QueryTier::Tier0));
+        assert_eq!(QueryTier::parse("tier1"), Some(QueryTier::Tier1));
+        assert_eq!(QueryTier::parse("tier2"), Some(QueryTier::Tier2));
+        assert_eq!(QueryTier::parse("tier3"), Some(QueryTier::Tier3));
+        assert_eq!(QueryTier::parse("0"), Some(QueryTier::Tier0));
+        assert_eq!(QueryTier::parse("1"), Some(QueryTier::Tier1));
+        assert_eq!(QueryTier::parse("2"), Some(QueryTier::Tier2));
+        assert_eq!(QueryTier::parse("3"), Some(QueryTier::Tier3));
+        assert_eq!(QueryTier::parse("TIER0"), Some(QueryTier::Tier0));
+        assert_eq!(QueryTier::parse("invalid"), None);
     }
 
     #[actix_web::test]

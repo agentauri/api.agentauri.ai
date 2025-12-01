@@ -178,7 +178,7 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
                         total_tasks_spawned += 1;
 
                         // Log metrics periodically (every 100 tasks)
-                        if total_tasks_spawned % 100 == 0 {
+                        if total_tasks_spawned.is_multiple_of(100) {
                             tracing::info!(
                                 tasks_spawned = total_tasks_spawned,
                                 tasks_succeeded = total_tasks_succeeded,
@@ -236,7 +236,7 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
 
                         // Emit metric for transient errors
                         #[cfg(feature = "metrics")]
-                        metrics::counter!("event_processor.listener_transient_errors", 1);
+                        metrics::counter!("event_processor.listener_transient_errors").increment(1);
 
                         // Exponential backoff before retry
                         tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
@@ -282,7 +282,7 @@ pub async fn start_listening(db_pool: DbPool, redis_conn: MultiplexedConnection)
 
                         // Increment panic metric (would be Prometheus in production)
                         #[cfg(feature = "metrics")]
-                        metrics::counter!("event_processor.spawned_tasks_panicked", 1);
+                        metrics::counter!("event_processor.spawned_tasks_panicked").increment(1);
 
                         // Note: We don't bail here - polling fallback will catch the event
                     }
@@ -300,7 +300,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use event_processor::queue::JobQueue; // FIX 1.2: Add missing import
-    use shared::{ActionJob, ActionType};  // FIX 1.2: Add missing imports
+    use shared::{ActionJob, ActionType}; // FIX 1.2: Add missing imports
     use std::sync::{Arc, Mutex};
 
     /// Mock job queue for testing

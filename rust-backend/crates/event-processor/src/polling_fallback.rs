@@ -54,7 +54,9 @@ struct UnprocessedEvent {
     id: String,
     chain_id: i64,
     block_number: i64,
+    #[allow(dead_code)] // Used in SQL query and debug logs
     registry: String,
+    #[allow(dead_code)] // Used in SQL query and debug logs
     event_type: String,
 }
 
@@ -142,7 +144,8 @@ impl PollingFallback {
                         );
                         // Increment Prometheus metric
                         #[cfg(feature = "metrics")]
-                        metrics::counter!("event_processor.polling_fallback.events_recovered", count as u64);
+                        metrics::counter!("event_processor.polling_fallback.events_recovered")
+                            .increment(count as u64);
                     } else {
                         debug!("Polling fallback: no unprocessed events found");
                     }
@@ -242,7 +245,8 @@ impl PollingFallback {
 
                         // Emit metric for monitoring
                         #[cfg(feature = "metrics")]
-                        metrics::counter!("event_processor.polling_fallback.batch_aborted", 1);
+                        metrics::counter!("event_processor.polling_fallback.batch_aborted")
+                            .increment(1);
 
                         break; // Abort this batch, will retry in next poll
                     }
@@ -268,8 +272,10 @@ impl PollingFallback {
             // Emit metrics
             #[cfg(feature = "metrics")]
             {
-                metrics::counter!("event_processor.polling_fallback.events_failed", failed_count as u64);
-                metrics::gauge!("event_processor.polling_fallback.failure_rate", failure_rate);
+                metrics::counter!("event_processor.polling_fallback.events_failed")
+                    .increment(failed_count as u64);
+                metrics::gauge!("event_processor.polling_fallback.failure_rate")
+                    .set(failure_rate);
             }
         }
 

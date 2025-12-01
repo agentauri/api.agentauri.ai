@@ -73,7 +73,7 @@ impl JobQueue for RedisJobQueue {
 
             // Emit metric for monitoring
             #[cfg(feature = "metrics")]
-            metrics::counter!("event_processor.queue_rejections", 1);
+            metrics::counter!("event_processor.queue_rejections").increment(1);
 
             bail!(
                 "Redis queue depth {} exceeds critical threshold {} - rejecting job to prevent memory exhaustion",
@@ -95,7 +95,7 @@ impl JobQueue for RedisJobQueue {
 
             // Emit metric for monitoring
             #[cfg(feature = "metrics")]
-            metrics::gauge!("event_processor.queue_depth_high", 1.0);
+            metrics::gauge!("event_processor.queue_depth_high").set(1.0);
         }
 
         // Serialize job
@@ -111,7 +111,7 @@ impl JobQueue for RedisJobQueue {
 
         // Emit queue depth metric for Prometheus
         #[cfg(feature = "metrics")]
-        metrics::gauge!("event_processor.queue_depth", queue_depth as f64);
+        metrics::gauge!("event_processor.queue_depth").set(queue_depth as f64);
 
         tracing::debug!(
             job_id = %job.id,

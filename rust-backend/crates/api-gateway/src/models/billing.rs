@@ -1,4 +1,8 @@
 //! Billing and credits DTOs
+//!
+//! **Note**: Stripe integration and x402 crypto payment features are partially implemented.
+//! Some DTOs and database models are defined but not yet fully integrated with handlers.
+//! These will be completed in Phase 4-5.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -87,6 +91,7 @@ fn default_limit() -> i64 {
 
 /// Request to purchase credits via Stripe
 #[derive(Debug, Deserialize, Validate)]
+#[allow(dead_code)] // Future feature: Stripe checkout integration
 pub struct PurchaseCreditsRequest {
     /// Amount in USDC (whole units, e.g., 10 for $10)
     #[validate(range(min = 1, max = 10000))]
@@ -137,6 +142,7 @@ pub struct SubscriptionResponse {
 
 /// Database model for credits table
 #[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)] // Fields used by SQLx FromRow and in SQL queries
 pub struct Credit {
     pub id: String,
     pub organization_id: String,
@@ -150,12 +156,14 @@ pub struct Credit {
 #[derive(Debug, sqlx::FromRow)]
 pub struct CreditTransaction {
     pub id: i64,
+    #[allow(dead_code)] // Used in SQL queries and database operations
     pub organization_id: String,
     pub amount: i64,
     pub transaction_type: String,
     pub description: Option<String>,
     pub reference_id: Option<String>,
     pub balance_after: i64,
+    #[allow(dead_code)] // Used in SQL queries and database operations
     pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
@@ -178,15 +186,20 @@ impl From<CreditTransaction> for CreditTransactionResponse {
 #[derive(Debug, sqlx::FromRow)]
 pub struct Subscription {
     pub id: String,
+    #[allow(dead_code)] // Used in SQL queries and database operations
     pub organization_id: String,
+    #[allow(dead_code)] // Used in Stripe webhook integration
     pub stripe_subscription_id: Option<String>,
+    #[allow(dead_code)] // Used in Stripe webhook integration
     pub stripe_customer_id: Option<String>,
     pub plan: String,
     pub status: String,
     pub current_period_start: Option<DateTime<Utc>>,
     pub current_period_end: Option<DateTime<Utc>>,
     pub canceled_at: Option<DateTime<Utc>>,
+    #[allow(dead_code)] // Used in SQL queries
     pub created_at: DateTime<Utc>,
+    #[allow(dead_code)] // Used in SQL queries
     pub updated_at: DateTime<Utc>,
 }
 
@@ -205,6 +218,7 @@ impl From<Subscription> for SubscriptionResponse {
 
 /// Database model for payment_nonces table
 #[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)] // Future feature: x402 crypto payment integration
 pub struct PaymentNonce {
     pub id: String,
     pub organization_id: String,

@@ -1,5 +1,8 @@
 //! Agent links repository for database operations
 //!
+//! **Note**: Agent linking is a Layer 2 feature that will be completed in Phase 4-5.
+//! Some repository methods are implemented but not yet integrated with handlers.
+//!
 //! Handles storage and retrieval of agent-to-organization links.
 
 use anyhow::{Context, Result};
@@ -52,6 +55,7 @@ impl AgentLinkRepository {
     }
 
     /// Find an agent link by agent_id and chain_id
+    #[allow(dead_code)] // Future feature: Layer 2 agent authentication
     pub async fn find_by_agent(
         pool: &DbPool,
         agent_id: i64,
@@ -93,6 +97,7 @@ impl AgentLinkRepository {
     }
 
     /// Find agent link by ID
+    #[allow(dead_code)] // Future feature: GET /api/v1/agents/:id endpoint
     pub async fn find_by_id(pool: &DbPool, id: &str) -> Result<Option<AgentLink>> {
         let link = sqlx::query_as::<_, AgentLink>(
             r#"

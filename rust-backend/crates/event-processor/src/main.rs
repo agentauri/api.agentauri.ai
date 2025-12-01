@@ -81,8 +81,7 @@ async fn main() -> Result<()> {
 
             loop {
                 // Wait 24 hours before first cleanup
-                tokio::time::sleep(tokio::time::Duration::from_secs(CLEANUP_INTERVAL_SECS))
-                    .await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(CLEANUP_INTERVAL_SECS)).await;
 
                 // Run cleanup
                 let state_manager = TriggerStateManager::new(db_pool.clone());

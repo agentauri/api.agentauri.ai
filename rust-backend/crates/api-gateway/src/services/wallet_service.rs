@@ -1,7 +1,11 @@
-//! Wallet Authentication Service
+//! Wallet Authentication Service (Layer 2 - Future Feature)
 //!
 //! This service handles EIP-191 signature verification for wallet-based authentication
 //! and on-chain ownership verification for agent NFTs.
+//!
+//! **Note**: This module is implemented but not yet fully integrated with the API Gateway.
+//! It will be completed in Phase 4 when wallet signature authentication (Layer 2) is
+//! fully enabled. Some items have `#[allow(dead_code)]` annotations.
 //!
 //! # Features
 //!
@@ -23,9 +27,11 @@ use rand::RngCore;
 use thiserror::Error;
 
 /// Challenge expiration time in minutes
+#[allow(dead_code)] // Future feature: Layer 2 wallet authentication
 const CHALLENGE_EXPIRATION_MINUTES: i64 = 5;
 
 /// Nonce length in bytes
+#[allow(dead_code)] // Future feature: Layer 2 wallet authentication
 const NONCE_LENGTH: usize = 32;
 
 /// Errors that can occur during wallet operations
@@ -41,9 +47,11 @@ pub enum WalletError {
     ChallengeExpired,
 
     #[error("Invalid nonce")]
+    #[allow(dead_code)] // Future feature: Layer 2 wallet authentication
     InvalidNonce,
 
     #[error("Nonce already used")]
+    #[allow(dead_code)] // Future feature: Layer 2 wallet authentication
     NonceReused,
 
     #[error("Invalid address format: {0}")]
@@ -59,11 +67,13 @@ pub enum WalletError {
     OnChainError(String),
 
     #[error("Internal error: {0}")]
+    #[allow(dead_code)] // Future feature: Layer 2 wallet authentication
     Internal(String),
 }
 
 /// Result of generating a new challenge
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Future feature: Layer 2 wallet authentication
 pub struct GeneratedChallenge {
     /// The message to sign
     pub message: String,
@@ -172,6 +182,7 @@ impl WalletService {
     ///
     /// # Returns
     /// A `GeneratedChallenge` containing the message, nonce, and expiration time
+    #[allow(dead_code)] // Future feature: Layer 2 wallet authentication
     pub fn generate_challenge(
         &self,
         wallet_address: &str,

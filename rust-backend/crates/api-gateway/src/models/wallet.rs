@@ -1,4 +1,9 @@
 //! Wallet authentication and agent linking DTOs
+//!
+//! **Note**: Layer 2 wallet authentication and agent linking features are partially implemented
+//! but not yet fully integrated with the API Gateway. These will be completed in Phase 4-5.
+
+#![allow(dead_code)] // Future feature: Layer 2 wallet authentication
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

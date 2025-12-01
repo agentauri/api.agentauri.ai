@@ -38,6 +38,7 @@ pub enum AuthLayer {
     /// Layer 1: API Key (Organization-based)
     ApiKey,
     /// Layer 2: Wallet Signature (Agent-based, inherits from org)
+    #[allow(dead_code)] // Future feature: Layer 2 Wallet authentication
     WalletSignature,
 }
 
@@ -52,6 +53,7 @@ impl AuthLayer {
     }
 
     /// Get the layer priority (higher = takes precedence)
+    #[allow(dead_code)] // Future feature: Used for Layer 2 precedence logic
     pub fn priority(&self) -> u8 {
         match self {
             AuthLayer::Anonymous => 0,
@@ -73,12 +75,14 @@ pub struct AuthContext {
     pub layer: AuthLayer,
 
     /// User ID (Layer 1 JWT, or Layer 2 wallet-linked user)
+    #[allow(dead_code)] // Future feature: Layer 2 Wallet authentication
     pub user_id: Option<String>,
 
     /// Organization ID (Layer 1 API Key, or Layer 2 agent's org)
     pub organization_id: Option<String>,
 
     /// Agent ID (Layer 2 only)
+    #[allow(dead_code)] // Future feature: Layer 2 Wallet authentication
     pub agent_id: Option<i64>,
 
     /// Client IP address (always present for Layer 0 fallback)
@@ -137,6 +141,7 @@ impl AuthContext {
     /// * `agent_id` - Agent ID (from agent linking)
     /// * `ip_address` - Client IP address
     /// * `plan` - Organization subscription plan
+    #[allow(dead_code)] // Future feature: Layer 2 Wallet authentication
     pub fn wallet_signature(
         user_id: String,
         organization_id: String,
@@ -206,6 +211,7 @@ impl AuthContext {
     /// # Returns
     ///
     /// `true` if the tier is allowed, `false` otherwise
+    #[allow(dead_code)] // Future feature: Tier-based query authorization
     pub fn allows_tier(&self, tier: u8) -> bool {
         match self.layer {
             AuthLayer::Anonymous => tier <= 1, // Tier 0-1 only

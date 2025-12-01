@@ -1,6 +1,12 @@
-//! OAuth Token Service
+//! OAuth Token Service (Future Feature)
+//!
+//! **Note**: OAuth authorization code flow is partially implemented but not yet fully integrated.
+//! This will be completed in a future phase.
 //!
 //! This service handles secure OAuth token generation, hashing, and verification.
+
+#![allow(dead_code)] // Future feature: OAuth authorization code flow
+
 //!
 //! # Security Features
 //!

@@ -476,13 +476,15 @@ pub async fn handle_stripe_webhook(
             // Record transaction
             if let Err(e) = TransactionRepository::create(
                 &mut *tx,
-                &organization_id,
-                micro_usdc,
-                "purchase",
-                Some("Stripe checkout purchase"),
-                Some(&session_id),
-                new_balance,
-                None,
+                crate::repositories::billing::CreateTransactionParams {
+                    organization_id: &organization_id,
+                    amount: micro_usdc,
+                    transaction_type: "purchase",
+                    description: Some("Stripe checkout purchase"),
+                    reference_id: Some(&session_id),
+                    balance_after: new_balance,
+                    metadata: None,
+                },
             )
             .await
             {

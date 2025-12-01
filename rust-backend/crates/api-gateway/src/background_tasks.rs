@@ -247,8 +247,12 @@ mod tests {
     #[test]
     fn test_config_respects_minimum() {
         // Even if env var is set to something lower, it should use minimum
-        // This test just verifies the constant is reasonable
-        assert!(MIN_NONCE_CLEANUP_INTERVAL_SECS >= 60); // At least 1 minute
+        // The constant MIN_NONCE_CLEANUP_INTERVAL_SECS is enforced in BackgroundTaskConfig::default()
+        // This test verifies that the default config uses at least the minimum
+        let config = BackgroundTaskConfig::default();
+        assert!(
+            config.nonce_cleanup_interval >= Duration::from_secs(MIN_NONCE_CLEANUP_INTERVAL_SECS)
+        );
     }
 
     #[test]

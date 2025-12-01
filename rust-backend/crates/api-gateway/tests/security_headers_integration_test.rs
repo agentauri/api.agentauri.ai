@@ -43,9 +43,7 @@ async fn test_security_headers_on_health_endpoint() {
     )
     .await;
 
-    let req = test::TestRequest::get()
-        .uri("/api/v1/health")
-        .to_request();
+    let req = test::TestRequest::get().uri("/api/v1/health").to_request();
     let resp = test::call_service(&app, req).await;
 
     // Verify all security headers are present
@@ -125,9 +123,7 @@ async fn test_hsts_production_config() {
     )
     .await;
 
-    let req = test::TestRequest::get()
-        .uri("/api/v1/health")
-        .to_request();
+    let req = test::TestRequest::get().uri("/api/v1/health").to_request();
     let resp = test::call_service(&app, req).await;
 
     // Verify HSTS is enabled
