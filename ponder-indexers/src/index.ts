@@ -8,6 +8,7 @@ import { ponder } from "@/generated";
 import type { Address } from "viem";
 import { Event, Checkpoint } from "../ponder.schema";
 import { logEventProcessed, logEventError, logCheckpointUpdated } from "./logger";
+import { telemetry } from "./telemetry";
 import {
   CHAIN_IDS,
   REGISTRIES,
@@ -42,6 +43,45 @@ import type {
 export { CHAIN_IDS, REGISTRIES, generateEventId, bytes32ToHex };
 
 // ============================================================================
+// TELEMETRY HELPER
+// ============================================================================
+
+/**
+ * Wrapper for event handlers that adds telemetry tracking
+ */
+async function withTelemetry<T>(
+  handler: () => Promise<T>,
+  chainId: bigint,
+  blockNumber: bigint,
+  eventName: string
+): Promise<T> {
+  const startTime = performance.now();
+  try {
+    const result = await handler();
+    const duration = performance.now() - startTime;
+
+    // Record event processing
+    telemetry.recordEvent(Number(chainId), eventName, duration);
+
+    // Update chain sync status
+    telemetry.updateChainSync(
+      Number(chainId),
+      Number(blockNumber),
+      Number(blockNumber), // We don't have target block from Ponder API
+      true, // Assume realtime (Ponder doesn't expose sync state)
+      0 // RPC rate not available from Ponder API
+    );
+
+    return result;
+  } catch (error) {
+    // Still record the event even if it failed (for monitoring)
+    const duration = performance.now() - startTime;
+    telemetry.recordEvent(Number(chainId), `${eventName}:error`, duration);
+    throw error;
+  }
+}
+
+// ============================================================================
 // IDENTITY REGISTRY EVENT HANDLERS
 // ============================================================================
 
@@ -69,55 +109,63 @@ ponder.on("IdentityRegistryLineaSepolia:Registered", async ({ event, context }) 
 async function handleRegistered(event: RegisteredEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.IDENTITY;
   const eventType = "Registered";
+  const eventName = `${registry}:${eventType}`;
 
-  try {
-    // Validate inputs
-    const validatedAgentId = validateAgentId(event.args.agentId);
-    const validatedOwner = validateAndNormalizeAddress(event.args.owner, "owner");
-    const validatedTokenUri = validateUri(event.args.tokenURI, "tokenURI");
+  await withTelemetry(
+    async () => {
+      try {
+        // Validate inputs
+        const validatedAgentId = validateAgentId(event.args.agentId);
+        const validatedOwner = validateAndNormalizeAddress(event.args.owner, "owner");
+        const validatedTokenUri = validateUri(event.args.tokenURI, "tokenURI");
 
-    const eventId = generateEventId(
-      registry,
-      chainId,
-      event.transaction.hash,
-      event.log.logIndex
-    );
+        const eventId = generateEventId(
+          registry,
+          chainId,
+          event.transaction.hash,
+          event.log.logIndex
+        );
 
-    await context.db.insert(Event).values({
-      id: eventId,
-      chainId,
-      blockNumber: event.block.number,
-      blockHash: event.block.hash,
-      transactionHash: event.transaction.hash,
-      logIndex: event.log.logIndex,
-      registry,
-      eventType,
-      agentId: validatedAgentId,
-      timestamp: event.block.timestamp,
-      owner: validatedOwner,
-      tokenUri: validatedTokenUri,
-    });
+        await context.db.insert(Event).values({
+          id: eventId,
+          chainId,
+          blockNumber: event.block.number,
+          blockHash: event.block.hash,
+          transactionHash: event.transaction.hash,
+          logIndex: event.log.logIndex,
+          registry,
+          eventType,
+          agentId: validatedAgentId,
+          timestamp: event.block.timestamp,
+          owner: validatedOwner,
+          tokenUri: validatedTokenUri,
+        });
 
-    // Update checkpoint (with race condition protection)
-    await context.db
-      .insert(Checkpoint)
-      .values({
-        id: chainId,
-        chainId,
-        lastBlockNumber: event.block.number,
-        lastBlockHash: event.block.hash,
-      })
-      .onConflictDoUpdate({
-        lastBlockNumber: event.block.number,
-        lastBlockHash: event.block.hash,
-      });
+        // Update checkpoint (with race condition protection)
+        await context.db
+          .insert(Checkpoint)
+          .values({
+            id: chainId,
+            chainId,
+            lastBlockNumber: event.block.number,
+            lastBlockHash: event.block.hash,
+          })
+          .onConflictDoUpdate({
+            lastBlockNumber: event.block.number,
+            lastBlockHash: event.block.hash,
+          });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
-    logCheckpointUpdated(chainId, event.block.number);
-  } catch (error) {
-    logEventError(registry, eventType, chainId, error as Error);
-    throw error; // Re-throw to let Ponder handle retries
-  }
+        logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
+        logCheckpointUpdated(chainId, event.block.number);
+      } catch (error) {
+        logEventError(registry, eventType, chainId, error as Error);
+        throw error; // Re-throw to let Ponder handle retries
+      }
+    },
+    chainId,
+    event.block.number,
+    eventName
+  );
 }
 
 /**
