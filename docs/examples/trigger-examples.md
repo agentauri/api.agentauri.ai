@@ -532,6 +532,6 @@ Available variables depend on the event type. Common variables:
 ## Additional Examples
 
 For more examples, see:
-- [docs/api/rest-api-spec.md](../api/rest-api-spec.md) - API request/response examples
-- [docs/protocols/erc-8004-integration.md](../protocols/erc-8004-integration.md) - Event examples
-- [docs/protocols/mcp-integration.md](../protocols/mcp-integration.md) - MCP payload examples
+- [API Documentation](../../rust-backend/crates/api-gateway/API_DOCUMENTATION.md) - API request/response examples
+- [ERC-8004 Integration](../protocols/erc-8004-integration.md) - Event examples
+- [MCP Integration](../protocols/mcp-integration.md) - MCP payload examples

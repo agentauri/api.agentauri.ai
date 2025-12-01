@@ -1,5 +1,9 @@
 # Rate Limiting Architecture
 
+This document provides technical implementation details for the rate limiting system.
+
+**For user-facing documentation**, see [Rate Limiting User Guide](../auth/RATE_LIMITS_USER_GUIDE.md).
+
 ## Overview
 
 The api.8004.dev rate limiting system provides a comprehensive, Redis-based sliding window rate limiter that supports the 3-layer authentication model with query tier cost multipliers.

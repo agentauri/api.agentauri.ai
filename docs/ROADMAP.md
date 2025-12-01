@@ -40,7 +40,7 @@ The roadmap now includes Pull Layer features for agent-initiated queries:
 - Phase 5 Extended: A2A Protocol + MCP Query Tools
 - Timeline extended to 25 weeks (+3 weeks from original 22)
 
-See [Pull Layer Specification](../docs/api/PULL_LAYER.md) for details.
+See [MCP Query Tools](api/QUERY_TOOLS.md) and [A2A Integration](protocols/A2A_INTEGRATION.md) for details.
 
 **Authentication System (NEW)**
 3-layer authentication for different client types:

@@ -14,6 +14,7 @@ dist/
 .env.local
 .env.*.local
 .env.test  # Test environment credentials (NEVER commit!)
+.env.backup*  # Environment backup files
 
 # Database
 *.db
@@ -52,6 +53,12 @@ coverage/
 *.key
 secrets/
 .secret
+
+# PostgreSQL TLS Certificates (development only)
+docker/postgres/certs/*.crt
+docker/postgres/certs/*.key
+docker/postgres/certs/*.srl
+docker/postgres/certs/*.pem
 
 # Temporary files
 tmp/

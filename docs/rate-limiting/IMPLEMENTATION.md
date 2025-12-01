@@ -1,5 +1,10 @@
 # Unified Rate Limiter Middleware - Implementation Summary
 
+This document provides detailed implementation notes for developers working on the rate limiting system.
+
+**For user-facing documentation**, see [Rate Limiting User Guide](../auth/RATE_LIMITS_USER_GUIDE.md).
+**For architecture overview**, see [Rate Limiting Architecture](./ARCHITECTURE.md).
+
 ## Overview
 
 Successfully implemented the **Unified Rate Limiter Middleware** for the api.8004.dev project as part of Week 13, Phase 3. This middleware provides comprehensive rate limiting for all API routes based on authentication context and query tiers.

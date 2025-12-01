@@ -390,5 +390,5 @@ docker-compose down -v
 
 - Read [CLAUDE.md](../../CLAUDE.md) for comprehensive project documentation
 - Review [Database Schema](../database/schema.md)
-- Explore [API Documentation](../api/rest-api-spec.md)
+- Explore [API Documentation](../../rust-backend/crates/api-gateway/API_DOCUMENTATION.md)
 - Check out [Example Triggers](../examples/trigger-examples.md)

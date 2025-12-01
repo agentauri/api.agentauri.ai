@@ -1,5 +1,11 @@
 # Rate Limiting Quick Reference
 
+This is a developer cheat sheet for quick reference while working with the rate limiting system.
+
+**For complete documentation**, see:
+- [Rate Limiting User Guide](../auth/RATE_LIMITS_USER_GUIDE.md) - How rate limiting affects API usage
+- [Rate Limiting Architecture](./ARCHITECTURE.md) - System design and implementation details
+
 ## Components Overview
 
 ```

@@ -471,10 +471,10 @@ INSERT INTO events (...) VALUES (...);
 
 ## Related Documentation
 
-- [Database Schema](./database/schema.md)
-- [Ponder Indexer Setup](./development/ponder-setup.md)
-- [Event Processor Architecture](./architecture/event-processor.md)
-- [Trigger Evaluation Engine](./architecture/trigger-engine.md)
+- [Database Schema](../database/schema.md)
+- [Development Setup](../development/setup.md)
+- [System Overview](./system-overview.md)
+- [API Documentation](../../rust-backend/crates/api-gateway/API_DOCUMENTATION.md)
 
 ## Monitoring and Observability
 

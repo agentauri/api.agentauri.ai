@@ -1,6 +1,11 @@
-# Rate Limiting
+# Rate Limiting - User Guide
 
-This document describes the rate limiting implementation for api.8004.dev.
+This guide explains how rate limiting affects API usage and provides implementation examples.
+
+**For technical implementation details**, see:
+- [Rate Limiting Architecture](../rate-limiting/ARCHITECTURE.md) - System design and Redis implementation
+- [Rate Limiting Implementation](../rate-limiting/IMPLEMENTATION.md) - Code walkthrough
+- [Rate Limiting Quick Reference](../rate-limiting/QUICK_REFERENCE.md) - Developer cheat sheet
 
 ## Overview
 
