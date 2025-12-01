@@ -114,35 +114,73 @@ ponder-indexers/
 
 ## Event Handlers
 
+**Status**: ✅ Complete - All ERC-8004 events covered (as of 2025-12-01)
+
 ### Identity Registry Events
 
-**AgentRegistered**
-- Triggered when a new agent is registered
-- Stores: agentId, owner, tokenURI, timestamp
+1. **Registered** ✅ (formerly AgentRegistered)
+   - Triggered when a new agent is registered
+   - Stores: agentId, owner, tokenURI, timestamp
 
-**MetadataUpdated**
-- Triggered when agent metadata is updated
-- Stores: agentId, key, value, timestamp
+2. **MetadataSet** ✅ (formerly MetadataUpdated)
+   - Triggered when agent metadata is updated
+   - Stores: agentId, key, value, timestamp
+
+3. **UriUpdated** ✅ **[NEWLY ADDED - 2025-12-01]**
+   - Triggered when an agent's tokenURI is updated
+   - Stores: agentId, newUri, updatedBy, timestamp
+   - **Impact**: Critical for tracking agent profile/config changes
+
+4. **Transfer** ✅ **[NEWLY ADDED - 2025-12-01]**
+   - Triggered when agent ownership is transferred (ERC721)
+   - Stores: tokenId (agentId), from, to, timestamp
+   - **Impact**: Critical for tracking agent control changes
 
 ### Reputation Registry Events
 
-**FeedbackSubmitted**
-- Triggered when feedback is submitted for an agent
-- Stores: agentId, client, feedbackIndex, score, tags, fileURI, fileHash, timestamp
+1. **NewFeedback** ✅ (formerly FeedbackSubmitted)
+   - Triggered when feedback is submitted for an agent
+   - Stores: agentId, clientAddress, feedbackIndex, score, tags, fileURI, fileHash, timestamp
 
-**ScoreUpdated**
-- Triggered when an agent's reputation score changes
-- Stores: agentId, newScore, feedbackCount, timestamp
+2. **FeedbackRevoked** ✅ **[NEWLY ADDED - 2025-12-01]**
+   - Triggered when feedback is revoked by the client
+   - Stores: agentId, clientAddress, feedbackIndex, timestamp
+   - **Impact**: Critical for reputation accuracy (fraud/error corrections)
+
+3. **ResponseAppended** ✅ **[NEWLY ADDED - 2025-12-01]**
+   - Triggered when a response is appended to existing feedback
+   - Stores: agentId, clientAddress, feedbackIndex, responder, responseUri, responseHash, timestamp
+   - **Impact**: Enables dispute resolution and context provision
 
 ### Validation Registry Events
 
-**ValidationPerformed**
-- Triggered when a validation is completed
-- Stores: agentId, validator, requestHash, response, responseURI, responseHash, tag, timestamp
+1. **ValidationResponse** ✅ (formerly ValidationPerformed)
+   - Triggered when a validation response is submitted
+   - Stores: agentId, validatorAddress, requestHash, response, responseUri, responseHash, tag, timestamp
 
-**ValidationRequested**
-- Triggered when a validation is requested
-- Stores: agentId, validator, requestHash, timestamp
+2. **ValidationRequest** ✅ (formerly ValidationRequested)
+   - Triggered when a validation is requested
+   - Stores: agentId, validatorAddress, requestHash, requestUri, timestamp
+
+---
+
+### Recent Event Handler Additions (2025-12-01)
+
+**Problem**: 4 events were NOT being indexed due to missing handlers
+**Impact**: Total visibility gap for URI updates, ownership transfers, feedback revocations, and responses
+
+**Events Fixed**:
+- ✅ IdentityRegistry:UriUpdated (was completely missed)
+- ✅ IdentityRegistry:Transfer (was completely missed)
+- ✅ ReputationRegistry:FeedbackRevoked (was completely missed)
+- ✅ ReputationRegistry:ResponseAppended (was completely missed)
+
+**Data Validation**: See [REAL_EVENT_DATA.md](./REAL_EVENT_DATA.md) for real blockchain transactions proving these events exist and are now being indexed.
+
+**Next Steps After Update**:
+1. Re-sync Ponder from START_BLOCK to capture historical events
+2. Verify events table in PostgreSQL for new event types
+3. Test triggers with these real event types
 
 ## GraphQL API
 

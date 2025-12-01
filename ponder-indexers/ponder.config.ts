@@ -1,12 +1,23 @@
-import { createConfig } from "@ponder/core";
+import { createConfig, mergeAbis } from "@ponder/core";
 import { http, fallback, type Transport } from "viem";
 import { loadBalance, rateLimit } from "@ponder/utils";
 
+import ERC1967ProxyAbi from "./abis/ERC1967Proxy.json";
 import IdentityRegistryAbi from "./abis/IdentityRegistry.json";
 import ReputationRegistryAbi from "./abis/ReputationRegistry.json";
 import ValidationRegistryAbi from "./abis/ValidationRegistry.json";
 import { getEnv, getConfiguredChains, type EnvConfig } from "./src/env-validation";
-import { logRpcConfig, logRpcSkipped, logConfigValidated, logConfigError, configLogger } from "./src/logger";
+import {
+  logRpcConfig,
+  logRpcSkipped,
+  logConfigValidated,
+  logConfigError,
+  configLogger,
+  logHealthCheckStart,
+  logHealthCheckResult,
+  logHealthCheckSummary,
+} from "./src/logger";
+import { healthCheckProviders } from "./src/health-check";
 
 // ============================================================================
 // ENVIRONMENT VALIDATION
@@ -63,38 +74,98 @@ function getRpcUrls(chainPrefix: string): {
 }
 
 /**
+ * Run health checks and filter out unhealthy providers
+ * Returns healthy providers only
+ *
+ * @param chainPrefix - Environment variable prefix (e.g., "ETHEREUM_SEPOLIA")
+ * @returns Promise<Record<string, string>> - Map of healthy provider names to URLs
+ */
+async function getHealthyProviders(chainPrefix: string): Promise<Record<string, string>> {
+  const urls = getRpcUrls(chainPrefix);
+
+  // Build provider map for health checks
+  const providerMap: Record<string, string> = {};
+  if (urls.alchemy) providerMap.alchemy = urls.alchemy;
+  if (urls.infura) providerMap.infura = urls.infura;
+  if (urls.quiknode) providerMap.quiknode = urls.quiknode;
+  if (urls.ankr) providerMap.ankr = urls.ankr;
+
+  if (Object.keys(providerMap).length === 0) {
+    return {};
+  }
+
+  // HEALTH CHECK: Test all providers
+  logHealthCheckStart(chainPrefix, Object.keys(providerMap));
+  const healthCheckResults = await healthCheckProviders(providerMap);
+
+  // Log individual results
+  for (const result of healthCheckResults) {
+    logHealthCheckResult(
+      chainPrefix,
+      result.provider,
+      result.success,
+      result.latency,
+      result.error
+    );
+  }
+
+  // Summary
+  const passed = healthCheckResults.filter((r) => r.success).length;
+  const failed = healthCheckResults.filter((r) => !r.success).length;
+  logHealthCheckSummary(chainPrefix, passed, failed, healthCheckResults.length);
+
+  // Return only healthy providers
+  const healthyProviders: Record<string, string> = {};
+  for (const result of healthCheckResults) {
+    if (result.success) {
+      healthyProviders[result.provider] = result.url;
+    }
+  }
+
+  return healthyProviders;
+}
+
+/**
  * Creates a resilient transport with failover, load balancing, and smart ranking.
  *
- * Architecture with 4 providers:
+ * NOW WITH HEALTH-CHECK INTEGRATION:
+ * - Only creates transports for providers that passed health checks
+ * - Eliminates SSL/connection errors by filtering bad providers upfront
+ *
+ * Architecture with healthy providers:
  * - fallback() with rank: automatically promotes faster/more stable providers
- * - loadBalance() for Primary Pool (Alchemy + Infura) and Fallback Pool (QuikNode + Ankr)
+ * - loadBalance() for Primary Pool and Fallback Pool (if 4+ providers)
  * - rateLimit() for each individual provider
  *
  * @param chainPrefix - Environment variable prefix (e.g., "ETHEREUM_SEPOLIA")
- * @returns Transport or null if no RPC is configured
+ * @param healthyProviders - Map of healthy provider names (from health check)
+ * @returns Transport or null if no healthy RPC providers
  */
-function createResilientTransport(chainPrefix: string): Transport | null {
+function createResilientTransport(
+  chainPrefix: string,
+  healthyProviders: Record<string, string>
+): Transport | null {
   const urls = getRpcUrls(chainPrefix);
 
-  // Create rate-limited transports for each available provider
+  // Create rate-limited transports ONLY for healthy providers
   const transports: Transport[] = [];
 
-  if (urls.alchemy) {
+  if (urls.alchemy && healthyProviders.alchemy) {
     transports.push(
       rateLimit(http(urls.alchemy), { requestsPerSecond: RATE_LIMITS.alchemy })
     );
   }
-  if (urls.infura) {
+  if (urls.infura && healthyProviders.infura) {
     transports.push(
       rateLimit(http(urls.infura), { requestsPerSecond: RATE_LIMITS.infura })
     );
   }
-  if (urls.quiknode) {
+  if (urls.quiknode && healthyProviders.quiknode) {
     transports.push(
       rateLimit(http(urls.quiknode), { requestsPerSecond: RATE_LIMITS.quiknode })
     );
   }
-  if (urls.ankr) {
+  if (urls.ankr && healthyProviders.ankr) {
     transports.push(
       rateLimit(http(urls.ankr), { requestsPerSecond: RATE_LIMITS.ankr })
     );
@@ -284,30 +355,49 @@ const networkEnvPrefixes: Record<string, string> = {
   lineaMainnet: "LINEA_MAINNET",
 };
 
-// Build networks dynamically (only include those with RPC configured)
-const configuredNetworks: Record<
-  string,
-  { chainId: number; transport: Transport }
-> = {};
-const enabledNetworkKeys: string[] = [];
+// Build networks dynamically with async health checks
+// Using async IIFE pattern because Ponder doesn't support async config
+async function buildNetworksWithHealthChecks() {
+  const configuredNetworks: Record<
+    string,
+    { chainId: number; transport: Transport }
+  > = {};
+  const enabledNetworkKeys: string[] = [];
 
-for (const [networkKey, envPrefix] of Object.entries(networkEnvPrefixes)) {
-  const transport = createResilientTransport(envPrefix);
-  const networkConfig = networks[networkKey];
-  if (transport && networkConfig) {
-    configuredNetworks[networkKey] = {
-      chainId: networkConfig.chainId,
-      transport,
-    };
-    enabledNetworkKeys.push(networkKey);
+  // Run health checks for all networks in parallel
+  const healthCheckPromises = Object.entries(networkEnvPrefixes).map(
+    async ([networkKey, envPrefix]) => {
+      const healthyProviders = await getHealthyProviders(envPrefix);
+      return { networkKey, envPrefix, healthyProviders };
+    }
+  );
+
+  const healthCheckResults = await Promise.all(healthCheckPromises);
+
+  // Build transports with healthy providers only
+  for (const { networkKey, envPrefix, healthyProviders } of healthCheckResults) {
+    const transport = createResilientTransport(envPrefix, healthyProviders);
+    const networkConfig = networks[networkKey];
+    if (transport && networkConfig) {
+      configuredNetworks[networkKey] = {
+        chainId: networkConfig.chainId,
+        transport,
+      };
+      enabledNetworkKeys.push(networkKey);
+    }
   }
+
+  // Log final configuration summary
+  configLogger.info({
+    enabledNetworks: enabledNetworkKeys,
+    totalNetworks: enabledNetworkKeys.length,
+  }, "Ponder configuration complete");
+
+  return { configuredNetworks, enabledNetworkKeys };
 }
 
-// Log final configuration summary
-configLogger.info({
-  enabledNetworks: enabledNetworkKeys,
-  totalNetworks: enabledNetworkKeys.length,
-}, "Ponder configuration complete");
+// Execute async setup
+const { configuredNetworks, enabledNetworkKeys } = await buildNetworksWithHealthChecks();
 
 // Build contracts dynamically (only for enabled networks)
 type ContractConfig = {
@@ -328,26 +418,26 @@ for (const networkKey of enabledNetworkKeys) {
   // Skip if no contract addresses for this network
   if (!contractAddrs) continue;
 
-  // Identity Registry
+  // Identity Registry (ERC1967 Proxy + Implementation)
   configuredContracts[`IdentityRegistry${pascalNetworkKey}`] = {
     network: networkKey,
-    abi: IdentityRegistryAbi,
+    abi: mergeAbis([ERC1967ProxyAbi, IdentityRegistryAbi]),
     address: contractAddrs["identity"]!,
     startBlock,
   };
 
-  // Reputation Registry
+  // Reputation Registry (ERC1967 Proxy + Implementation)
   configuredContracts[`ReputationRegistry${pascalNetworkKey}`] = {
     network: networkKey,
-    abi: ReputationRegistryAbi,
+    abi: mergeAbis([ERC1967ProxyAbi, ReputationRegistryAbi]),
     address: contractAddrs["reputation"]!,
     startBlock,
   };
 
-  // Validation Registry
+  // Validation Registry (ERC1967 Proxy + Implementation)
   configuredContracts[`ValidationRegistry${pascalNetworkKey}`] = {
     network: networkKey,
-    abi: ValidationRegistryAbi,
+    abi: mergeAbis([ERC1967ProxyAbi, ValidationRegistryAbi]),
     address: contractAddrs["validation"]!,
     startBlock,
   };

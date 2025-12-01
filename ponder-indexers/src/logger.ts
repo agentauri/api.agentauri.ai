@@ -169,4 +169,65 @@ export function logCheckpointUpdated(chainId: bigint, blockNumber: bigint): void
   }, "Checkpoint updated");
 }
 
+/**
+ * Health Check Logger - for RPC provider health checks
+ */
+export const healthCheckLogger = logger.child({ component: "health-check" });
+
+/**
+ * Log health check start
+ */
+export function logHealthCheckStart(chain: string, providers: string[]): void {
+  healthCheckLogger.info({
+    chain,
+    providers,
+    providerCount: providers.length,
+  }, `Starting health checks for ${chain}`);
+}
+
+/**
+ * Log individual health check result
+ */
+export function logHealthCheckResult(
+  chain: string,
+  provider: string,
+  success: boolean,
+  latency?: number,
+  error?: string
+): void {
+  if (success) {
+    healthCheckLogger.info({
+      chain,
+      provider,
+      latency,
+      status: "OK",
+    }, `✅ ${provider}: OK (${latency}ms)`);
+  } else {
+    healthCheckLogger.warn({
+      chain,
+      provider,
+      error,
+      status: "FAILED",
+    }, `❌ ${provider}: FAILED - ${error}`);
+  }
+}
+
+/**
+ * Log health check summary
+ */
+export function logHealthCheckSummary(
+  chain: string,
+  passed: number,
+  failed: number,
+  total: number
+): void {
+  const status = failed === 0 ? "all providers healthy" : `${failed} provider(s) failed`;
+  healthCheckLogger.info({
+    chain,
+    passed,
+    failed,
+    total,
+  }, `Health check complete: ${passed}/${total} providers available (${status})`);
+}
+
 export default logger;

@@ -11,14 +11,8 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "client",
+        "name": "clientAddress",
         "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "feedbackIndex",
-        "type": "uint256"
       },
       {
         "indexed": false,
@@ -27,37 +21,31 @@
         "type": "uint8"
       },
       {
-        "indexed": false,
-        "internalType": "string",
+        "indexed": true,
+        "internalType": "bytes32",
         "name": "tag1",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "indexed": false,
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "tag2",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "indexed": false,
         "internalType": "string",
-        "name": "fileURI",
+        "name": "feedbackUri",
         "type": "string"
       },
       {
         "indexed": false,
         "internalType": "bytes32",
-        "name": "fileHash",
+        "name": "feedbackHash",
         "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
       }
     ],
-    "name": "FeedbackSubmitted",
+    "name": "NewFeedback",
     "type": "event"
   },
   {
@@ -70,25 +58,75 @@
         "type": "uint256"
       },
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "newScore",
-        "type": "uint256"
+        "indexed": true,
+        "internalType": "address",
+        "name": "clientAddress",
+        "type": "address"
       },
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "feedbackCount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "feedbackIndex",
+        "type": "uint64"
       }
     ],
-    "name": "ScoreUpdated",
+    "name": "FeedbackRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "clientAddress",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "feedbackIndex",
+        "type": "uint64"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "responder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "responseUri",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "responseHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ResponseAppended",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "version",
+        "type": "uint64"
+      }
+    ],
+    "name": "Initialized",
     "type": "event"
   }
 ]

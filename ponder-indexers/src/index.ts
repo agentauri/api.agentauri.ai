@@ -1,14 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Ponder Event Handlers for Ponder 0.7.x
  *
- * Note: ESLint unsafe rules are disabled because Ponder's dynamic API
- * doesn't provide complete TypeScript type definitions for event handlers.
- * The `event` and `context` objects are strongly typed at runtime by Ponder.
+ * Handles blockchain events from ERC-8004 registries (Identity, Reputation, Validation)
+ * with comprehensive validation and type safety.
  */
 import { ponder } from "@/generated";
 import type { Address } from "viem";
@@ -20,6 +14,29 @@ import {
   generateEventId,
   bytes32ToHex,
 } from "./helpers";
+import {
+  validateAndNormalizeAddress,
+  validateAgentId,
+  validateScore,
+  validateUri,
+  validateBytes32Hash,
+  validateMetadataKey,
+  validateMetadataValue,
+  validateTag,
+  validateFeedbackIndex,
+} from "./validation";
+import type {
+  RegisteredEvent,
+  MetadataSetEvent,
+  UriUpdatedEvent,
+  TransferEvent,
+  NewFeedbackEvent,
+  FeedbackRevokedEvent,
+  ResponseAppendedEvent,
+  ValidationRequestEvent,
+  ValidationResponseEvent,
+  PonderContext,
+} from "./types";
 
 // Re-export for backwards compatibility
 export { CHAIN_IDS, REGISTRIES, generateEventId, bytes32ToHex };
@@ -29,31 +46,36 @@ export { CHAIN_IDS, REGISTRIES, generateEventId, bytes32ToHex };
 // ============================================================================
 
 /**
- * AgentRegistered Event
+ * Registered Event
  * Emitted when a new agent is registered in the Identity Registry
  */
-ponder.on("IdentityRegistryEthereumSepolia:AgentRegistered", async ({ event, context }) => {
-  await handleAgentRegistered(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+ponder.on("IdentityRegistryEthereumSepolia:Registered", async ({ event, context }) => {
+  await handleRegistered(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:AgentRegistered", async ({ event, context }) => {
-  await handleAgentRegistered(event, context, CHAIN_IDS.BASE_SEPOLIA);
+ponder.on("IdentityRegistryBaseSepolia:Registered", async ({ event, context }) => {
+  await handleRegistered(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryLineaSepolia:AgentRegistered", async ({ event, context }) => {
-  await handleAgentRegistered(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+ponder.on("IdentityRegistryLineaSepolia:Registered", async ({ event, context }) => {
+  await handleRegistered(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
 // PolygonAmoy handlers commented out (RPC not configured)
-// ponder.on("IdentityRegistryPolygonAmoy:AgentRegistered", async ({ event, context }) => {
-//   await handleAgentRegistered(event, context, CHAIN_IDS.POLYGON_AMOY);
+// ponder.on("IdentityRegistryPolygonAmoy:Registered", async ({ event, context }) => {
+//   await handleRegistered(event, context, CHAIN_IDS.POLYGON_AMOY);
 // });
 
-async function handleAgentRegistered(event: any, context: any, chainId: bigint): Promise<void> {
+async function handleRegistered(event: RegisteredEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.IDENTITY;
-  const eventType = "AgentRegistered";
+  const eventType = "Registered";
 
   try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedOwner = validateAndNormalizeAddress(event.args.owner, "owner");
+    const validatedTokenUri = validateUri(event.args.tokenURI, "tokenURI");
+
     const eventId = generateEventId(
       registry,
       chainId,
@@ -70,13 +92,13 @@ async function handleAgentRegistered(event: any, context: any, chainId: bigint):
       logIndex: event.log.logIndex,
       registry,
       eventType,
-      agentId: event.args.agentId,
-      timestamp: event.args.timestamp,
-      owner: event.args.owner.toLowerCase() as Address,
-      tokenUri: event.args.tokenURI,
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      owner: validatedOwner,
+      tokenUri: validatedTokenUri,
     });
 
-    // Update checkpoint
+    // Update checkpoint (with race condition protection)
     await context.db
       .insert(Checkpoint)
       .values({
@@ -90,7 +112,7 @@ async function handleAgentRegistered(event: any, context: any, chainId: bigint):
         lastBlockHash: event.block.hash,
       });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, event.args.agentId);
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
     logCheckpointUpdated(chainId, event.block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
@@ -99,30 +121,35 @@ async function handleAgentRegistered(event: any, context: any, chainId: bigint):
 }
 
 /**
- * MetadataUpdated Event
- * Emitted when agent metadata is updated
+ * MetadataSet Event
+ * Emitted when agent metadata is set/updated
  */
-ponder.on("IdentityRegistryEthereumSepolia:MetadataUpdated", async ({ event, context }) => {
-  await handleMetadataUpdated(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+ponder.on("IdentityRegistryEthereumSepolia:MetadataSet", async ({ event, context }) => {
+  await handleMetadataSet(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:MetadataUpdated", async ({ event, context }) => {
-  await handleMetadataUpdated(event, context, CHAIN_IDS.BASE_SEPOLIA);
+ponder.on("IdentityRegistryBaseSepolia:MetadataSet", async ({ event, context }) => {
+  await handleMetadataSet(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryLineaSepolia:MetadataUpdated", async ({ event, context }) => {
-  await handleMetadataUpdated(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+ponder.on("IdentityRegistryLineaSepolia:MetadataSet", async ({ event, context }) => {
+  await handleMetadataSet(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("IdentityRegistryPolygonAmoy:MetadataUpdated", async ({ event, context }) => {
-//   await handleMetadataUpdated(event, context, CHAIN_IDS.POLYGON_AMOY);
+// ponder.on("IdentityRegistryPolygonAmoy:MetadataSet", async ({ event, context }) => {
+//   await handleMetadataSet(event, context, CHAIN_IDS.POLYGON_AMOY);
 // });
 
-async function handleMetadataUpdated(event: any, context: any, chainId: bigint): Promise<void> {
+async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.IDENTITY;
-  const eventType = "MetadataUpdated";
+  const eventType = "MetadataSet";
 
   try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedKey = validateMetadataKey(event.args.key);
+    const validatedValue = validateMetadataValue(event.args.value);
+
     const eventId = generateEventId(
       registry,
       chainId,
@@ -139,10 +166,10 @@ async function handleMetadataUpdated(event: any, context: any, chainId: bigint):
       logIndex: event.log.logIndex,
       registry,
       eventType,
-      agentId: event.args.agentId,
-      timestamp: event.args.timestamp,
-      metadataKey: event.args.key,
-      metadataValue: event.args.value,
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      metadataKey: validatedKey,
+      metadataValue: validatedValue,
     });
 
     // Update checkpoint
@@ -159,7 +186,147 @@ async function handleMetadataUpdated(event: any, context: any, chainId: bigint):
         lastBlockHash: event.block.hash,
       });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, event.args.agentId);
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
+    logCheckpointUpdated(chainId, event.block.number);
+  } catch (error) {
+    logEventError(registry, eventType, chainId, error as Error);
+    throw error;
+  }
+}
+
+/**
+ * UriUpdated Event
+ * Emitted when an agent's tokenURI is updated
+ */
+ponder.on("IdentityRegistryEthereumSepolia:UriUpdated", async ({ event, context }) => {
+  await handleUriUpdated(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+});
+
+ponder.on("IdentityRegistryBaseSepolia:UriUpdated", async ({ event, context }) => {
+  await handleUriUpdated(event, context, CHAIN_IDS.BASE_SEPOLIA);
+});
+
+ponder.on("IdentityRegistryLineaSepolia:UriUpdated", async ({ event, context }) => {
+  await handleUriUpdated(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+});
+
+async function handleUriUpdated(event: UriUpdatedEvent, context: PonderContext, chainId: bigint): Promise<void> {
+  const registry = REGISTRIES.IDENTITY;
+  const eventType = "UriUpdated";
+
+  try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedNewUri = validateUri(event.args.newUri, "newUri");
+    const validatedUpdatedBy = validateAndNormalizeAddress(event.args.updatedBy, "updatedBy");
+
+    const eventId = generateEventId(
+      registry,
+      chainId,
+      event.transaction.hash,
+      event.log.logIndex
+    );
+
+    await context.db.insert(Event).values({
+      id: eventId,
+      chainId,
+      blockNumber: event.block.number,
+      blockHash: event.block.hash,
+      transactionHash: event.transaction.hash,
+      logIndex: event.log.logIndex,
+      registry,
+      eventType,
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      tokenUri: validatedNewUri,
+      owner: validatedUpdatedBy, // Store updatedBy in owner field (schema reuse)
+    });
+
+    // Update checkpoint
+    await context.db
+      .insert(Checkpoint)
+      .values({
+        id: chainId,
+        chainId,
+        lastBlockNumber: event.block.number,
+        lastBlockHash: event.block.hash,
+      })
+      .onConflictDoUpdate({
+        lastBlockNumber: event.block.number,
+        lastBlockHash: event.block.hash,
+      });
+
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
+    logCheckpointUpdated(chainId, event.block.number);
+  } catch (error) {
+    logEventError(registry, eventType, chainId, error as Error);
+    throw error;
+  }
+}
+
+/**
+ * Transfer Event (ERC721)
+ * Emitted when agent ownership is transferred
+ */
+ponder.on("IdentityRegistryEthereumSepolia:Transfer", async ({ event, context }) => {
+  await handleTransfer(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+});
+
+ponder.on("IdentityRegistryBaseSepolia:Transfer", async ({ event, context }) => {
+  await handleTransfer(event, context, CHAIN_IDS.BASE_SEPOLIA);
+});
+
+ponder.on("IdentityRegistryLineaSepolia:Transfer", async ({ event, context }) => {
+  await handleTransfer(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+});
+
+async function handleTransfer(event: TransferEvent, context: PonderContext, chainId: bigint): Promise<void> {
+  const registry = REGISTRIES.IDENTITY;
+  const eventType = "Transfer";
+
+  try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.tokenId);
+    const validatedTo = validateAndNormalizeAddress(event.args.to, "to");
+    const validatedFrom = validateAndNormalizeAddress(event.args.from, "from");
+
+    const eventId = generateEventId(
+      registry,
+      chainId,
+      event.transaction.hash,
+      event.log.logIndex
+    );
+
+    await context.db.insert(Event).values({
+      id: eventId,
+      chainId,
+      blockNumber: event.block.number,
+      blockHash: event.block.hash,
+      transactionHash: event.transaction.hash,
+      logIndex: event.log.logIndex,
+      registry,
+      eventType,
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      owner: validatedTo, // New owner
+      clientAddress: validatedFrom, // Previous owner (schema reuse)
+    });
+
+    // Update checkpoint
+    await context.db
+      .insert(Checkpoint)
+      .values({
+        id: chainId,
+        chainId,
+        lastBlockNumber: event.block.number,
+        lastBlockHash: event.block.hash,
+      })
+      .onConflictDoUpdate({
+        lastBlockNumber: event.block.number,
+        lastBlockHash: event.block.hash,
+      });
+
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
     logCheckpointUpdated(chainId, event.block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
@@ -172,30 +339,39 @@ async function handleMetadataUpdated(event: any, context: any, chainId: bigint):
 // ============================================================================
 
 /**
- * FeedbackSubmitted Event
+ * NewFeedback Event
  * Emitted when feedback is submitted for an agent
  */
-ponder.on("ReputationRegistryEthereumSepolia:FeedbackSubmitted", async ({ event, context }) => {
-  await handleFeedbackSubmitted(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+ponder.on("ReputationRegistryEthereumSepolia:NewFeedback", async ({ event, context }) => {
+  await handleNewFeedback(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryBaseSepolia:FeedbackSubmitted", async ({ event, context }) => {
-  await handleFeedbackSubmitted(event, context, CHAIN_IDS.BASE_SEPOLIA);
+ponder.on("ReputationRegistryBaseSepolia:NewFeedback", async ({ event, context }) => {
+  await handleNewFeedback(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryLineaSepolia:FeedbackSubmitted", async ({ event, context }) => {
-  await handleFeedbackSubmitted(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+ponder.on("ReputationRegistryLineaSepolia:NewFeedback", async ({ event, context }) => {
+  await handleNewFeedback(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ReputationRegistryPolygonAmoy:FeedbackSubmitted", async ({ event, context }) => {
-//   await handleFeedbackSubmitted(event, context, CHAIN_IDS.POLYGON_AMOY);
+// ponder.on("ReputationRegistryPolygonAmoy:NewFeedback", async ({ event, context }) => {
+//   await handleNewFeedback(event, context, CHAIN_IDS.POLYGON_AMOY);
 // });
 
-async function handleFeedbackSubmitted(event: any, context: any, chainId: bigint): Promise<void> {
+async function handleNewFeedback(event: NewFeedbackEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.REPUTATION;
-  const eventType = "FeedbackSubmitted";
+  const eventType = "NewFeedback";
 
   try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedClientAddress = validateAndNormalizeAddress(event.args.clientAddress, "clientAddress");
+    const validatedScore = validateScore(event.args.score);
+    const validatedTag1 = validateTag(event.args.tag1, "tag1");
+    const validatedTag2 = validateTag(event.args.tag2, "tag2");
+    const validatedFeedbackUri = validateUri(event.args.feedbackUri, "feedbackUri");
+    const validatedFeedbackHash = validateBytes32Hash(event.args.feedbackHash, "feedbackHash");
+
     const eventId = generateEventId(
       registry,
       chainId,
@@ -212,15 +388,15 @@ async function handleFeedbackSubmitted(event: any, context: any, chainId: bigint
       logIndex: event.log.logIndex,
       registry,
       eventType,
-      agentId: event.args.agentId,
-      timestamp: event.args.timestamp,
-      clientAddress: event.args.client.toLowerCase() as Address,
-      feedbackIndex: event.args.feedbackIndex,
-      score: Number(event.args.score),
-      tag1: event.args.tag1,
-      tag2: event.args.tag2,
-      fileUri: event.args.fileURI,
-      fileHash: bytes32ToHex(event.args.fileHash),
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      clientAddress: validatedClientAddress,
+      feedbackIndex: null, // NewFeedback doesn't emit feedbackIndex (contract-assigned)
+      score: validatedScore,
+      tag1: validatedTag1,
+      tag2: validatedTag2,
+      fileUri: validatedFeedbackUri,
+      fileHash: validatedFeedbackHash,
     });
 
     // Update checkpoint
@@ -237,7 +413,7 @@ async function handleFeedbackSubmitted(event: any, context: any, chainId: bigint
         lastBlockHash: event.block.hash,
       });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, event.args.agentId);
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
     logCheckpointUpdated(chainId, event.block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
@@ -246,30 +422,31 @@ async function handleFeedbackSubmitted(event: any, context: any, chainId: bigint
 }
 
 /**
- * ScoreUpdated Event
- * Emitted when an agent's reputation score is updated
+ * FeedbackRevoked Event
+ * Emitted when feedback is revoked by the client
  */
-ponder.on("ReputationRegistryEthereumSepolia:ScoreUpdated", async ({ event, context }) => {
-  await handleScoreUpdated(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+ponder.on("ReputationRegistryEthereumSepolia:FeedbackRevoked", async ({ event, context }) => {
+  await handleFeedbackRevoked(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryBaseSepolia:ScoreUpdated", async ({ event, context }) => {
-  await handleScoreUpdated(event, context, CHAIN_IDS.BASE_SEPOLIA);
+ponder.on("ReputationRegistryBaseSepolia:FeedbackRevoked", async ({ event, context }) => {
+  await handleFeedbackRevoked(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryLineaSepolia:ScoreUpdated", async ({ event, context }) => {
-  await handleScoreUpdated(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+ponder.on("ReputationRegistryLineaSepolia:FeedbackRevoked", async ({ event, context }) => {
+  await handleFeedbackRevoked(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ReputationRegistryPolygonAmoy:ScoreUpdated", async ({ event, context }) => {
-//   await handleScoreUpdated(event, context, CHAIN_IDS.POLYGON_AMOY);
-// });
-
-async function handleScoreUpdated(event: any, context: any, chainId: bigint): Promise<void> {
+async function handleFeedbackRevoked(event: FeedbackRevokedEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.REPUTATION;
-  const eventType = "ScoreUpdated";
+  const eventType = "FeedbackRevoked";
 
   try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedClientAddress = validateAndNormalizeAddress(event.args.clientAddress, "clientAddress");
+    const validatedFeedbackIndex = validateFeedbackIndex(event.args.feedbackIndex);
+
     const eventId = generateEventId(
       registry,
       chainId,
@@ -286,10 +463,10 @@ async function handleScoreUpdated(event: any, context: any, chainId: bigint): Pr
       logIndex: event.log.logIndex,
       registry,
       eventType,
-      agentId: event.args.agentId,
-      timestamp: event.args.timestamp,
-      score: Number(event.args.newScore),
-      feedbackIndex: event.args.feedbackCount,
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      clientAddress: validatedClientAddress,
+      feedbackIndex: validatedFeedbackIndex,
     });
 
     // Update checkpoint
@@ -306,43 +483,129 @@ async function handleScoreUpdated(event: any, context: any, chainId: bigint): Pr
         lastBlockHash: event.block.hash,
       });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, event.args.agentId);
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
     logCheckpointUpdated(chainId, event.block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
     throw error;
   }
 }
+
+/**
+ * ResponseAppended Event
+ * Emitted when a response is appended to existing feedback
+ */
+ponder.on("ReputationRegistryEthereumSepolia:ResponseAppended", async ({ event, context }) => {
+  await handleResponseAppended(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+});
+
+ponder.on("ReputationRegistryBaseSepolia:ResponseAppended", async ({ event, context }) => {
+  await handleResponseAppended(event, context, CHAIN_IDS.BASE_SEPOLIA);
+});
+
+ponder.on("ReputationRegistryLineaSepolia:ResponseAppended", async ({ event, context }) => {
+  await handleResponseAppended(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+});
+
+async function handleResponseAppended(event: ResponseAppendedEvent, context: PonderContext, chainId: bigint): Promise<void> {
+  const registry = REGISTRIES.REPUTATION;
+  const eventType = "ResponseAppended";
+
+  try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedClientAddress = validateAndNormalizeAddress(event.args.clientAddress, "clientAddress");
+    const validatedFeedbackIndex = validateFeedbackIndex(event.args.feedbackIndex);
+    const validatedResponder = validateAndNormalizeAddress(event.args.responder, "responder");
+    const validatedResponseUri = validateUri(event.args.responseUri, "responseUri");
+    const validatedResponseHash = validateBytes32Hash(event.args.responseHash, "responseHash");
+
+    const eventId = generateEventId(
+      registry,
+      chainId,
+      event.transaction.hash,
+      event.log.logIndex
+    );
+
+    await context.db.insert(Event).values({
+      id: eventId,
+      chainId,
+      blockNumber: event.block.number,
+      blockHash: event.block.hash,
+      transactionHash: event.transaction.hash,
+      logIndex: event.log.logIndex,
+      registry,
+      eventType,
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      clientAddress: validatedClientAddress,
+      feedbackIndex: validatedFeedbackIndex,
+      validatorAddress: validatedResponder, // Reuse validatorAddress for responder (schema reuse)
+      responseUri: validatedResponseUri,
+      responseHash: validatedResponseHash,
+    });
+
+    // Update checkpoint
+    await context.db
+      .insert(Checkpoint)
+      .values({
+        id: chainId,
+        chainId,
+        lastBlockNumber: event.block.number,
+        lastBlockHash: event.block.hash,
+      })
+      .onConflictDoUpdate({
+        lastBlockNumber: event.block.number,
+        lastBlockHash: event.block.hash,
+      });
+
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
+    logCheckpointUpdated(chainId, event.block.number);
+  } catch (error) {
+    logEventError(registry, eventType, chainId, error as Error);
+    throw error;
+  }
+}
+
+// NOTE: ScoreUpdated event removed - not emitted by deployed contract
 
 // ============================================================================
 // VALIDATION REGISTRY EVENT HANDLERS
 // ============================================================================
 
 /**
- * ValidationPerformed Event
- * Emitted when a validation is performed for an agent
+ * ValidationResponse Event
+ * Emitted when a validation response is submitted
  */
-ponder.on("ValidationRegistryEthereumSepolia:ValidationPerformed", async ({ event, context }) => {
-  await handleValidationPerformed(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+ponder.on("ValidationRegistryEthereumSepolia:ValidationResponse", async ({ event, context }) => {
+  await handleValidationResponse(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ValidationRegistryBaseSepolia:ValidationPerformed", async ({ event, context }) => {
-  await handleValidationPerformed(event, context, CHAIN_IDS.BASE_SEPOLIA);
+ponder.on("ValidationRegistryBaseSepolia:ValidationResponse", async ({ event, context }) => {
+  await handleValidationResponse(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("ValidationRegistryLineaSepolia:ValidationPerformed", async ({ event, context }) => {
-  await handleValidationPerformed(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+ponder.on("ValidationRegistryLineaSepolia:ValidationResponse", async ({ event, context }) => {
+  await handleValidationResponse(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ValidationRegistryPolygonAmoy:ValidationPerformed", async ({ event, context }) => {
-//   await handleValidationPerformed(event, context, CHAIN_IDS.POLYGON_AMOY);
+// ponder.on("ValidationRegistryPolygonAmoy:ValidationResponse", async ({ event, context }) => {
+//   await handleValidationResponse(event, context, CHAIN_IDS.POLYGON_AMOY);
 // });
 
-async function handleValidationPerformed(event: any, context: any, chainId: bigint): Promise<void> {
+async function handleValidationResponse(event: ValidationResponseEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.VALIDATION;
-  const eventType = "ValidationPerformed";
+  const eventType = "ValidationResponse";
 
   try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedValidatorAddress = validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress");
+    const validatedRequestHash = validateBytes32Hash(event.args.requestHash, "requestHash");
+    const validatedResponseUri = validateUri(event.args.responseUri, "responseUri");
+    const validatedResponseHash = validateBytes32Hash(event.args.responseHash, "responseHash");
+    const validatedTag = validateTag(event.args.tag, "tag");
+
     const eventId = generateEventId(
       registry,
       chainId,
@@ -359,14 +622,14 @@ async function handleValidationPerformed(event: any, context: any, chainId: bigi
       logIndex: event.log.logIndex,
       registry,
       eventType,
-      agentId: event.args.agentId,
-      timestamp: event.args.timestamp,
-      validatorAddress: event.args.validator.toLowerCase() as Address,
-      requestHash: bytes32ToHex(event.args.requestHash),
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      validatorAddress: validatedValidatorAddress,
+      requestHash: validatedRequestHash,
       response: Number(event.args.response),
-      responseUri: event.args.responseURI,
-      responseHash: bytes32ToHex(event.args.responseHash),
-      tag: event.args.tag,
+      responseUri: validatedResponseUri,
+      responseHash: validatedResponseHash,
+      tag: validatedTag,
     });
 
     // Update checkpoint
@@ -383,7 +646,7 @@ async function handleValidationPerformed(event: any, context: any, chainId: bigi
         lastBlockHash: event.block.hash,
       });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, event.args.agentId);
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
     logCheckpointUpdated(chainId, event.block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
@@ -392,30 +655,36 @@ async function handleValidationPerformed(event: any, context: any, chainId: bigi
 }
 
 /**
- * ValidationRequested Event
+ * ValidationRequest Event
  * Emitted when a validation is requested for an agent
  */
-ponder.on("ValidationRegistryEthereumSepolia:ValidationRequested", async ({ event, context }) => {
-  await handleValidationRequested(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+ponder.on("ValidationRegistryEthereumSepolia:ValidationRequest", async ({ event, context }) => {
+  await handleValidationRequest(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ValidationRegistryBaseSepolia:ValidationRequested", async ({ event, context }) => {
-  await handleValidationRequested(event, context, CHAIN_IDS.BASE_SEPOLIA);
+ponder.on("ValidationRegistryBaseSepolia:ValidationRequest", async ({ event, context }) => {
+  await handleValidationRequest(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("ValidationRegistryLineaSepolia:ValidationRequested", async ({ event, context }) => {
-  await handleValidationRequested(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+ponder.on("ValidationRegistryLineaSepolia:ValidationRequest", async ({ event, context }) => {
+  await handleValidationRequest(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ValidationRegistryPolygonAmoy:ValidationRequested", async ({ event, context }) => {
-//   await handleValidationRequested(event, context, CHAIN_IDS.POLYGON_AMOY);
+// ponder.on("ValidationRegistryPolygonAmoy:ValidationRequest", async ({ event, context }) => {
+//   await handleValidationRequest(event, context, CHAIN_IDS.POLYGON_AMOY);
 // });
 
-async function handleValidationRequested(event: any, context: any, chainId: bigint): Promise<void> {
+async function handleValidationRequest(event: ValidationRequestEvent, context: PonderContext, chainId: bigint): Promise<void> {
   const registry = REGISTRIES.VALIDATION;
-  const eventType = "ValidationRequested";
+  const eventType = "ValidationRequest";
 
   try {
+    // Validate inputs
+    const validatedAgentId = validateAgentId(event.args.agentId);
+    const validatedValidatorAddress = validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress");
+    const validatedRequestHash = validateBytes32Hash(event.args.requestHash, "requestHash");
+    const validatedRequestUri = validateUri(event.args.requestUri, "requestUri");
+
     const eventId = generateEventId(
       registry,
       chainId,
@@ -432,10 +701,11 @@ async function handleValidationRequested(event: any, context: any, chainId: bigi
       logIndex: event.log.logIndex,
       registry,
       eventType,
-      agentId: event.args.agentId,
-      timestamp: event.args.timestamp,
-      validatorAddress: event.args.validator.toLowerCase() as Address,
-      requestHash: bytes32ToHex(event.args.requestHash),
+      agentId: validatedAgentId,
+      timestamp: event.block.timestamp,
+      validatorAddress: validatedValidatorAddress,
+      requestHash: validatedRequestHash,
+      requestUri: validatedRequestUri,
     });
 
     // Update checkpoint
@@ -452,7 +722,7 @@ async function handleValidationRequested(event: any, context: any, chainId: bigi
         lastBlockHash: event.block.hash,
       });
 
-    logEventProcessed(registry, eventType, chainId, event.block.number, event.args.agentId);
+    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
     logCheckpointUpdated(chainId, event.block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
