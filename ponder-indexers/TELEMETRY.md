@@ -3,73 +3,84 @@
 Visualizzazione migliorata dello stato di indicizzazione di Ponder con:
 - **Blocco corrente** per ogni chain
 - **Eventi organizzati per chain** (non più lista piatta)
-- **Metriche di performance** per ogni tipo di evento
+- **Nomi evento leggibili** (`identity:Registered` vs `IdentityRegistryEthereum...`)
 
-## Attivazione
+## ⚠️ Importante: Approccio Standalone
 
-### 1. Abilita il telemetry nel `.env`
+Ponder usa un sistema di UI terminal-based che rende impossibile sovrascrivere la visualizzazione predefinita. Per questo motivo, il telemetry personalizzato funziona come **script standalone** da eseguire in un terminale separato.
 
-```bash
-# Copia .env.example se non hai già un .env
-cp .env.example .env
+## Utilizzo (Metodo Consigliato)
 
-# Modifica .env e imposta:
-PONDER_TELEMETRY_ENABLED=true
-```
-
-### 2. Avvia Ponder
+### 1. Installa le dipendenze
 
 ```bash
 cd ponder-indexers
+pnpm install
+```
+
+### 2. Avvia Ponder nel terminale principale
+
+```bash
+# Terminale 1
 pnpm dev
+```
+
+### 3. Avvia il telemetry dashboard in un secondo terminale
+
+```bash
+# Terminale 2 (nuovo terminale)
+cd ponder-indexers
+pnpm telemetry
 ```
 
 ## Output Atteso
 
-Invece della visualizzazione predefinita di Ponder, vedrai:
+Nel terminale del dashboard vedrai:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Ponder Sync Status                     │
+│              Ponder Indexer Telemetry Dashboard             │
 └─────────────────────────────────────────────────────────────┘
 
-Sync
+Sync Status
 
-| Network              | Status     | Block           | Progress     | RPC (req/s) |
-|----------------------|------------|-----------------|--------------|-------------|
-| baseSepolia          | realtime   | 34427002        | 100%         | 1.0         |
-| ethereumSepolia      | realtime   | 9748229         | 100%         | 1.0         |
-| lineaSepolia         | realtime   | 21469914        | 100%         | 1.6         |
+| Network              | Current Block   | Total Events |
+|----------------------|-----------------|--------------|
+| baseSepolia          | 34427002        | 805          |
+| ethereumSepolia      | 9748229         | 54           |
+| lineaSepolia         | 21469914        | 8            |
 
 
-Indexing (by Chain)
+Events by Chain
 
 baseSepolia (Chain 84532):
-| Event                                    | Count      | Avg Duration (ms)  |
-|------------------------------------------|------------|--------------------|
-| identity:Registered                      | 50         | 0.094              |
-| identity:MetadataSet                     | 670        | 0.068              |
-| identity:Transfer                        | 50         | 0.180              |
-| reputation:NewFeedback                   | 5          | 0.825              |
-| reputation:ResponseAppended              | 4          | 0.565              |
-| validation:ValidationResponse            | 33         | 46.258             |
+| Event                                    | Count      |
+|------------------------------------------|------------|
+| identity:MetadataSet                     | 670        |
+| identity:Registered                      | 50         |
+| identity:Transfer                        | 50         |
+| validation:ValidationResponse            | 33         |
+| reputation:NewFeedback                   | 5          |
+| reputation:ResponseAppended              | 4          |
 
 ethereumSepolia (Chain 11155111):
-| Event                                    | Count      | Avg Duration (ms)  |
-|------------------------------------------|------------|--------------------|
-| identity:Registered                      | 19         | 538.365            |
-| identity:UriUpdated                      | 15         | 382.934            |
-| reputation:NewFeedback                   | 16         | 215.003            |
-| validation:ValidationResponse            | 5          | 31.124             |
+| Event                                    | Count      |
+|------------------------------------------|------------|
+| identity:Registered                      | 19         |
+| reputation:NewFeedback                   | 16         |
+| identity:UriUpdated                      | 15         |
+| validation:ValidationResponse            | 5          |
 
 lineaSepolia (Chain 59141):
-| Event                                    | Count      | Avg Duration (ms)  |
-|------------------------------------------|------------|--------------------|
-| validation:ValidationRequest             | 4          | 0.479              |
+| Event                                    | Count      |
+|------------------------------------------|------------|
+| validation:ValidationRequest             | 4          |
+| validation:ValidationResponse            | 4          |
 
 
 Total Events Indexed: 867
 Refresh Rate: 2s
+Database: localhost:5432/erc8004_backend
 
 Press Ctrl+C to stop
 ```
@@ -105,138 +116,116 @@ baseSepolia (Chain 84532):
 ✅ Eventi raggruppati per chain
 ✅ Blocco corrente visibile nella sezione Sync
 
-## Applicare il Telemetry a Tutti gli Handler
+## Come Funziona
 
-Attualmente solo l'handler `handleRegistered` usa il telemetry wrapper. Per applicarlo a tutti gli handler:
+Lo script `telemetry-dashboard.ts` si connette direttamente al database PostgreSQL e legge:
 
-### Opzione 1: Manuale (Consigliata)
+1. **Checkpoint table**: Per ottenere il blocco corrente di ogni chain
+2. **Event table**: Per contare gli eventi raggruppati per chain e tipo
 
-Per ogni handler function in `src/index.ts`, applica questo pattern:
-
-**Prima:**
-```typescript
-async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const registry = REGISTRIES.IDENTITY;
-  const eventType = "MetadataSet";
-
-  try {
-    // ... validation and database insert
-    logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
-  } catch (error) {
-    logEventError(registry, eventType, chainId, error as Error);
-    throw error;
-  }
-}
-```
-
-**Dopo:**
-```typescript
-async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const registry = REGISTRIES.IDENTITY;
-  const eventType = "MetadataSet";
-  const eventName = `${registry}:${eventType}`;
-
-  await withTelemetry(
-    async () => {
-      try {
-        // ... validation and database insert (unchanged)
-        logEventProcessed(registry, eventType, chainId, event.block.number, validatedAgentId);
-      } catch (error) {
-        logEventError(registry, eventType, chainId, error as Error);
-        throw error;
-      }
-    },
-    chainId,
-    event.block.number,
-    eventName
-  );
-}
-```
-
-### Opzione 2: Script Automatico (Avanzata)
-
-Puoi creare uno script bash con `sed` per applicare il pattern automaticamente, ma richiede attenzione per non introdurre errori.
-
-**Lista degli handler da aggiornare:**
-- `handleMetadataSet` ✅ (Identity Registry)
-- `handleUriUpdated` ✅ (Identity Registry)
-- `handleTransfer` ✅ (Identity Registry)
-- `handleNewFeedback` ✅ (Reputation Registry)
-- `handleFeedbackRevoked` ✅ (Reputation Registry)
-- `handleResponseAppended` ✅ (Reputation Registry)
-- `handleValidationRequest` ✅ (Validation Registry)
-- `handleValidationResponse` ✅ (Validation Registry)
+**Vantaggi dell'approccio standalone:**
+- ✅ Non interferisce con la UI di Ponder
+- ✅ Non richiede modifiche agli event handlers
+- ✅ Legge dati reali dal database (nessuna approssimazione)
+- ✅ Refresh automatico ogni 2 secondi
+- ✅ Può essere eseguito su qualsiasi macchina con accesso al database
 
 ## Configurazione Avanzata
 
 ### Modificare il Refresh Rate
 
-In `src/telemetry.ts`, linea 16:
+In `telemetry-dashboard.ts`, cerca questa linea:
 
 ```typescript
-private readonly DISPLAY_REFRESH_MS = 2000; // Cambia a 5000 per refresh ogni 5s
+  // Refresh every 2 seconds
+  setInterval(async () => {
+    const stats = await fetchStats();
+    displayDashboard(stats);
+  }, 2000); // Cambia 2000 a 5000 per refresh ogni 5s
+```
+
+### Eseguire su Macchina Remota
+
+Il dashboard può essere eseguito su qualsiasi macchina con accesso al database:
+
+```bash
+# Imposta DATABASE_URL per database remoto
+export DATABASE_URL="postgresql://user:password@remote-host:5432/erc8004_backend"
+
+# Esegui il dashboard
+pnpm telemetry
 ```
 
 ### Aggiungere Metriche Custom
 
-Puoi estendere `ChainStats` per tracciare metriche aggiuntive:
+Modifica la query SQL in `telemetry-dashboard.ts` per aggiungere aggregazioni:
 
 ```typescript
-interface ChainStats {
-  name: string;
-  chainId: number;
-  currentBlock: number;
-  targetBlock: number;
-  isRealtime: boolean;
-  rpcRate: number;
-  events: Record<string, EventStats>;
-  // Aggiungi le tue metriche:
-  totalGasUsed?: bigint;
-  uniqueAgents?: Set<string>;
-}
+// Esempio: Aggiungere conteggio agenti unici
+const uniqueAgentsResult = await pool.query(`
+  SELECT "chainId", COUNT(DISTINCT "agentId") as unique_agents
+  FROM "Event"
+  GROUP BY "chainId"
+`);
 ```
 
-## Disabilitazione
+## Limitazioni
 
-Per tornare alla visualizzazione predefinita di Ponder:
-
-```bash
-# In .env
-PONDER_TELEMETRY_ENABLED=false
-
-# Oppure rimuovi completamente la variabile
-```
-
-## Limitazioni Attuali
-
-1. **Target Block**: Ponder non espone l'API per sapere il blocco target durante il sync iniziale, quindi mostriamo sempre il blocco corrente
-2. **RPC Rate**: Ponder non espone metriche real-time delle richieste RPC, quindi mostriamo `0`
-3. **Sync State**: Non possiamo distinguere tra "syncing" e "realtime" tramite API di Ponder, quindi assumiamo sempre "realtime"
-
-Queste limitazioni potrebbero essere risolte in future versioni di Ponder se esporranno API pubbliche per telemetry.
+1. **No metriche di performance**: Lo script standalone non traccia la durata di processing degli eventi (solo Ponder internamente lo sa)
+2. **No RPC rate**: Non abbiamo accesso alle metriche RPC di Ponder
+3. **Polling del database**: Il dashboard interroga il database ogni 2s (leggero overhead)
 
 ## Troubleshooting
 
-### Il telemetry non si avvia
+### Errore "DATABASE_URL environment variable not set"
 
-1. Verifica che `PONDER_TELEMETRY_ENABLED=true` sia nel file `.env` (non `.env.example`)
-2. Riavvia Ponder con `pnpm dev`
-3. Controlla i log per errori di import
+Assicurati di avere il file `.env` nella directory `ponder-indexers/` con:
+
+```bash
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend
+```
+
+Oppure esportala prima di eseguire il dashboard:
+
+```bash
+export DATABASE_URL="postgresql://..."
+pnpm telemetry
+```
+
+### Errore "Database connection failed"
+
+1. Verifica che PostgreSQL sia in esecuzione: `docker-compose ps`
+2. Verifica la connessione: `psql erc8004_backend`
+3. Controlla username/password nel DATABASE_URL
+
+### Il dashboard non mostra eventi
+
+1. Verifica che Ponder sia in esecuzione nel primo terminale
+2. Attendi che Ponder inizi a indicizzare eventi
+3. Controlla che ci siano dati nella tabella `Event`:
+   ```sql
+   SELECT COUNT(*) FROM "Event";
+   ```
 
 ### Lo schermo lampeggia
 
-Questo è normale durante il refresh ogni 2 secondi. Puoi aumentare l'intervallo modificando `DISPLAY_REFRESH_MS` in `src/telemetry.ts`.
+Questo è normale durante il refresh ogni 2 secondi. Puoi aumentare l'intervallo modificando il valore in `telemetry-dashboard.ts`.
 
-### Eventi non appaiono
+### "Cannot find module 'pg'"
 
-Assicurati di aver applicato il wrapper `withTelemetry` agli handler. Solo gli handler wrappati registrano eventi nel telemetry.
+Esegui `pnpm install` per installare le dipendenze:
+
+```bash
+cd ponder-indexers
+pnpm install
+```
 
 ## Performance Impact
 
-Il telemetry custom ha un impatto trascurabile sulle performance:
-- **Overhead per evento**: ~0.01ms (misurazione `performance.now()`)
-- **Refresh display**: 2s (non blocca il processing degli eventi)
-- **Memoria**: ~1KB per chain tracked
+Il dashboard ha un impatto minimo:
+- **Query al database**: 2 SELECT ogni 2 secondi (~1 query/secondo)
+- **Overhead**: <10ms per refresh (misurazione query + rendering)
+- **Memoria**: ~5MB (Node.js + pg driver)
 
 ---
 
