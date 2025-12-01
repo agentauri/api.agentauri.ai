@@ -116,8 +116,10 @@ function displayDashboard(stats: Map<number, ChainStats>): void {
   // Clear screen and move cursor to top
   console.clear();
 
+  const now = new Date().toLocaleTimeString();
   console.log("\n┌─────────────────────────────────────────────────────────────┐");
   console.log("│              Ponder Indexer Telemetry Dashboard             │");
+  console.log(`│                    Last Update: ${now.padEnd(18)} │`);
   console.log("└─────────────────────────────────────────────────────────────┘\n");
 
   // Sync Status Table
@@ -190,6 +192,8 @@ async function main(): Promise<void> {
   try {
     await pool.query("SELECT 1");
     console.log("✅ Database connection successful\n");
+    console.log("📊 Dashboard will refresh every 2 seconds...\n");
+    console.log("💡 Tip: If numbers don't change, Ponder is fully synced (waiting for new blocks)\n");
   } catch (error) {
     console.error("❌ Database connection failed:", error);
     process.exit(1);
