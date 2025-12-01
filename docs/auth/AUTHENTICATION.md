@@ -217,6 +217,7 @@ DELETE /api/v1/agents/:agent_id/link  # Unlink agent
 
 - [API_KEYS.md](./API_KEYS.md) - API key format, lifecycle, and management
 - [WALLET_SIGNATURES.md](./WALLET_SIGNATURES.md) - EIP-191 verification and agent linking
+- [OAUTH.md](./OAUTH.md) - OAuth 2.0 authorization code flow (Phase 4-5)
 - [RATE_LIMITING.md](./RATE_LIMITING.md) - Per-tier rate limiting implementation
 - [SECURITY_MODEL.md](./SECURITY_MODEL.md) - Threat model and security best practices
 
