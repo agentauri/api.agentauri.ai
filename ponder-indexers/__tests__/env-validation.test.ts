@@ -4,7 +4,7 @@
  * Tests for the Zod-based environment variable validation
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { envSchema, resetEnvCache, getConfiguredChains, type EnvConfig } from "../env-validation";
+import { envSchema, resetEnvCache, getConfiguredChains, type EnvConfig } from "../src/env-validation";
 
 describe("envSchema", () => {
   const originalEnv = process.env;

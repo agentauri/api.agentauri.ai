@@ -5,6 +5,9 @@
  * independently of the Ponder runtime.
  */
 import type { Hash, Hex } from "viem";
+import { Event, Checkpoint } from "../ponder.schema";
+import { logEventProcessed, logEventError, logCheckpointUpdated } from "./logger";
+import type { PonderContext, BlockInfo, TransactionInfo, LogInfo } from "./types";
 
 // ============================================================================
 // CONSTANTS
@@ -55,4 +58,84 @@ export function generateEventId(
  */
 export function bytes32ToHex(bytes32: Hex): string {
   return bytes32;
+}
+
+// ============================================================================
+// EVENT PROCESSING HELPER
+// ============================================================================
+
+/**
+ * Event data for processEvent helper
+ */
+export interface EventData {
+  registry: Registry;
+  eventType: string;
+  chainId: bigint;
+  agentId: bigint;
+  /** Additional event-specific fields */
+  eventValues: Record<string, unknown>;
+}
+
+/**
+ * Centralized event processing helper that handles:
+ * - Event ID generation
+ * - Database insert for Event table
+ * - Checkpoint update
+ * - Success/error logging
+ * - Error re-throw for Ponder retry handling
+ *
+ * This reduces code duplication across all 9 event handlers.
+ */
+export async function processEvent(
+  context: PonderContext,
+  block: BlockInfo,
+  transaction: TransactionInfo,
+  log: LogInfo,
+  data: EventData
+): Promise<void> {
+  const { registry, eventType, chainId, agentId, eventValues } = data;
+
+  try {
+    const eventId = generateEventId(registry, chainId, transaction.hash as Hash, log.logIndex);
+
+    // Insert event
+    await context.db.insert(Event).values({
+      id: eventId,
+      chainId,
+      blockNumber: block.number,
+      blockHash: block.hash,
+      transactionHash: transaction.hash,
+      logIndex: log.logIndex,
+      registry,
+      eventType,
+      agentId,
+      timestamp: block.timestamp,
+      ...eventValues,
+    });
+
+    // Update checkpoint (with race condition protection)
+    const checkpointInsert = context.db
+      .insert(Checkpoint)
+      .values({
+        id: chainId,
+        chainId,
+        lastBlockNumber: block.number,
+        lastBlockHash: block.hash,
+      });
+
+    if (checkpointInsert.onConflictDoUpdate) {
+      await checkpointInsert.onConflictDoUpdate({
+        lastBlockNumber: block.number,
+        lastBlockHash: block.hash,
+      });
+    } else {
+      await checkpointInsert;
+    }
+
+    logEventProcessed(registry, eventType, chainId, block.number, agentId);
+    logCheckpointUpdated(chainId, block.number);
+  } catch (error) {
+    logEventError(registry, eventType, chainId, error as Error);
+    throw error; // Re-throw to let Ponder handle retries
+  }
 }

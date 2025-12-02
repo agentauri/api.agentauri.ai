@@ -4,7 +4,7 @@
  * Tests for the helper functions used in event handlers
  */
 import { describe, it, expect } from "vitest";
-import { generateEventId, bytes32ToHex, CHAIN_IDS, REGISTRIES } from "../helpers";
+import { generateEventId, bytes32ToHex, CHAIN_IDS, REGISTRIES } from "../src/helpers";
 
 describe("CHAIN_IDS constants", () => {
   it("should have correct Ethereum Sepolia chain ID", () => {
