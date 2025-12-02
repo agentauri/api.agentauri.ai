@@ -67,6 +67,12 @@ alloy = { workspace = true }
 # Stripe payment processing
 async-stripe = { workspace = true }
 
+# OAuth 2.0 client for social login
+oauth2 = { workspace = true }
+
+# URL encoding for redirects
+urlencoding = { workspace = true }
+
 # Hex encoding/decoding
 hex = { workspace = true }
 

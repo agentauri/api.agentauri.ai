@@ -8,6 +8,7 @@ pub mod conditions;
 pub mod oauth;
 pub mod organizations;
 pub mod triggers;
+pub mod user_identities;
 pub mod users;
 pub mod wallet;
 
@@ -19,6 +20,7 @@ pub use conditions::ConditionRepository;
 pub use oauth::{OAuthClientRepository, OAuthTokenRepository};
 pub use organizations::{MemberRepository, OrganizationRepository, OrganizationWithRole};
 pub use triggers::TriggerRepository;
+pub use user_identities::UserIdentityRepository;
 pub use users::UserRepository;
 
 // Billing and wallet repositories are accessed via their modules

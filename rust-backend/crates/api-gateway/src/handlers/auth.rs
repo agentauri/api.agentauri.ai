@@ -263,8 +263,20 @@ pub async fn login(
         ));
     }
 
+    // Check if user has a password (social-only users don't)
+    let password_hash = match &user.password_hash {
+        Some(hash) => hash,
+        None => {
+            // User registered via social login, can't login with password
+            return HttpResponse::BadRequest().json(ErrorResponse::new(
+                "no_password",
+                "This account uses social login. Please sign in with Google or GitHub.",
+            ));
+        }
+    };
+
     // Verify password
-    let parsed_hash = match PasswordHash::new(&user.password_hash) {
+    let parsed_hash = match PasswordHash::new(password_hash) {
         Ok(hash) => hash,
         Err(e) => {
             tracing::error!("Failed to parse password hash: {}", e);

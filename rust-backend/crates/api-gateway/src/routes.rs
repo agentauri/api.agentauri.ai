@@ -23,7 +23,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/auth")
                     .route("/register", web::post().to(handlers::register))
-                    .route("/login", web::post().to(handlers::login)),
+                    .route("/login", web::post().to(handlers::login))
+                    // Social login endpoints (OAuth 2.0)
+                    .route("/google", web::get().to(handlers::google_auth))
+                    .route("/google/callback", web::get().to(handlers::google_callback))
+                    .route("/github", web::get().to(handlers::github_auth))
+                    .route("/github/callback", web::get().to(handlers::github_callback)),
             )
             // OAuth token endpoints (public - client credentials auth)
             .route("/oauth/token", web::post().to(handlers::token_endpoint))

@@ -110,6 +110,12 @@ async-stripe = { version = "0.39", features = ["runtime-tokio-hyper"] }
 # Hex encoding/decoding
 hex = "0.4"
 
+# OAuth 2.0 client for social login (Google, GitHub)
+oauth2 = "4.4"
+
+# URL encoding for redirects
+urlencoding = "2.1"
+
 # System utilities
 hostname = "0.4"
 

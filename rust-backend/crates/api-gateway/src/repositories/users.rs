@@ -151,4 +151,46 @@ impl UserRepository {
 
         Ok(result)
     }
+
+    /// Create a new social login user (no password)
+    ///
+    /// This function creates a user without a password for social-only authentication.
+    /// The user can later add a password or link additional providers.
+    pub async fn create_social_user<'e, E>(
+        executor: E,
+        username: &str,
+        email: &str,
+        primary_auth_provider: &str,
+        avatar_url: Option<&str>,
+    ) -> Result<User>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let user_id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now();
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (
+                id, username, email, password_hash,
+                created_at, updated_at, is_active,
+                primary_auth_provider, avatar_url
+            )
+            VALUES ($1, $2, $3, NULL, $4, $5, true, $6, $7)
+            RETURNING *
+            "#,
+        )
+        .bind(&user_id)
+        .bind(username)
+        .bind(email)
+        .bind(now)
+        .bind(now)
+        .bind(primary_auth_provider)
+        .bind(avatar_url)
+        .fetch_one(executor)
+        .await
+        .context("Failed to create social user")?;
+
+        Ok(user)
+    }
 }

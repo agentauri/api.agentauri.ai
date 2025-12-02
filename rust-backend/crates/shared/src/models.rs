@@ -12,11 +12,13 @@ pub struct User {
     pub username: String,
     pub email: String,
     #[serde(skip_serializing)]
-    pub password_hash: String,
+    pub password_hash: Option<String>, // Optional for social-only users
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
     pub is_active: bool,
+    pub primary_auth_provider: Option<String>, // 'email', 'google', 'github', 'wallet'
+    pub avatar_url: Option<String>,
 }
 
 /// Organization for multi-tenant account model
@@ -363,6 +365,93 @@ pub struct OAuthToken {
     pub revoked: bool,
     pub created_at: DateTime<Utc>,
 }
+
+/// User identity for multi-provider authentication
+///
+/// Links multiple authentication providers (email, Google, GitHub, wallet)
+/// to a single user account, enabling account linking.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct UserIdentity {
+    pub id: String,
+    pub user_id: String,
+
+    /// Authentication provider: 'email', 'google', 'github', 'wallet'
+    pub provider: String,
+
+    /// Unique identifier from the provider (e.g., Google sub, GitHub id)
+    pub provider_user_id: String,
+
+    /// Email from the provider (if available)
+    pub email: Option<String>,
+
+    /// Display name from the provider
+    pub display_name: Option<String>,
+
+    /// Avatar URL from the provider
+    pub avatar_url: Option<String>,
+
+    /// Wallet address (only for provider='wallet')
+    pub wallet_address: Option<String>,
+
+    /// Chain ID (only for provider='wallet')
+    pub chain_id: Option<i32>,
+
+    /// Encrypted OAuth access token
+    #[serde(skip_serializing)]
+    pub access_token_encrypted: Option<String>,
+
+    /// Encrypted OAuth refresh token
+    #[serde(skip_serializing)]
+    pub refresh_token_encrypted: Option<String>,
+
+    /// Token expiration time
+    pub token_expires_at: Option<DateTime<Utc>>,
+
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+/// Authentication provider type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthProvider {
+    Email,
+    Google,
+    GitHub,
+    Wallet,
+}
+
+impl AuthProvider {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AuthProvider::Email => "email",
+            AuthProvider::Google => "google",
+            AuthProvider::GitHub => "github",
+            AuthProvider::Wallet => "wallet",
+        }
+    }
+}
+
+impl std::str::FromStr for AuthProvider {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "email" => Ok(AuthProvider::Email),
+            "google" => Ok(AuthProvider::Google),
+            "github" => Ok(AuthProvider::GitHub),
+            "wallet" => Ok(AuthProvider::Wallet),
+            _ => Err(format!("Invalid auth provider: {}", s)),
+        }
+    }
+}
+
+impl std::fmt::Display for AuthProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 // ============================================================================
 // Request/Response DTOs for API
 // ============================================================================

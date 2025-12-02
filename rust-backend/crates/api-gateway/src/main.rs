@@ -20,7 +20,7 @@ use middleware::auth_extractor::AuthExtractor;
 use middleware::query_tier::QueryTierExtractor;
 use middleware::security_headers::SecurityHeaders;
 use middleware::unified_rate_limiter::UnifiedRateLimiter;
-use services::WalletService;
+use services::{SocialAuthService, WalletService};
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -54,6 +54,14 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         "WalletService initialized with {} chain configurations",
         chain_configs.len()
+    );
+
+    // Initialize SocialAuthService for OAuth login (Google, GitHub)
+    let social_auth_service = SocialAuthService::from_env();
+    tracing::info!(
+        "SocialAuthService initialized (Google: {}, GitHub: {})",
+        social_auth_service.is_google_configured(),
+        social_auth_service.is_github_configured()
     );
 
     // Initialize Redis client for rate limiting
@@ -102,6 +110,8 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(config.clone()))
             // Store WalletService in app state (shared across all requests)
             .app_data(web::Data::new(wallet_service.clone()))
+            // Store SocialAuthService in app state (shared across all requests)
+            .app_data(web::Data::new(social_auth_service.clone()))
             // Configure routes
             .configure(routes::configure)
     })
