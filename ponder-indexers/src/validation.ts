@@ -323,9 +323,20 @@ export function validateMetadataValue(
 ): string {
   const MAX_VALUE_LENGTH = 10000; // 10KB limit
 
-  // Convert bytes to string
-  const strValue =
-    typeof value === "string" ? value : Buffer.from(value).toString("utf8");
+  let strValue: string;
+
+  if (value instanceof Uint8Array) {
+    // Validate UTF-8 encoding BEFORE conversion using fatal decoder
+    try {
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      strValue = decoder.decode(value);
+    } catch {
+      throw new Error("Metadata value contains invalid UTF-8");
+    }
+  } else {
+    // String input is already valid UTF-8 by JavaScript guarantee
+    strValue = value;
+  }
 
   // Check for null bytes
   if (strValue.includes("\0")) {
@@ -337,13 +348,6 @@ export function validateMetadataValue(
     throw new Error(
       `Metadata value exceeds maximum length (${MAX_VALUE_LENGTH} chars): ${strValue.length} chars`
     );
-  }
-
-  // Validate UTF-8 encoding
-  try {
-    new TextEncoder().encode(strValue);
-  } catch (error) {
-    throw new Error("Metadata value contains invalid UTF-8");
   }
 
   return strValue;

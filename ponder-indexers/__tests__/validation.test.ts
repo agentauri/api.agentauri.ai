@@ -345,10 +345,9 @@ describe("validateMetadataValue", () => {
   it("should reject invalid UTF-8", () => {
     // Create invalid UTF-8 sequence
     const invalidUtf8 = new Uint8Array([0xff, 0xfe, 0xfd]);
-    const invalidString = Buffer.from(invalidUtf8).toString("utf8");
 
-    // Should not throw during conversion but fail on encoding validation
-    expect(() => validateMetadataValue(invalidString)).toThrow("invalid UTF-8");
+    // Pass Uint8Array directly to validate UTF-8 encoding properly
+    expect(() => validateMetadataValue(invalidUtf8)).toThrow("invalid UTF-8");
   });
 });
 
