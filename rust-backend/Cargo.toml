@@ -100,6 +100,8 @@ regex = "1"
 # Cryptographic utilities
 base64 = "0.22"
 rand = "0.8"
+hmac = "0.12"
+sha2 = "0.10"
 
 # Ethereum / EIP-191 signature verification
 alloy = { version = "0.5", features = ["signers", "contract", "provider-http"] }

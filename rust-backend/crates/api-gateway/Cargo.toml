@@ -57,6 +57,8 @@ regex = { workspace = true }
 # Cryptographic utilities for API key generation
 base64 = { workspace = true }
 rand = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
 
 # Rate limiting for authentication
 governor = { workspace = true }

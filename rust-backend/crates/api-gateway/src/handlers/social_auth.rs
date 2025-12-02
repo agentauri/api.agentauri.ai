@@ -13,7 +13,7 @@ use crate::{
     repositories::{
         MemberRepository, OrganizationRepository, UserIdentityRepository, UserRepository,
     },
-    services::SocialAuthService,
+    services::{SocialAuthError, SocialAuthService},
 };
 
 /// Query parameters for OAuth initiation
@@ -97,8 +97,14 @@ pub async fn google_callback(
         match social_auth.google_callback(&query.code, &query.state).await {
             Ok(result) => result,
             Err(e) => {
-                tracing::error!("Google callback failed: {}", e);
-                return redirect_with_error(&social_auth, "oauth_failed", &e.to_string());
+                tracing::error!(
+                    provider = "google",
+                    error = %e,
+                    error_type = ?e,
+                    "OAuth callback failed"
+                );
+                let (error_code, user_message) = map_oauth_error_to_user_message(&e);
+                return redirect_with_error(&social_auth, error_code, user_message);
             }
         };
 
@@ -131,8 +137,14 @@ pub async fn github_callback(
         match social_auth.github_callback(&query.code, &query.state).await {
             Ok(result) => result,
             Err(e) => {
-                tracing::error!("GitHub callback failed: {}", e);
-                return redirect_with_error(&social_auth, "oauth_failed", &e.to_string());
+                tracing::error!(
+                    provider = "github",
+                    error = %e,
+                    error_type = ?e,
+                    "OAuth callback failed"
+                );
+                let (error_code, user_message) = map_oauth_error_to_user_message(&e);
+                return redirect_with_error(&social_auth, error_code, user_message);
             }
         };
 
@@ -146,6 +158,41 @@ pub async fn github_callback(
         state_payload.redirect_after,
     )
     .await
+}
+
+/// Map SocialAuthError to user-friendly (code, message) tuple
+/// This prevents leaking internal error details to the frontend
+fn map_oauth_error_to_user_message(e: &SocialAuthError) -> (&'static str, &'static str) {
+    match e {
+        SocialAuthError::InvalidState | SocialAuthError::StateExpired => (
+            "session_expired",
+            "Your session has expired. Please try again.",
+        ),
+        SocialAuthError::TokenExchangeFailed(_) => (
+            "auth_failed",
+            "Authentication with the provider failed. Please try again.",
+        ),
+        SocialAuthError::ProfileFetchFailed(_) => (
+            "profile_error",
+            "Could not retrieve your profile from the provider. Please try again.",
+        ),
+        SocialAuthError::EmailNotProvided => (
+            "email_required",
+            "A verified email address is required for registration.",
+        ),
+        SocialAuthError::EmailNotVerified => (
+            "email_not_verified",
+            "Please verify your email with the provider before signing in.",
+        ),
+        SocialAuthError::ProviderNotConfigured(_) => (
+            "provider_unavailable",
+            "This login method is currently unavailable.",
+        ),
+        _ => (
+            "auth_error",
+            "An error occurred during authentication. Please try again.",
+        ),
+    }
 }
 
 /// Common handler for OAuth callbacks
@@ -162,46 +209,93 @@ async fn handle_oauth_callback(
     profile: crate::services::OAuthUserProfile,
     redirect_after: Option<String>,
 ) -> HttpResponse {
-    // 1. Check if identity already exists
-    if let Ok(Some(identity)) =
-        UserIdentityRepository::find_by_provider(&pool, provider, &profile.provider_user_id).await
+    // 1. Check if identity already exists - handle errors explicitly to prevent duplicates
+    match UserIdentityRepository::find_by_provider(&pool, provider, &profile.provider_user_id).await
     {
-        // Identity exists - log in the user
-        return login_existing_user(pool, config, social_auth, &identity.user_id, redirect_after)
+        Ok(Some(identity)) => {
+            // Identity exists - log in the user
+            return login_existing_user(
+                pool,
+                config,
+                social_auth,
+                &identity.user_id,
+                redirect_after,
+            )
             .await;
+        }
+        Ok(None) => {
+            // Identity not found, continue to check email
+        }
+        Err(e) => {
+            // Database error - abort to prevent creating duplicate accounts
+            tracing::error!(
+                provider = provider,
+                provider_user_id = %profile.provider_user_id,
+                error = %e,
+                "Database error while looking up identity - aborting to prevent duplicates"
+            );
+            return redirect_with_error(
+                &social_auth,
+                "service_unavailable",
+                "Authentication service temporarily unavailable. Please try again.",
+            );
+        }
     }
 
     // 2. Get email from profile (required for new accounts)
     let email = match &profile.email {
         Some(email) if profile.email_verified => email.clone(),
         Some(email) => {
-            // Email exists but not verified - for now, accept it with a warning
-            tracing::warn!("User email {} not verified by {}", email, provider);
+            // Email exists but not verified - log warning but continue
+            tracing::warn!(
+                email = %email,
+                provider = provider,
+                "User email not verified by provider - proceeding with caution"
+            );
             email.clone()
         }
         None => {
-            tracing::error!("No email provided by {}", provider);
+            tracing::error!(provider = provider, "No email provided by provider");
             return redirect_with_error(
                 &social_auth,
                 "email_required",
-                "Email is required for registration",
+                "A verified email address is required for registration.",
             );
         }
     };
 
     // 3. Check if email matches an existing user → link to existing account
-    if let Ok(Some(existing_user)) = UserRepository::find_by_email(&pool, &email).await {
-        // Email matches existing user - link this identity to that user
-        return link_and_login(
-            pool,
-            config,
-            social_auth,
-            &existing_user.id,
-            provider,
-            &profile,
-            redirect_after,
-        )
-        .await;
+    // Handle errors explicitly to prevent creating duplicate accounts
+    match UserRepository::find_by_email(&pool, &email).await {
+        Ok(Some(existing_user)) => {
+            // Email matches existing user - link this identity to that user
+            return link_and_login(
+                pool,
+                config,
+                social_auth,
+                &existing_user.id,
+                provider,
+                &profile,
+                redirect_after,
+            )
+            .await;
+        }
+        Ok(None) => {
+            // No existing user with this email, proceed to create new user
+        }
+        Err(e) => {
+            // Database error - abort to prevent creating duplicate accounts
+            tracing::error!(
+                email = %email,
+                error = %e,
+                "Database error while looking up user by email - aborting to prevent duplicates"
+            );
+            return redirect_with_error(
+                &social_auth,
+                "service_unavailable",
+                "Authentication service temporarily unavailable. Please try again.",
+            );
+        }
     }
 
     // 4. Create new user and identity
@@ -465,6 +559,9 @@ fn redirect_with_error(
 }
 
 /// Find a unique username by appending numbers if necessary
+///
+/// Handles database errors gracefully by falling back to UUID-based username
+/// to prevent infinite loops or excessive database load during failures.
 async fn find_unique_username(pool: &DbPool, base: &str) -> String {
     let mut username = base.to_string();
     let mut attempt = 0;
@@ -472,13 +569,26 @@ async fn find_unique_username(pool: &DbPool, base: &str) -> String {
     loop {
         match UserRepository::username_exists(pool, &username).await {
             Ok(false) => return username,
-            _ => {
+            Ok(true) => {
+                // Username exists, try next number
                 attempt += 1;
                 username = format!("{}{}", base, attempt);
                 if attempt > 100 {
-                    // Fallback to UUID if too many collisions
+                    tracing::warn!(
+                        base_username = %base,
+                        "Exceeded 100 username collision attempts, falling back to UUID"
+                    );
                     return format!("user_{}", &Uuid::new_v4().to_string()[..8]);
                 }
+            }
+            Err(e) => {
+                // Database error - log and use UUID fallback to avoid infinite loop
+                tracing::error!(
+                    username = %username,
+                    error = %e,
+                    "Database error checking username availability, using UUID fallback"
+                );
+                return format!("user_{}", &Uuid::new_v4().to_string()[..8]);
             }
         }
     }
@@ -550,5 +660,76 @@ mod tests {
         assert_eq!(generate_personal_slug("johndoe"), "johndoe-personal");
         assert_eq!(generate_personal_slug("john_doe"), "john-doe-personal");
         assert_eq!(generate_personal_slug("John"), "john-personal");
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_invalid_state() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::InvalidState);
+        assert_eq!(code, "session_expired");
+        assert!(msg.contains("expired"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_state_expired() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::StateExpired);
+        assert_eq!(code, "session_expired");
+        assert!(msg.contains("expired"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_token_exchange_failed() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::TokenExchangeFailed(
+            "secret error details".to_string(),
+        ));
+        assert_eq!(code, "auth_failed");
+        // Ensure secret details are NOT leaked
+        assert!(!msg.contains("secret"));
+        assert!(msg.contains("failed"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_profile_fetch_failed() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::ProfileFetchFailed(
+            "internal API response".to_string(),
+        ));
+        assert_eq!(code, "profile_error");
+        // Ensure internal details are NOT leaked
+        assert!(!msg.contains("internal"));
+        assert!(!msg.contains("API"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_email_not_provided() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::EmailNotProvided);
+        assert_eq!(code, "email_required");
+        assert!(msg.contains("email"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_email_not_verified() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::EmailNotVerified);
+        assert_eq!(code, "email_not_verified");
+        assert!(msg.contains("verify"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_provider_not_configured() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::ProviderNotConfigured(
+            "google".to_string(),
+        ));
+        assert_eq!(code, "provider_unavailable");
+        // Ensure provider name is NOT leaked
+        assert!(!msg.contains("google"));
+    }
+
+    #[test]
+    fn test_map_oauth_error_to_user_message_internal_error() {
+        let (code, msg) = map_oauth_error_to_user_message(&SocialAuthError::Internal(
+            "database connection string".to_string(),
+        ));
+        assert_eq!(code, "auth_error");
+        // Ensure internal details are NOT leaked
+        assert!(!msg.contains("database"));
+        assert!(!msg.contains("connection"));
     }
 }

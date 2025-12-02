@@ -162,15 +162,56 @@ pub struct SocialAuthService {
 
 impl SocialAuthService {
     /// Create a new SocialAuthService from environment variables
+    ///
+    /// # Panics
+    /// In production (when ENVIRONMENT != "development"), panics if:
+    /// - OAUTH_STATE_SECRET is not set or is less than 32 characters
+    /// - FRONTEND_URL is not set
     pub fn from_env() -> Self {
         let google_config = Self::load_google_config();
         let github_config = Self::load_github_config();
 
-        let state_secret = std::env::var("OAUTH_STATE_SECRET")
-            .unwrap_or_else(|_| "default-dev-secret".to_string());
+        let is_development = std::env::var("ENVIRONMENT")
+            .map(|e| e == "development")
+            .unwrap_or(false);
 
-        let frontend_url =
-            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        // State secret for HMAC signing - CRITICAL for security
+        let state_secret = match std::env::var("OAUTH_STATE_SECRET") {
+            Ok(secret) => {
+                if secret.len() < 32 && !is_development {
+                    panic!(
+                        "OAUTH_STATE_SECRET must be at least 32 characters in production. \
+                         Generate with: openssl rand -base64 32"
+                    );
+                }
+                secret
+            }
+            Err(_) if is_development => {
+                tracing::warn!(
+                    "OAUTH_STATE_SECRET not set, using development default. \
+                     DO NOT use this in production!"
+                );
+                "default-dev-secret-not-for-production".to_string()
+            }
+            Err(_) => {
+                panic!(
+                    "OAUTH_STATE_SECRET must be set in production. \
+                     Generate with: openssl rand -base64 32"
+                );
+            }
+        };
+
+        // Frontend URL for redirects
+        let frontend_url = match std::env::var("FRONTEND_URL") {
+            Ok(url) => url,
+            Err(_) if is_development => {
+                tracing::warn!("FRONTEND_URL not set, using localhost for development");
+                "http://localhost:3000".to_string()
+            }
+            Err(_) => {
+                panic!("FRONTEND_URL must be set in production");
+            }
+        };
 
         let http_client = reqwest::Client::builder()
             .pool_max_idle_per_host(10)
@@ -535,7 +576,21 @@ impl SocialAuthService {
             })?;
 
         if !response.status().is_success() {
-            // Email endpoint might fail if user hasn't granted email scope
+            let status = response.status();
+            // 404 or 403 typically means user hasn't granted email scope
+            if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::FORBIDDEN
+            {
+                tracing::info!(
+                    status = %status,
+                    "GitHub email endpoint returned expected non-success status (likely missing email scope)"
+                );
+                return Ok((None, false));
+            }
+            // Other errors (5xx, 401, etc.) should be logged as warnings
+            tracing::warn!(
+                status = %status,
+                "GitHub email endpoint failed with unexpected status - proceeding without email"
+            );
             return Ok((None, false));
         }
 
@@ -611,16 +666,15 @@ impl SocialAuthService {
 
     /// Sign data with HMAC-SHA256
     fn sign_data(&self, data: &[u8]) -> Vec<u8> {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
 
-        // Simple HMAC-like signature (in production, use a proper HMAC library)
-        let mut hasher = DefaultHasher::new();
-        data.hash(&mut hasher);
-        self.state_secret.hash(&mut hasher);
-        let hash = hasher.finish();
+        type HmacSha256 = Hmac<Sha256>;
 
-        hash.to_le_bytes().to_vec()
+        let mut mac = HmacSha256::new_from_slice(self.state_secret.as_bytes())
+            .expect("HMAC can take key of any size");
+        mac.update(data);
+        mac.finalize().into_bytes().to_vec()
     }
 }
 
