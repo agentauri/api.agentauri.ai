@@ -52,6 +52,7 @@ const rpcProviderSchema = {
   // Linea Sepolia
   LINEA_SEPOLIA_RPC_ALCHEMY: httpsUrl.optional(),
   LINEA_SEPOLIA_RPC_INFURA: httpsUrl.optional(),
+  LINEA_SEPOLIA_RPC_QUIKNODE: httpsUrl.optional(),
   LINEA_SEPOLIA_RPC_ANKR: httpsUrl.optional(),
   LINEA_SEPOLIA_RPC_URL: httpsUrl.optional(),
 
@@ -214,6 +215,7 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
       hasRpc: Boolean(
         env.LINEA_SEPOLIA_RPC_ALCHEMY ??
         env.LINEA_SEPOLIA_RPC_INFURA ??
+        env.LINEA_SEPOLIA_RPC_QUIKNODE ??
         env.LINEA_SEPOLIA_RPC_ANKR ??
         env.LINEA_SEPOLIA_RPC_URL
       ),
@@ -293,6 +295,7 @@ export function getConfiguredChains(env: EnvConfig): string[] {
   if (
     env.LINEA_SEPOLIA_RPC_ALCHEMY ??
     env.LINEA_SEPOLIA_RPC_INFURA ??
+    env.LINEA_SEPOLIA_RPC_QUIKNODE ??
     env.LINEA_SEPOLIA_RPC_ANKR ??
     env.LINEA_SEPOLIA_RPC_URL
   ) {
