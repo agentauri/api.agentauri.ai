@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                circuit_breaker_config,\n                circuit_breaker_state\n            FROM triggers\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "circuit_breaker_config",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "circuit_breaker_state",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "cc85d885ee14581bf3bb04fb406a060bfc0b5e83ff2cd9c00eba9b610dbe2f01"
+}

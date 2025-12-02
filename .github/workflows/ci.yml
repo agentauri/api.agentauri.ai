@@ -186,6 +186,9 @@ jobs:
 
       - name: Run Clippy
         working-directory: rust-backend
+        # Note: Clippy runs WITHOUT DATABASE_URL, using SQLx offline mode.
+        # If this fails with "set DATABASE_URL...", run `cargo sqlx prepare --workspace`
+        # locally and commit the updated .sqlx/ directory.
         run: cargo clippy --workspace -- -D warnings
 
       - name: Run Rust tests
