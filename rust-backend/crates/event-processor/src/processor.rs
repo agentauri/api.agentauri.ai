@@ -303,7 +303,8 @@ pub async fn process_event<Q: JobQueue>(
                             );
                             // Emit metric for monitoring
                             #[cfg(feature = "metrics")]
-                            metrics::counter!("event_processor.action_enqueue_failures").increment(1);
+                            metrics::counter!("event_processor.action_enqueue_failures")
+                                .increment(1);
 
                             // Continue processing other actions
                         }

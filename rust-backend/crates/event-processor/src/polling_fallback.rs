@@ -274,8 +274,7 @@ impl PollingFallback {
             {
                 metrics::counter!("event_processor.polling_fallback.events_failed")
                     .increment(failed_count as u64);
-                metrics::gauge!("event_processor.polling_fallback.failure_rate")
-                    .set(failure_rate);
+                metrics::gauge!("event_processor.polling_fallback.failure_rate").set(failure_rate);
             }
         }
 
