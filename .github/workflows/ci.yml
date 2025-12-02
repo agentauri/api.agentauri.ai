@@ -163,6 +163,21 @@ jobs:
     needs: check-files
     if: needs.check-files.outputs.rust-exists == 'true'
 
+    services:
+      postgres:
+        image: timescale/timescaledb:2.23.1-pg15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_password_12345
+          POSTGRES_DB: erc8004_backend
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -180,6 +195,12 @@ jobs:
         with:
           workspaces: rust-backend
 
+      - name: Run database migrations
+        run: |
+          for migration in database/migrations/*.sql; do
+            PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f "$migration"
+          done
+
       - name: Check Rust formatting
         working-directory: rust-backend
         run: cargo fmt -- --check
@@ -193,6 +214,8 @@ jobs:
 
       - name: Run Rust tests
         working-directory: rust-backend
+        env:
+          DATABASE_URL: postgres://postgres:ci_test_password_12345@localhost:5432/erc8004_backend
         run: cargo test --workspace --lib --bins
 
       - name: Generate Rust test summary
