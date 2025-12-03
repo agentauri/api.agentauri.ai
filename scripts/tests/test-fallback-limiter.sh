@@ -19,6 +19,7 @@ NC='\033[0m'
 
 # Configuration
 API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
+# shellcheck disable=SC2034 # Reserved for future use
 HEALTH_ENDPOINT="$API_BASE_URL/api/v1/health"
 TESTS_PASSED=0
 TESTS_FAILED=0

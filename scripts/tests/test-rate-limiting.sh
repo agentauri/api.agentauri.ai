@@ -74,7 +74,7 @@ echo -e "\n${YELLOW}Test 6: Rate Limit Enforcement (Rapid Requests)${NC}"
 echo "Making 20 rapid requests to test rate limiting..."
 
 RATE_LIMITED=0
-for i in {1..20}; do
+for _ in {1..20}; do
     STATUS=$(curl -s -o /dev/null -w "%{http_code}" $API_URL/api/v1/health)
     if [ "$STATUS" -eq 429 ]; then
         RATE_LIMITED=1

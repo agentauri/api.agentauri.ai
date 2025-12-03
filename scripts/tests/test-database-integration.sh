@@ -28,7 +28,7 @@ if [ -z "$PGPASSWORD" ]; then
     exit 1
 fi
 
-DB_PASSWORD="$PGPASSWORD"
+# Note: PGPASSWORD is used directly by psql, no need for DB_PASSWORD variable
 
 # Test counter
 TESTS_RUN=0

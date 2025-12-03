@@ -68,7 +68,7 @@ test_requests_within_limit_allowed() {
     print_info "Making 5 requests (within anonymous limit of 10)..."
 
     allowed_count=0
-    for i in {1..5}; do
+    for _ in {1..5}; do
         status=$(curl -s -w "%{http_code}" -o /dev/null "$HEALTH_ENDPOINT")
 
         if [ "$status" == "200" ]; then
@@ -91,7 +91,7 @@ test_requests_blocked_when_exceeded() {
     print_test "Test 2: Requests exceeding limit are blocked with 429"
 
     print_info "Making 10 requests to reach limit..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
@@ -115,7 +115,7 @@ test_429_error_message() {
 
     # Exhaust limit
     print_info "Exhausting rate limit..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
@@ -140,7 +140,7 @@ test_headers_on_429_response() {
 
     # Exhaust limit
     print_info "Exhausting rate limit..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
@@ -176,7 +176,7 @@ test_remaining_is_zero_when_blocked() {
 
     # Exhaust limit
     print_info "Exhausting rate limit..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
@@ -218,7 +218,7 @@ test_no_shadow_violation_status() {
 
     # Exhaust limit
     print_info "Exhausting rate limit..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
@@ -241,7 +241,7 @@ test_security_headers_on_429() {
 
     # Exhaust limit
     print_info "Exhausting rate limit..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
@@ -275,7 +275,7 @@ test_burst_protection() {
     allowed=0
     blocked=0
 
-    for i in {1..15}; do
+    for _ in {1..15}; do
         status=$(curl -s -w "%{http_code}" -o /dev/null "$HEALTH_ENDPOINT")
 
         if [ "$status" == "200" ]; then

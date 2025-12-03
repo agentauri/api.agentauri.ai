@@ -102,7 +102,7 @@ test_shadow_mode_allows_requests() {
     print_info "Making 15 requests (anonymous limit is 10)..."
 
     allowed_count=0
-    for i in {1..15}; do
+    for _ in {1..15}; do
         status=$(curl -s -w "%{http_code}" -o /dev/null "$HEALTH_ENDPOINT")
 
         if [ "$status" == "200" ]; then
@@ -126,7 +126,7 @@ test_shadow_violation_header() {
 
     # First, exhaust the limit
     print_info "Exhausting rate limit (10 requests)..."
-    for i in {1..10}; do
+    for _ in {1..10}; do
         curl -s -o /dev/null "$HEALTH_ENDPOINT"
         sleep 0.1
     done
