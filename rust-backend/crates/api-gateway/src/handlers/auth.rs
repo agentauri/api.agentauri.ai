@@ -19,7 +19,20 @@ use crate::{
 
 /// Register a new user
 ///
-/// POST /api/v1/auth/register
+/// Creates a new user account with username, email, and password.
+/// Also creates a personal organization for the user.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/register",
+    tag = "Authentication",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "User registered successfully", body = AuthResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 409, description = "Username or email already exists", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
 pub async fn register(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,
@@ -217,7 +230,22 @@ pub async fn register(
 
 /// Login with username/email and password
 ///
-/// POST /api/v1/auth/login
+/// Authenticates a user and returns a JWT token.
+/// Implements account lockout for brute-force protection.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    tag = "Authentication",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 400, description = "Validation error or no password set", body = ErrorResponse),
+        (status = 401, description = "Invalid credentials", body = ErrorResponse),
+        (status = 403, description = "Account disabled", body = ErrorResponse),
+        (status = 429, description = "Account locked due to too many failed attempts", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
 pub async fn login(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,
@@ -263,6 +291,31 @@ pub async fn login(
         ));
     }
 
+    // Check if account is locked (brute-force protection)
+    match UserRepository::check_account_lockout(&pool, &user.id).await {
+        Ok(Some(seconds_remaining)) => {
+            tracing::warn!(
+                user_id = %user.id,
+                seconds_remaining = seconds_remaining,
+                "Login attempt on locked account"
+            );
+            return HttpResponse::TooManyRequests().json(ErrorResponse::new(
+                "account_locked",
+                format!(
+                    "Account is temporarily locked. Try again in {} seconds.",
+                    seconds_remaining
+                ),
+            ));
+        }
+        Ok(None) => {
+            // Account is not locked, proceed
+        }
+        Err(e) => {
+            // Log error but don't block login (fail open for better availability)
+            tracing::error!("Failed to check account lockout: {}", e);
+        }
+    }
+
     // Check if user has a password (social-only users don't)
     let password_hash = match &user.password_hash {
         Some(hash) => hash,
@@ -292,10 +345,29 @@ pub async fn login(
         .verify_password(req.password.as_bytes(), &parsed_hash)
         .is_err()
     {
+        // Record failed login attempt (may trigger lockout)
+        match UserRepository::record_failed_login(&pool, &user.id).await {
+            Ok(attempts) => {
+                tracing::warn!(
+                    user_id = %user.id,
+                    failed_attempts = attempts,
+                    "Failed login attempt"
+                );
+            }
+            Err(e) => {
+                tracing::error!("Failed to record failed login: {}", e);
+            }
+        }
+
         return HttpResponse::Unauthorized().json(ErrorResponse::new(
             "invalid_credentials",
             "Invalid credentials",
         ));
+    }
+
+    // Successful login - reset failed login attempts
+    if let Err(e) = UserRepository::reset_failed_login(&pool, &user.id).await {
+        tracing::warn!("Failed to reset failed login counter: {}", e);
     }
 
     // Update last login timestamp

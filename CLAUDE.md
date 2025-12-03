@@ -32,6 +32,12 @@ psql < database/seeds/test_data.sql   # Load test data
 POST   /api/v1/auth/register          # Create user account
 POST   /api/v1/auth/login             # Get JWT token
 
+# Social Authentication (OAuth 2.0)
+GET    /api/v1/auth/google            # Initiate Google OAuth
+GET    /api/v1/auth/google/callback   # Google OAuth callback
+GET    /api/v1/auth/github            # Initiate GitHub OAuth
+GET    /api/v1/auth/github/callback   # GitHub OAuth callback
+
 # API Key Management (Layer 1)
 POST   /api/v1/api-keys               # Create API key
 GET    /api/v1/api-keys               # List organization's keys
@@ -136,9 +142,15 @@ This backend transforms these raw blockchain signals into intelligent actions: n
     - Timing attack mitigation via pre-computed dummy hash for constant-time verification
     - Authentication rate limiting: 20 attempts/min per IP, 1000/min global
     - Dual audit logging: `api_key_audit_log` (org-scoped) + `auth_failures` (pre-org failures)
+    - Account lockout: 5 failed attempts → progressive lockout (15min-4h)
   - All payment methods (Stripe, x402, Credits)
   - Per-plan rate limits (Starter: 100/hr, Pro: 500/hr, Enterprise: 2000/hr)
   - Full access to Tier 0-3 queries
+- **Social Authentication** (OAuth 2.0)
+  - Google and GitHub OAuth 2.0 support
+  - HMAC-SHA256 signed state tokens (CSRF protection)
+  - Automatic account linking by email
+  - See [Social Login Documentation](docs/auth/SOCIAL_LOGIN.md)
 - **Layer 2: Wallet Signature** - On-chain agent authentication
   - EIP-191 signature verification
   - Agent → Account linking via challenge-response
@@ -147,6 +159,12 @@ This backend transforms these raw blockchain signals into intelligent actions: n
   - Inherits account permissions and rate limits
 
 See [Authentication Documentation](docs/auth/AUTHENTICATION.md) for complete details.
+
+**Background Tasks**: The API Gateway runs periodic maintenance tasks for cleanup:
+- Nonce cleanup (wallet auth, payment nonces)
+- OAuth token cleanup
+- Auth failures retention (30 days)
+- See [Background Tasks Documentation](docs/operations/BACKGROUND_TASKS.md)
 
 ### ERC-8004 Protocol Reference
 
@@ -861,6 +879,47 @@ CREATE INDEX idx_triggers_org_chain_registry_enabled
 }
 ```
 
+#### OpenAPI Documentation (MANDATORY)
+
+**CRITICAL RULE: Keep OpenAPI Spec in Sync**
+
+All API changes MUST include corresponding OpenAPI documentation updates. The documentation uses `utoipa` crate for compile-time validation.
+
+**When Adding/Modifying Endpoints**:
+1. Add `#[utoipa::path(...)]` annotation to the handler function
+2. Add `#[derive(ToSchema)]` to any new request/response DTOs
+3. Register the handler path in `src/openapi.rs` under `paths(...)`
+4. Register new schemas in `src/openapi.rs` under `components(schemas(...))`
+5. Re-export `__path_*` types in `handlers/mod.rs` if needed
+
+**Example Handler Annotation**:
+```rust
+#[utoipa::path(
+    post,
+    path = "/api/v1/example",
+    tag = "Examples",
+    request_body = ExampleRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "Created", body = SuccessResponse<ExampleResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    )
+)]
+pub async fn create_example(...) -> impl Responder { ... }
+```
+
+**Verification**:
+- Swagger UI: `http://localhost:8080/api-docs/`
+- OpenAPI JSON: `http://localhost:8080/api/v1/openapi.json`
+
+**Files to Update**:
+| Change Type | Files to Modify |
+|-------------|-----------------|
+| New endpoint | Handler file, `openapi.rs` (paths), `handlers/mod.rs` (re-export) |
+| New DTO | Model file (add ToSchema), `openapi.rs` (schemas) |
+| Modified endpoint | Handler file (update utoipa::path) |
+
 ## Development Workflow
 
 ### Local Testing Scripts
@@ -1357,6 +1416,6 @@ The project has strong code quality (917+ tests, zero technical debt) and solid 
 
 ---
 
-**Last Updated**: January 30, 2025
-**Version**: 1.4.0 (Phase 4 Week 14 Complete + Production Roadmap)
+**Last Updated**: December 2, 2025
+**Version**: 1.5.0 (Social Auth + Account Lockout + Background Tasks)
 **Maintainers**: Development Team

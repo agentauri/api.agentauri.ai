@@ -7,6 +7,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 use crate::validators::ETH_ADDRESS_REGEX;
@@ -77,7 +78,8 @@ pub struct WalletVerifyResponse {
 // ============================================================================
 
 /// Request to link an ERC-8004 agent to an organization
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"agent_id": 42, "chain_id": 11155111, "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb4", "signature": "0x...", "nonce": "abc123"}))]
 pub struct LinkAgentRequest {
     /// ERC-8004 agent token ID
     #[validate(range(min = 0))]
@@ -101,8 +103,8 @@ pub struct LinkAgentRequest {
 }
 
 /// Response after successfully linking an agent
-#[derive(Debug, Serialize)]
-pub struct LinkedAgentResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AgentLinkResponse {
     /// Link record ID
     pub id: String,
     /// Agent token ID
@@ -154,7 +156,7 @@ pub struct AgentLink {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<AgentLink> for LinkedAgentResponse {
+impl From<AgentLink> for AgentLinkResponse {
     fn from(link: AgentLink) -> Self {
         Self {
             id: link.id,
@@ -298,8 +300,8 @@ mod tests {
     }
 
     #[test]
-    fn test_linked_agent_response_serialization() {
-        let response = LinkedAgentResponse {
+    fn test_agent_link_response_serialization() {
+        let response = AgentLinkResponse {
             id: "link-123".to_string(),
             agent_id: 42,
             chain_id: 11155111,

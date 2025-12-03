@@ -36,7 +36,7 @@ mod unit_tests {
     fn test_agent_card_structure() {
         use chrono::Utc;
 
-        let agent_card = AgentCard {
+        let agent_card = AgentCardResponse {
             name: "Test API".to_string(),
             version: "1.0.0".to_string(),
             description: "Test description".to_string(),
@@ -271,7 +271,7 @@ mod unit_tests {
     fn test_agent_card_json_complete() {
         use chrono::Utc;
 
-        let agent_card = AgentCard {
+        let agent_card = AgentCardResponse {
             name: "ERC-8004 Backend API".to_string(),
             version: "1.0.0".to_string(),
             description: "Real-time backend infrastructure".to_string(),

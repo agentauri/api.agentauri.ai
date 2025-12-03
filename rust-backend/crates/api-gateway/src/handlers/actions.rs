@@ -17,8 +17,24 @@ use crate::{
 
 /// Create a new action for a trigger
 ///
-/// POST /api/v1/triggers/{trigger_id}/actions
-/// Requires X-Organization-ID header
+/// Creates a new action to execute when the trigger matches. Requires write permission.
+#[utoipa::path(
+    post,
+    path = "/api/v1/triggers/{trigger_id}/actions",
+    tag = "Actions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID")
+    ),
+    request_body = CreateActionRequest,
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 201, description = "Action created", body = SuccessResponse<ActionResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn create_action(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -85,8 +101,21 @@ pub async fn create_action(
 
 /// List actions for a trigger
 ///
-/// GET /api/v1/triggers/{trigger_id}/actions
-/// Requires X-Organization-ID header
+/// Returns all actions for the specified trigger.
+#[utoipa::path(
+    get,
+    path = "/api/v1/triggers/{trigger_id}/actions",
+    tag = "Actions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "List of actions", body = SuccessResponse<Vec<ActionResponse>>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_actions(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -135,8 +164,25 @@ pub async fn list_actions(
 
 /// Update an action
 ///
-/// PUT /api/v1/triggers/{trigger_id}/actions/{id}
-/// Requires X-Organization-ID header
+/// Updates action configuration. Requires write permission.
+#[utoipa::path(
+    put,
+    path = "/api/v1/triggers/{trigger_id}/actions/{id}",
+    tag = "Actions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID"),
+        ("id" = i32, Path, description = "Action ID")
+    ),
+    request_body = UpdateActionRequest,
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "Action updated", body = SuccessResponse<ActionResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger or action not found", body = ErrorResponse)
+    )
+)]
 pub async fn update_action(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -220,8 +266,23 @@ pub async fn update_action(
 
 /// Delete an action
 ///
-/// DELETE /api/v1/triggers/{trigger_id}/actions/{id}
-/// Requires X-Organization-ID header
+/// Permanently removes the action. Requires write permission.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/triggers/{trigger_id}/actions/{id}",
+    tag = "Actions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID"),
+        ("id" = i32, Path, description = "Action ID")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 204, description = "Action deleted"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger or action not found", body = ErrorResponse)
+    )
+)]
 pub async fn delete_action(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,

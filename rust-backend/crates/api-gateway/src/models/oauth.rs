@@ -28,6 +28,7 @@
 use chrono::{DateTime, Utc};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 // Re-export database models from shared crate
@@ -40,7 +41,8 @@ pub use shared::models::OAuthToken;
 // ============================================================================
 
 /// Request to create a new OAuth client
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"client_name": "My App", "redirect_uris": ["https://example.com/callback"], "scopes": ["read:triggers"], "grant_types": ["authorization_code", "refresh_token"]}))]
 pub struct CreateOAuthClientRequest {
     /// Display name for the OAuth application
     #[validate(length(min = 1, max = 255))]
@@ -68,7 +70,8 @@ pub struct CreateOAuthClientRequest {
 }
 
 /// OAuth token request (RFC 6749 Section 4.1.3)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
+#[schema(example = json!({"grant_type": "client_credentials", "client_id": "client_abc123", "client_secret": "secret_xyz"}))]
 pub struct TokenRequest {
     /// Grant type: "authorization_code", "refresh_token", "client_credentials"
     pub grant_type: String,
@@ -100,7 +103,7 @@ pub struct TokenRequest {
 // ============================================================================
 
 /// Response after creating an OAuth client
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CreateOAuthClientResponse {
     /// The client ID (public identifier)
     pub client_id: String,
@@ -128,7 +131,7 @@ pub struct CreateOAuthClientResponse {
 }
 
 /// Response for listing OAuth clients (masked)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OAuthClientResponse {
     /// Internal ID
     pub id: String,
@@ -175,7 +178,7 @@ impl From<OAuthClient> for OAuthClientResponse {
 }
 
 /// OAuth token response (RFC 6749 Section 5.1)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TokenResponse {
     /// The access token
     pub access_token: String,
@@ -195,7 +198,7 @@ pub struct TokenResponse {
 }
 
 /// Response for listing OAuth clients
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OAuthClientListResponse {
     pub clients: Vec<OAuthClientResponse>,
     pub total: i64,

@@ -8,7 +8,7 @@ use redis::AsyncCommands;
 use tracing::{debug, error, info, instrument};
 
 use crate::models::discovery::{
-    AgentCard, Authentication, AuthenticationEndpoints, Capabilities, ChainInfo, Contact,
+    AgentCardResponse, Authentication, AuthenticationEndpoints, Capabilities, ChainInfo, Contact,
     Endpoints, PullLayer, PushLayer, RateLimitTier, RateLimiting,
 };
 
@@ -18,31 +18,15 @@ const CACHE_TTL_SECONDS: u64 = 3600; // 1 hour
 /// GET /.well-known/agent.json
 ///
 /// Returns the Agent Card with system metadata and capabilities.
-///
-/// # Authentication
-///
-/// None required - this is a public endpoint.
-///
-/// # Caching
-///
-/// Response is cached in Redis for 1 hour and includes HTTP Cache-Control header.
-///
-/// # CORS
-///
-/// Supports cross-origin requests (Access-Control-Allow-Origin: *).
-///
-/// # Response
-///
-/// ```json
-/// {
-///   "name": "ERC-8004 Backend API",
-///   "version": "1.0.0",
-///   "description": "...",
-///   "capabilities": { ... },
-///   "endpoints": { ... },
-///   "contact": { ... }
-/// }
-/// ```
+/// This is a public endpoint used for API discovery.
+#[utoipa::path(
+    get,
+    path = "/.well-known/agent.json",
+    tag = "Discovery",
+    responses(
+        (status = 200, description = "Agent Card with system metadata", body = AgentCardResponse)
+    )
+)]
 #[instrument(skip(config))]
 pub async fn get_agent_card(config: web::Data<shared::Config>) -> Result<HttpResponse> {
     debug!("Discovery endpoint called");
@@ -104,7 +88,7 @@ fn build_response(json_body: String) -> HttpResponse {
 }
 
 /// Generate Agent Card with system metadata
-fn generate_agent_card() -> AgentCard {
+fn generate_agent_card() -> AgentCardResponse {
     // Use environment variables for dynamic values
     let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "https://api.8004.dev".to_string());
     let contact_email =
@@ -114,7 +98,7 @@ fn generate_agent_card() -> AgentCard {
     let documentation_url =
         std::env::var("DOCUMENTATION_URL").unwrap_or_else(|_| "https://docs.8004.dev".to_string());
 
-    AgentCard {
+    AgentCardResponse {
         name: "ERC-8004 Backend API".to_string(),
         version: "1.0.0".to_string(),
         description: "Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events".to_string(),

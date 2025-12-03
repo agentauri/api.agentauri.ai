@@ -4,10 +4,11 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Agent Card - System metadata for discovery endpoint
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentCard {
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AgentCardResponse {
     pub name: String,
     pub version: String,
     pub description: String,
@@ -21,7 +22,7 @@ pub struct AgentCard {
 }
 
 /// System capabilities
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Capabilities {
     pub push_layer: PushLayer,
     pub pull_layer: PullLayer,
@@ -30,7 +31,7 @@ pub struct Capabilities {
 }
 
 /// Push layer capabilities (event-driven triggers)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PushLayer {
     pub enabled: bool,
     pub features: Vec<String>,
@@ -38,7 +39,7 @@ pub struct PushLayer {
 }
 
 /// Pull layer capabilities (agent queries)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PullLayer {
     pub enabled: bool,
     pub features: Vec<String>,
@@ -47,7 +48,7 @@ pub struct PullLayer {
 }
 
 /// Blockchain chain information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ChainInfo {
     pub chain_id: i32,
     pub name: String,
@@ -55,21 +56,21 @@ pub struct ChainInfo {
 }
 
 /// Authentication capabilities
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Authentication {
     pub methods: Vec<String>,
     pub oauth2_supported: bool,
 }
 
 /// Rate limiting information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RateLimiting {
     pub enabled: bool,
     pub tiers: Vec<RateLimitTier>,
 }
 
 /// Rate limit tier configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RateLimitTier {
     pub tier: String,
     pub rate_limit: String,
@@ -77,7 +78,7 @@ pub struct RateLimitTier {
 }
 
 /// API endpoint references
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Endpoints {
     pub api_documentation: String,
     pub health_check: String,
@@ -86,14 +87,14 @@ pub struct Endpoints {
 }
 
 /// Authentication endpoint URLs
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthenticationEndpoints {
     pub register: String,
     pub login: String,
 }
 
 /// Contact information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Contact {
     pub email: String,
     pub github: String,
@@ -107,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_agent_card_serialization() {
-        let agent_card = AgentCard {
+        let agent_card = AgentCardResponse {
             name: "Test API".to_string(),
             version: "1.0.0".to_string(),
             description: "Test description".to_string(),

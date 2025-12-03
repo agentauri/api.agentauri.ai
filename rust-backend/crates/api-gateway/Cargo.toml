@@ -90,6 +90,10 @@ tokio-util = { workspace = true }
 # Redis for caching
 redis = { workspace = true }
 
+# OpenAPI documentation
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+
 [dev-dependencies]
 mockall = { workspace = true }
 actix-rt = { workspace = true }

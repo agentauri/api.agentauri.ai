@@ -31,6 +31,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 // ============================================================================
@@ -61,7 +62,8 @@ pub const VALID_ROLES: [&str; 4] = [ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, ROLE_VI
 // ============================================================================
 
 /// Request to create a new organization
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "My Organization", "slug": "my-org", "description": "A great organization"}))]
 pub struct CreateOrganizationRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: String,
@@ -75,7 +77,8 @@ pub struct CreateOrganizationRequest {
 }
 
 /// Request to update an organization
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "Updated Name", "description": "New description"}))]
 pub struct UpdateOrganizationRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: Option<String>,
@@ -85,7 +88,8 @@ pub struct UpdateOrganizationRequest {
 }
 
 /// Request to add a member to an organization
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"user_id": "user-123", "role": "member"}))]
 pub struct AddMemberRequest {
     #[validate(length(min = 1))]
     pub user_id: String,
@@ -95,7 +99,8 @@ pub struct AddMemberRequest {
 }
 
 /// Request to update a member's role
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"role": "admin"}))]
 pub struct UpdateMemberRoleRequest {
     #[validate(custom(function = "validate_role"))]
     pub role: String,
@@ -105,7 +110,8 @@ pub struct UpdateMemberRoleRequest {
 ///
 /// The new owner must already be a member of the organization.
 /// Personal organizations cannot have ownership transferred.
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"new_owner_id": "user-456"}))]
 pub struct TransferOwnershipRequest {
     /// ID of the user to transfer ownership to
     #[validate(length(min = 1))]
@@ -117,7 +123,7 @@ pub struct TransferOwnershipRequest {
 // ============================================================================
 
 /// Organization response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrganizationResponse {
     pub id: String,
     pub name: String,
@@ -164,7 +170,7 @@ impl OrganizationResponse {
 }
 
 /// Organization response with the user's role
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrganizationWithRoleResponse {
     #[serde(flatten)]
     pub organization: OrganizationResponse,
@@ -172,7 +178,7 @@ pub struct OrganizationWithRoleResponse {
 }
 
 /// Member response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MemberResponse {
     pub id: String,
     pub user_id: String,

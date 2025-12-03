@@ -2,10 +2,12 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 /// Request to create a new trigger
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "Low Score Alert", "description": "Alert when score drops below 60", "chain_id": 84532, "registry": "reputation", "enabled": true}))]
 pub struct CreateTriggerRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: String,
@@ -24,7 +26,8 @@ pub struct CreateTriggerRequest {
 }
 
 /// Request to update a trigger
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "Updated Alert", "enabled": false}))]
 pub struct UpdateTriggerRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: Option<String>,
@@ -43,7 +46,7 @@ pub struct UpdateTriggerRequest {
 }
 
 /// Trigger response (basic info without conditions/actions)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TriggerResponse {
     pub id: String,
     pub user_id: String,
@@ -77,7 +80,7 @@ impl From<shared::models::Trigger> for TriggerResponse {
 }
 
 /// Detailed trigger response with conditions and actions
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TriggerDetailResponse {
     #[serde(flatten)]
     pub trigger: TriggerResponse,
@@ -86,7 +89,7 @@ pub struct TriggerDetailResponse {
 }
 
 /// Condition response
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct ConditionResponse {
     pub id: i32,
     pub trigger_id: String,
@@ -114,7 +117,7 @@ impl From<shared::models::TriggerCondition> for ConditionResponse {
 }
 
 /// Action response
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct ActionResponse {
     pub id: i32,
     pub trigger_id: String,

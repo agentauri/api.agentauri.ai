@@ -1,10 +1,12 @@
 //! Authentication DTOs
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 /// Register request
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"username": "johndoe", "email": "john@example.com", "password": "securepassword123"}))]
 pub struct RegisterRequest {
     #[validate(length(min = 3, max = 50))]
     pub username: String,
@@ -17,7 +19,8 @@ pub struct RegisterRequest {
 }
 
 /// Login request
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"username_or_email": "johndoe", "password": "securepassword123"}))]
 pub struct LoginRequest {
     #[validate(length(min = 1))]
     pub username_or_email: String,
@@ -27,14 +30,14 @@ pub struct LoginRequest {
 }
 
 /// Authentication response with JWT token
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AuthResponse {
     pub token: String,
     pub user: UserResponse,
 }
 
 /// User response (safe for API, without password)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
     pub id: String,
     pub username: String,

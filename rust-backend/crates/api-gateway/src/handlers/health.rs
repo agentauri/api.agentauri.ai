@@ -3,9 +3,10 @@
 use actix_web::{web, HttpResponse, Responder};
 use serde::Serialize;
 use shared::DbPool;
+use utoipa::ToSchema;
 
 /// Health check response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct HealthResponse {
     pub status: String,
     pub database: String,
@@ -15,20 +16,15 @@ pub struct HealthResponse {
 /// Health check endpoint
 ///
 /// Returns the health status of the API Gateway and its dependencies.
-///
-/// # Endpoint
-///
-/// `GET /api/v1/health`
-///
-/// # Response
-///
-/// ```json
-/// {
-///   "status": "healthy",
-///   "database": "connected",
-///   "version": "0.1.0"
-/// }
-/// ```
+#[utoipa::path(
+    get,
+    path = "/api/v1/health",
+    tag = "Health",
+    responses(
+        (status = 200, description = "Service is healthy", body = HealthResponse),
+        (status = 503, description = "Service is unhealthy", body = HealthResponse)
+    )
+)]
 pub async fn health_check(pool: web::Data<DbPool>) -> impl Responder {
     // Check database connection
     let db_status = match shared::db::check_health(&pool).await {

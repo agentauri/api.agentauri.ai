@@ -5,11 +5,14 @@
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use anyhow::Context;
 use shared::{db, Config, RateLimiter};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod background_tasks;
 mod handlers;
 mod middleware;
 mod models;
+mod openapi;
 mod repositories;
 mod routes;
 mod services;
@@ -79,10 +82,12 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string())
     );
 
-    // Start background tasks (nonce cleanup)
+    // Start background tasks (nonce cleanup, payment nonce cleanup, auth failures cleanup)
     let bg_runner = BackgroundTaskRunner::new(db_pool.clone());
     let shutdown_token = bg_runner.start();
-    tracing::info!("Background tasks started (nonce cleanup every hour)");
+    tracing::info!(
+        "Background tasks started (nonces, OAuth tokens, payment nonces, auth failures cleanup)"
+    );
 
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("API Gateway listening on {}", server_addr);
@@ -114,6 +119,11 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(social_auth_service.clone()))
             // Configure routes
             .configure(routes::configure)
+            // OpenAPI documentation endpoints
+            .service(
+                SwaggerUi::new("/api-docs/{_:.*}")
+                    .url("/api/v1/openapi.json", openapi::ApiDoc::openapi()),
+            )
     })
     .bind(&server_addr)
     .with_context(|| format!("Failed to bind to {}", server_addr))?;

@@ -1,10 +1,12 @@
 //! Trigger Condition DTOs
 
 use serde::Deserialize;
+use utoipa::ToSchema;
 use validator::Validate;
 
 /// Request to create a new condition
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"condition_type": "score_threshold", "field": "score", "operator": "<", "value": "60"}))]
 pub struct CreateConditionRequest {
     #[validate(length(min = 1, max = 100))]
     pub condition_type: String,
@@ -22,7 +24,8 @@ pub struct CreateConditionRequest {
 }
 
 /// Request to update a condition
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"value": "70"}))]
 pub struct UpdateConditionRequest {
     #[validate(length(min = 1, max = 100))]
     pub condition_type: Option<String>,

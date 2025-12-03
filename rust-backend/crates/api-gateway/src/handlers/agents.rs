@@ -21,6 +21,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use shared::DbPool;
 use tracing::info;
+use utoipa::ToSchema;
 use validator::Validate;
 
 use crate::{
@@ -35,7 +36,7 @@ use crate::{
 // ============================================================================
 
 /// Request to link an agent to an organization
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct LinkAgentRequest {
     /// The agent token ID from IdentityRegistry
     pub agent_id: i64,
@@ -56,7 +57,7 @@ pub struct LinkAgentRequest {
 }
 
 /// Response for linked agent
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AgentLinkResponse {
     pub id: String,
     pub agent_id: i64,
@@ -96,6 +97,21 @@ pub struct ChainIdQuery {
 ///
 /// This endpoint verifies wallet signature and on-chain ownership before
 /// creating the link. The wallet address must own the agent NFT.
+#[utoipa::path(
+    post,
+    path = "/api/v1/agents/link",
+    tag = "Agents",
+    request_body = LinkAgentRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "Agent linked successfully", body = AgentLinkResponse),
+        (status = 400, description = "Invalid request or signature", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - not owner or not admin", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse),
+        (status = 409, description = "Agent already linked", body = ErrorResponse)
+    )
+)]
 pub async fn link_agent(
     pool: web::Data<DbPool>,
     wallet_service: web::Data<WalletService>,
@@ -279,6 +295,20 @@ pub async fn link_agent(
 /// List linked agents for an organization
 ///
 /// GET /api/v1/agents/linked?organization_id=xxx
+#[utoipa::path(
+    get,
+    path = "/api/v1/agents/linked",
+    tag = "Agents",
+    params(
+        ("organization_id" = String, Query, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of linked agents", body = Vec<AgentLinkResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_linked_agents(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -333,6 +363,23 @@ pub async fn list_linked_agents(
 /// Unlink an agent from an organization
 ///
 /// DELETE /api/v1/agents/{agent_id}/link?chain_id=xxx&organization_id=xxx
+#[utoipa::path(
+    delete,
+    path = "/api/v1/agents/{agent_id}/link",
+    tag = "Agents",
+    params(
+        ("agent_id" = i64, Path, description = "Agent token ID"),
+        ("chain_id" = i32, Query, description = "Chain ID"),
+        ("organization_id" = String, Query, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Agent unlinked successfully", body = SuccessResponse<String>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - not admin or wrong organization", body = ErrorResponse),
+        (status = 404, description = "Agent link not found", body = ErrorResponse)
+    )
+)]
 pub async fn unlink_agent(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,

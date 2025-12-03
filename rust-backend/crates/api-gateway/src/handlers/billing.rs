@@ -52,6 +52,20 @@ pub struct OrgIdQuery {
 /// Get credit balance for an organization
 ///
 /// GET /api/v1/billing/credits?organization_id=xxx
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/credits",
+    tag = "Billing",
+    params(
+        ("organization_id" = String, Query, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Credit balance", body = CreditBalanceResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization or credits not found", body = ErrorResponse)
+    )
+)]
 pub async fn get_credits(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -99,6 +113,24 @@ pub async fn get_credits(
 /// List credit transactions for an organization
 ///
 /// GET /api/v1/billing/transactions?organization_id=xxx&limit=20&offset=0
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/transactions",
+    tag = "Billing",
+    params(
+        ("organization_id" = String, Query, description = "Organization ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum items to return"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip"),
+        ("transaction_type" = Option<String>, Query, description = "Filter by transaction type")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of transactions", body = Vec<CreditTransactionResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_transactions(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -158,7 +190,7 @@ pub async fn list_transactions(
 // ============================================================================
 
 /// Request body wrapper for purchase that includes organization_id
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Deserialize, validator::Validate, utoipa::ToSchema)]
 pub struct PurchaseCreditsRequestWithOrg {
     /// The organization purchasing credits
     pub organization_id: String,
@@ -179,6 +211,21 @@ pub struct PurchaseCreditsRequestWithOrg {
 ///
 /// Creates a Stripe Checkout session for credit purchase.
 /// Returns checkout URL for client redirect.
+#[utoipa::path(
+    post,
+    path = "/api/v1/billing/credits/purchase",
+    tag = "Billing",
+    request_body = PurchaseCreditsRequestWithOrg,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Checkout session created", body = PurchaseCreditsResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - admin required", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse),
+        (status = 503, description = "Payment service unavailable", body = ErrorResponse)
+    )
+)]
 pub async fn purchase_credits(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,
@@ -283,6 +330,20 @@ pub async fn purchase_credits(
 /// Get subscription details for an organization
 ///
 /// GET /api/v1/billing/subscription?organization_id=xxx
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/subscription",
+    tag = "Billing",
+    params(
+        ("organization_id" = String, Query, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Subscription details", body = SubscriptionResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization or subscription not found", body = ErrorResponse)
+    )
+)]
 pub async fn get_subscription(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -339,6 +400,17 @@ pub async fn get_subscription(
 /// - checkout.session.completed: Add credits
 /// - checkout.session.async_payment_failed: Log failure
 /// - customer.subscription.created/updated/deleted: Update subscription
+#[utoipa::path(
+    post,
+    path = "/api/v1/billing/webhook",
+    tag = "Billing",
+    request_body(content = String, description = "Raw webhook payload", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Webhook processed"),
+        (status = 400, description = "Invalid signature or payload", body = ErrorResponse),
+        (status = 503, description = "Payment service unavailable", body = ErrorResponse)
+    )
+)]
 pub async fn handle_stripe_webhook(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,

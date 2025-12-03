@@ -1,10 +1,12 @@
 //! Trigger Action DTOs
 
 use serde::Deserialize;
+use utoipa::ToSchema;
 use validator::Validate;
 
 /// Request to create a new action
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"action_type": "telegram", "priority": 10, "config": {"chat_id": "123456789", "message_template": "Alert: {{event}}"}}))]
 pub struct CreateActionRequest {
     #[validate(length(min = 1, max = 100))]
     #[validate(custom(function = "validate_action_type"))]
@@ -16,7 +18,8 @@ pub struct CreateActionRequest {
 }
 
 /// Request to update an action
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"priority": 5}))]
 pub struct UpdateActionRequest {
     #[validate(length(min = 1, max = 100))]
     #[validate(custom(function = "validate_action_type"))]

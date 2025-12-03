@@ -118,6 +118,10 @@ oauth2 = "4.4"
 # URL encoding for redirects
 urlencoding = "2.1"
 
+# OpenAPI documentation
+utoipa = { version = "5", features = ["actix_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "8", features = ["actix-web"] }
+
 # System utilities
 hostname = "0.4"
 

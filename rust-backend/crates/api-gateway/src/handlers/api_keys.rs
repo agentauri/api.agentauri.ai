@@ -38,8 +38,8 @@ use crate::{
         handle_db_error, handle_error, require_found, validate_request,
     },
     models::{
-        can_manage_org, ApiKeyListResponse, ApiKeyResponse, CreateApiKeyRequest,
-        CreateApiKeyResponse, ErrorResponse, PaginationParams, RevokeApiKeyRequest,
+        can_manage_org, ApiKeyCreatedResponse, ApiKeyListResponse, ApiKeyResponse,
+        CreateApiKeyRequest, ErrorResponse, PaginationParams, RevokeApiKeyRequest,
         RotateApiKeyRequest, RotateApiKeyResponse, SuccessResponse,
     },
     repositories::{ApiKeyAuditRepository, ApiKeyRepository, MemberRepository},
@@ -56,6 +56,23 @@ use crate::{
 ///
 /// Returns the full API key ONLY at creation time. The key will never be
 /// shown again - the client MUST save it immediately.
+#[utoipa::path(
+    post,
+    path = "/api/v1/api-keys",
+    tag = "API Keys",
+    params(
+        ("organization_id" = String, Query, description = "Organization ID")
+    ),
+    request_body = CreateApiKeyRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "API key created - full key shown once", body = SuccessResponse<ApiKeyCreatedResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - admin required", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn create_api_key(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -178,7 +195,7 @@ pub async fn create_api_key(
     }
 
     // Return the full key - THIS IS THE ONLY TIME IT WILL BE SHOWN
-    let response = CreateApiKeyResponse {
+    let response = ApiKeyCreatedResponse {
         id: key.id,
         key: generated.key, // Full key - never shown again
         name: key.name,
@@ -196,6 +213,24 @@ pub async fn create_api_key(
 /// List API keys for an organization
 ///
 /// GET /api/v1/api-keys?organization_id=xxx&limit=20&offset=0
+#[utoipa::path(
+    get,
+    path = "/api/v1/api-keys",
+    tag = "API Keys",
+    params(
+        ("organization_id" = String, Query, description = "Organization ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip"),
+        ("include_revoked" = Option<bool>, Query, description = "Include revoked keys")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of API keys (masked)", body = ApiKeyListResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_api_keys(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -279,6 +314,20 @@ pub async fn list_api_keys(
 /// Get API key details
 ///
 /// GET /api/v1/api-keys/{id}
+#[utoipa::path(
+    get,
+    path = "/api/v1/api-keys/{id}",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "API Key ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "API key details (masked)", body = SuccessResponse<ApiKeyResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    )
+)]
 pub async fn get_api_key(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -319,6 +368,23 @@ pub async fn get_api_key(
 /// Revoke an API key
 ///
 /// DELETE /api/v1/api-keys/{id}
+#[utoipa::path(
+    delete,
+    path = "/api/v1/api-keys/{id}",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "API Key ID")
+    ),
+    request_body(content = Option<RevokeApiKeyRequest>, description = "Optional revocation reason"),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "API key revoked", body = SuccessResponse<ApiKeyResponse>),
+        (status = 400, description = "API key already revoked", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - admin required", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    )
+)]
 pub async fn revoke_api_key(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -410,6 +476,23 @@ pub async fn revoke_api_key(
 /// Rotate an API key (revoke old, create new)
 ///
 /// POST /api/v1/api-keys/{id}/rotate
+#[utoipa::path(
+    post,
+    path = "/api/v1/api-keys/{id}/rotate",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "API Key ID to rotate")
+    ),
+    request_body(content = Option<RotateApiKeyRequest>, description = "Optional new name and expiration"),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "API key rotated - new key shown once", body = SuccessResponse<RotateApiKeyResponse>),
+        (status = 400, description = "Cannot rotate revoked key", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - admin required", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    )
+)]
 pub async fn rotate_api_key(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -590,7 +673,7 @@ pub struct ApiKeyListQuery {
 mod tests {
     use super::*;
     use crate::models::{
-        ApiKeyListResponse, ApiKeyResponse, CreateApiKeyRequest, CreateApiKeyResponse,
+        ApiKeyCreatedResponse, ApiKeyListResponse, ApiKeyResponse, CreateApiKeyRequest,
         RevokeApiKeyRequest, RotateApiKeyRequest, RotateApiKeyResponse,
     };
     use chrono::Utc;
@@ -641,8 +724,8 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_create_api_key_response_serialize() {
-        let response = CreateApiKeyResponse {
+    fn test_api_key_created_response_serialize() {
+        let response = ApiKeyCreatedResponse {
             id: "key_123".to_string(),
             key: "sk_live_abc123xyz456".to_string(),
             name: "Production Key".to_string(),

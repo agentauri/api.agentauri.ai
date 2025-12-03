@@ -1,12 +1,17 @@
 //! Common DTOs shared across multiple resources
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Standard error response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[schema(example = json!({"error": "not_found", "message": "Resource not found"}))]
 pub struct ErrorResponse {
+    /// Error code (e.g., "not_found", "validation_error")
     pub error: String,
+    /// Human-readable error message
     pub message: String,
+    /// Additional error details (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<serde_json::Value>,
 }
@@ -34,9 +39,10 @@ impl ErrorResponse {
     }
 }
 
-/// Standard success response
-#[derive(Debug, Serialize, Deserialize)]
+/// Standard success response wrapper
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SuccessResponse<T> {
+    /// Response payload
     pub data: T,
 }
 
@@ -73,18 +79,26 @@ impl PaginationParams {
     }
 }
 
-/// Paginated response
-#[derive(Debug, Serialize, Deserialize)]
+/// Paginated response wrapper
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PaginatedResponse<T> {
+    /// Array of items
     pub data: Vec<T>,
+    /// Pagination metadata
     pub pagination: PaginationMeta,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Pagination metadata
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[schema(example = json!({"total": 100, "limit": 20, "offset": 0, "has_more": true}))]
 pub struct PaginationMeta {
+    /// Total number of items
     pub total: i64,
+    /// Maximum items per page
     pub limit: i64,
+    /// Number of items skipped
     pub offset: i64,
+    /// Whether more items exist beyond this page
     pub has_more: bool,
 }
 

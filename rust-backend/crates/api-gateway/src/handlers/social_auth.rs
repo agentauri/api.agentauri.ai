@@ -34,10 +34,20 @@ pub struct OAuthCallbackQuery {
 
 /// Initiate Google OAuth login
 ///
-/// GET /api/v1/auth/google
-///
 /// Redirects the user to Google's OAuth consent screen.
 /// After authorization, Google redirects to /api/v1/auth/google/callback
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/google",
+    tag = "Authentication",
+    params(
+        ("redirect_after" = Option<String>, Query, description = "URL to redirect after authentication")
+    ),
+    responses(
+        (status = 302, description = "Redirect to Google OAuth"),
+        (status = 500, description = "Failed to initialize OAuth", body = ErrorResponse)
+    )
+)]
 pub async fn google_auth(
     social_auth: web::Data<SocialAuthService>,
     query: web::Query<OAuthInitQuery>,
@@ -58,10 +68,20 @@ pub async fn google_auth(
 
 /// Initiate GitHub OAuth login
 ///
-/// GET /api/v1/auth/github
-///
 /// Redirects the user to GitHub's OAuth consent screen.
 /// After authorization, GitHub redirects to /api/v1/auth/github/callback
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/github",
+    tag = "Authentication",
+    params(
+        ("redirect_after" = Option<String>, Query, description = "URL to redirect after authentication")
+    ),
+    responses(
+        (status = 302, description = "Redirect to GitHub OAuth"),
+        (status = 500, description = "Failed to initialize OAuth", body = ErrorResponse)
+    )
+)]
 pub async fn github_auth(
     social_auth: web::Data<SocialAuthService>,
     query: web::Query<OAuthInitQuery>,
@@ -82,10 +102,21 @@ pub async fn github_auth(
 
 /// Handle Google OAuth callback
 ///
-/// GET /api/v1/auth/google/callback
-///
 /// Exchanges the authorization code for tokens, fetches the user profile,
 /// and creates/logs in the user. Redirects to frontend with JWT token.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/google/callback",
+    tag = "Authentication",
+    params(
+        ("code" = String, Query, description = "Authorization code from Google"),
+        ("state" = String, Query, description = "State parameter for CSRF protection")
+    ),
+    responses(
+        (status = 302, description = "Redirect to frontend with JWT token"),
+        (status = 500, description = "OAuth callback failed", body = ErrorResponse)
+    )
+)]
 pub async fn google_callback(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,
@@ -122,10 +153,21 @@ pub async fn google_callback(
 
 /// Handle GitHub OAuth callback
 ///
-/// GET /api/v1/auth/github/callback
-///
 /// Exchanges the authorization code for tokens, fetches the user profile,
 /// and creates/logs in the user. Redirects to frontend with JWT token.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/github/callback",
+    tag = "Authentication",
+    params(
+        ("code" = String, Query, description = "Authorization code from GitHub"),
+        ("state" = String, Query, description = "State parameter for CSRF protection")
+    ),
+    responses(
+        (status = 302, description = "Redirect to frontend with JWT token"),
+        (status = 500, description = "OAuth callback failed", body = ErrorResponse)
+    )
+)]
 pub async fn github_callback(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,

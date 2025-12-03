@@ -65,10 +65,22 @@ const REFRESH_TOKEN_EXPIRES_IN_SECONDS: i64 = 604800;
 
 /// Create a new OAuth client
 ///
-/// POST /api/v1/oauth/clients
-///
-/// Returns the client secret ONLY at creation time. The secret will never be
-/// shown again - the client MUST save it immediately.
+/// Registers a new OAuth 2.0 client. The client secret is shown ONLY once at creation.
+#[utoipa::path(
+    post,
+    path = "/api/v1/oauth/clients",
+    tag = "OAuth Clients",
+    request_body = CreateOAuthClientRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "OAuth client created", body = SuccessResponse<CreateOAuthClientResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse),
+        (status = 500, description = "Failed to create client", body = ErrorResponse)
+    )
+)]
 pub async fn create_oauth_client(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -174,7 +186,22 @@ pub async fn create_oauth_client(
 
 /// List OAuth clients for authenticated user's organization
 ///
-/// GET /api/v1/oauth/clients?limit=20&offset=0
+/// Returns list of OAuth clients. Client secrets are never exposed.
+#[utoipa::path(
+    get,
+    path = "/api/v1/oauth/clients",
+    tag = "OAuth Clients",
+    params(
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of OAuth clients", body = SuccessResponse<OAuthClientListResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_oauth_clients(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -251,9 +278,22 @@ pub async fn list_oauth_clients(
 
 /// Delete an OAuth client
 ///
-/// DELETE /api/v1/oauth/clients/:id
-///
-/// This will also CASCADE delete all tokens associated with this client.
+/// Deletes an OAuth client and all associated tokens.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/oauth/clients/{id}",
+    tag = "OAuth Clients",
+    params(
+        ("id" = String, Path, description = "Client ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Client deleted"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Client not found", body = ErrorResponse)
+    )
+)]
 pub async fn delete_oauth_client(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -316,12 +356,20 @@ pub async fn delete_oauth_client(
 
 /// OAuth 2.0 token endpoint
 ///
-/// POST /api/v1/oauth/token
-///
-/// Supports the following grant types:
-/// - authorization_code (with PKCE)
-/// - client_credentials (machine-to-machine)
-/// - refresh_token (token refresh)
+/// Issues access and refresh tokens. Supports client_credentials and refresh_token grants.
+#[utoipa::path(
+    post,
+    path = "/api/v1/oauth/token",
+    tag = "OAuth Clients",
+    request_body = TokenRequest,
+    responses(
+        (status = 200, description = "Token issued", body = TokenResponse),
+        (status = 400, description = "Invalid request or unsupported grant type", body = ErrorResponse),
+        (status = 401, description = "Invalid client credentials", body = ErrorResponse),
+        (status = 500, description = "Failed to generate token", body = ErrorResponse),
+        (status = 501, description = "Grant type not implemented", body = ErrorResponse)
+    )
+)]
 pub async fn token_endpoint(
     pool: web::Data<DbPool>,
     req: web::Json<TokenRequest>,

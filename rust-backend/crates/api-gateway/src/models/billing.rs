@@ -6,6 +6,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 // ============================================================================
@@ -13,7 +14,8 @@ use validator::Validate;
 // ============================================================================
 
 /// Response containing current credit balance
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(example = json!({"balance": 5000000, "currency": "USDC", "balance_formatted": "5.000000 USDC"}))]
 pub struct CreditBalanceResponse {
     /// Current balance in micro-USDC (6 decimals)
     pub balance: i64,
@@ -46,7 +48,7 @@ fn format_micro_usdc(micro: i64) -> String {
 // ============================================================================
 
 /// Response containing a credit transaction
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CreditTransactionResponse {
     /// Transaction ID
     pub id: i64,
@@ -90,8 +92,9 @@ fn default_limit() -> i64 {
 // ============================================================================
 
 /// Request to purchase credits via Stripe
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 #[allow(dead_code)] // Future feature: Stripe checkout integration
+#[schema(example = json!({"amount": 100, "success_url": "https://example.com/success", "cancel_url": "https://example.com/cancel"}))]
 pub struct PurchaseCreditsRequest {
     /// Amount in USDC (whole units, e.g., 10 for $10)
     #[validate(range(min = 1, max = 10000))]
@@ -107,7 +110,7 @@ pub struct PurchaseCreditsRequest {
 }
 
 /// Response containing Stripe checkout session info
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PurchaseCreditsResponse {
     /// Stripe checkout session URL
     pub checkout_url: String,
@@ -120,7 +123,7 @@ pub struct PurchaseCreditsResponse {
 // ============================================================================
 
 /// Response containing subscription details
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SubscriptionResponse {
     /// Subscription ID
     pub id: String,

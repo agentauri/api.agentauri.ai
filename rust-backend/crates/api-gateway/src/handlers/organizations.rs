@@ -65,7 +65,21 @@ use crate::{
 
 /// Create a new organization
 ///
-/// POST /api/v1/organizations
+/// Creates a new organization and adds the authenticated user as owner.
+#[utoipa::path(
+    post,
+    path = "/api/v1/organizations",
+    tag = "Organizations",
+    request_body = CreateOrganizationRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "Organization created", body = SuccessResponse<OrganizationResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 409, description = "Slug already exists", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
 pub async fn create_organization(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -132,7 +146,21 @@ pub async fn create_organization(
 
 /// List organizations for authenticated user
 ///
-/// GET /api/v1/organizations?limit=20&offset=0
+/// Returns paginated list of organizations the user is a member of.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations",
+    tag = "Organizations",
+    params(
+        ("limit" = Option<i64>, Query, description = "Maximum items per page (default: 20)"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip (default: 0)")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of organizations", body = PaginatedResponse<OrganizationWithRoleResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    )
+)]
 pub async fn list_organizations(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -190,7 +218,21 @@ pub async fn list_organizations(
 
 /// Get a single organization
 ///
-/// GET /api/v1/organizations/{id}
+/// Returns organization details including the user's role.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}",
+    tag = "Organizations",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Organization details", body = SuccessResponse<OrganizationWithRoleResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn get_organization(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -240,7 +282,24 @@ pub async fn get_organization(
 
 /// Update an organization
 ///
-/// PUT /api/v1/organizations/{id}
+/// Updates organization details. Requires admin or owner role.
+#[utoipa::path(
+    put,
+    path = "/api/v1/organizations/{id}",
+    tag = "Organizations",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    request_body = UpdateOrganizationRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Organization updated", body = SuccessResponse<OrganizationResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn update_organization(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -299,7 +358,23 @@ pub async fn update_organization(
 
 /// Delete an organization (owner only, not personal)
 ///
-/// DELETE /api/v1/organizations/{id}
+/// Permanently deletes an organization. Personal organizations cannot be deleted.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/organizations/{id}",
+    tag = "Organizations",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Organization deleted"),
+        (status = 400, description = "Cannot delete personal organization", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Only owner can delete", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn delete_organization(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -371,7 +446,25 @@ pub async fn delete_organization(
 
 /// Add a member to an organization
 ///
-/// POST /api/v1/organizations/{id}/members
+/// Adds a user to the organization. Requires admin or owner role.
+#[utoipa::path(
+    post,
+    path = "/api/v1/organizations/{id}/members",
+    tag = "Members",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    request_body = AddMemberRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "Member added", body = SuccessResponse<MemberResponse>),
+        (status = 400, description = "Validation error or invalid role", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Organization or user not found", body = ErrorResponse),
+        (status = 409, description = "User already a member", body = ErrorResponse)
+    )
+)]
 pub async fn add_member(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -464,7 +557,23 @@ pub async fn add_member(
 
 /// List members of an organization
 ///
-/// GET /api/v1/organizations/{id}/members?limit=20&offset=0
+/// Returns paginated list of organization members. Emails are masked for privacy.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/members",
+    tag = "Members",
+    params(
+        ("id" = String, Path, description = "Organization ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of members", body = PaginatedResponse<MemberResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_members(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -580,7 +689,25 @@ pub struct MemberPath {
 
 /// Update a member's role (owner only)
 ///
-/// PUT /api/v1/organizations/{id}/members/{user_id}
+/// Changes a member's role within the organization. Only the owner can update roles.
+#[utoipa::path(
+    put,
+    path = "/api/v1/organizations/{id}/members/{user_id}",
+    tag = "Members",
+    params(
+        ("id" = String, Path, description = "Organization ID"),
+        ("user_id" = String, Path, description = "User ID to update")
+    ),
+    request_body = UpdateMemberRoleRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Role updated", body = SuccessResponse<MemberResponse>),
+        (status = 400, description = "Invalid role change", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Only owner can update roles", body = ErrorResponse),
+        (status = 404, description = "Organization or member not found", body = ErrorResponse)
+    )
+)]
 pub async fn update_member_role(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -680,7 +807,24 @@ pub async fn update_member_role(
 
 /// Remove a member from an organization (admin+, cannot remove owner)
 ///
-/// DELETE /api/v1/organizations/{id}/members/{user_id}
+/// Removes a member from the organization. The owner cannot be removed.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/organizations/{id}/members/{user_id}",
+    tag = "Members",
+    params(
+        ("id" = String, Path, description = "Organization ID"),
+        ("user_id" = String, Path, description = "User ID to remove")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Member removed"),
+        (status = 400, description = "Cannot remove owner", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Organization or member not found", body = ErrorResponse)
+    )
+)]
 pub async fn remove_member(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -755,15 +899,24 @@ pub async fn remove_member(
 
 /// Transfer organization ownership to another member (owner only)
 ///
-/// POST /api/v1/organizations/{id}/transfer
-///
-/// This endpoint allows the current owner to transfer ownership to another
-/// member of the organization. The current owner becomes an admin after transfer.
-///
-/// # Constraints
-/// - Only the current owner can initiate a transfer
-/// - Personal organizations cannot be transferred
-/// - The new owner must already be a member of the organization
+/// Transfers ownership to another member. Personal organizations cannot be transferred.
+#[utoipa::path(
+    post,
+    path = "/api/v1/organizations/{id}/transfer",
+    tag = "Organizations",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    request_body = TransferOwnershipRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Ownership transferred", body = SuccessResponse<OrganizationResponse>),
+        (status = 400, description = "Cannot transfer personal organization or to self", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Only owner can transfer ownership", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
 pub async fn transfer_ownership(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,

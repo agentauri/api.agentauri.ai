@@ -17,8 +17,24 @@ use crate::{
 
 /// Create a new condition for a trigger
 ///
-/// POST /api/v1/triggers/{trigger_id}/conditions
-/// Requires X-Organization-ID header
+/// Creates a new matching condition for the trigger. Requires write permission.
+#[utoipa::path(
+    post,
+    path = "/api/v1/triggers/{trigger_id}/conditions",
+    tag = "Conditions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID")
+    ),
+    request_body = CreateConditionRequest,
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 201, description = "Condition created", body = SuccessResponse<ConditionResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn create_condition(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -87,8 +103,21 @@ pub async fn create_condition(
 
 /// List conditions for a trigger
 ///
-/// GET /api/v1/triggers/{trigger_id}/conditions
-/// Requires X-Organization-ID header
+/// Returns all conditions for the specified trigger.
+#[utoipa::path(
+    get,
+    path = "/api/v1/triggers/{trigger_id}/conditions",
+    tag = "Conditions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "List of conditions", body = SuccessResponse<Vec<ConditionResponse>>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn list_conditions(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -140,8 +169,25 @@ pub async fn list_conditions(
 
 /// Update a condition
 ///
-/// PUT /api/v1/triggers/{trigger_id}/conditions/{id}
-/// Requires X-Organization-ID header
+/// Updates condition configuration. Requires write permission.
+#[utoipa::path(
+    put,
+    path = "/api/v1/triggers/{trigger_id}/conditions/{id}",
+    tag = "Conditions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID"),
+        ("id" = i32, Path, description = "Condition ID")
+    ),
+    request_body = UpdateConditionRequest,
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "Condition updated", body = SuccessResponse<ConditionResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger or condition not found", body = ErrorResponse)
+    )
+)]
 pub async fn update_condition(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -228,8 +274,23 @@ pub async fn update_condition(
 
 /// Delete a condition
 ///
-/// DELETE /api/v1/triggers/{trigger_id}/conditions/{id}
-/// Requires X-Organization-ID header
+/// Permanently removes the condition. Requires write permission.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/triggers/{trigger_id}/conditions/{id}",
+    tag = "Conditions",
+    params(
+        ("trigger_id" = String, Path, description = "Trigger ID"),
+        ("id" = i32, Path, description = "Condition ID")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 204, description = "Condition deleted"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger or condition not found", body = ErrorResponse)
+    )
+)]
 pub async fn delete_condition(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,

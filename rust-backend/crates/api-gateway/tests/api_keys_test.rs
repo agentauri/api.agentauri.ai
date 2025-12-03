@@ -420,10 +420,10 @@ mod unit_tests {
 
     #[test]
     fn test_create_api_key_response_structure() {
-        use api_gateway::models::CreateApiKeyResponse;
+        use api_gateway::models::ApiKeyCreatedResponse;
         use chrono::Utc;
 
-        let response = CreateApiKeyResponse {
+        let response = ApiKeyCreatedResponse {
             id: "key_123".to_string(),
             key: "sk_live_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             name: "Test Key".to_string(),

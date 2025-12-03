@@ -18,8 +18,20 @@ use crate::{
 
 /// Create a new trigger
 ///
-/// POST /api/v1/triggers
-/// Requires X-Organization-ID header
+/// Creates a new trigger for event-driven actions. Requires write permission.
+#[utoipa::path(
+    post,
+    path = "/api/v1/triggers",
+    tag = "Triggers",
+    request_body = CreateTriggerRequest,
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 201, description = "Trigger created", body = SuccessResponse<TriggerResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse)
+    )
+)]
 pub async fn create_trigger(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -74,8 +86,21 @@ pub async fn create_trigger(
 
 /// List triggers for organization
 ///
-/// GET /api/v1/triggers?limit=20&offset=0
-/// Requires X-Organization-ID header
+/// Returns paginated list of triggers for the organization.
+#[utoipa::path(
+    get,
+    path = "/api/v1/triggers",
+    tag = "Triggers",
+    params(
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "List of triggers", body = PaginatedResponse<TriggerResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
+    )
+)]
 pub async fn list_triggers(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -130,8 +155,21 @@ pub async fn list_triggers(
 
 /// Get a single trigger with conditions and actions
 ///
-/// GET /api/v1/triggers/{id}
-/// Requires X-Organization-ID header
+/// Returns trigger details including its conditions and actions.
+#[utoipa::path(
+    get,
+    path = "/api/v1/triggers/{id}",
+    tag = "Triggers",
+    params(
+        ("id" = String, Path, description = "Trigger ID")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "Trigger details", body = SuccessResponse<TriggerDetailResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn get_trigger(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -209,8 +247,24 @@ pub async fn get_trigger(
 
 /// Update a trigger
 ///
-/// PUT /api/v1/triggers/{id}
-/// Requires X-Organization-ID header
+/// Updates trigger configuration. Requires write permission.
+#[utoipa::path(
+    put,
+    path = "/api/v1/triggers/{id}",
+    tag = "Triggers",
+    params(
+        ("id" = String, Path, description = "Trigger ID")
+    ),
+    request_body = UpdateTriggerRequest,
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 200, description = "Trigger updated", body = SuccessResponse<TriggerResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn update_trigger(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,
@@ -280,8 +334,22 @@ pub async fn update_trigger(
 
 /// Delete a trigger
 ///
-/// DELETE /api/v1/triggers/{id}
-/// Requires X-Organization-ID header
+/// Permanently deletes a trigger and its conditions/actions. Requires write permission.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/triggers/{id}",
+    tag = "Triggers",
+    params(
+        ("id" = String, Path, description = "Trigger ID")
+    ),
+    security(("bearer_auth" = []), ("organization_id" = [])),
+    responses(
+        (status = 204, description = "Trigger deleted"),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Insufficient permissions", body = ErrorResponse),
+        (status = 404, description = "Trigger not found", body = ErrorResponse)
+    )
+)]
 pub async fn delete_trigger(
     pool: web::Data<DbPool>,
     req_http: HttpRequest,

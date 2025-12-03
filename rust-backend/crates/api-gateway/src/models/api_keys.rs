@@ -24,6 +24,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::Validate;
 
 // ============================================================================
@@ -57,7 +58,8 @@ pub const KEY_PREFIX_LENGTH: usize = 16;
 // ============================================================================
 
 /// Request to create a new API key
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "Production Key", "environment": "live", "key_type": "standard", "permissions": ["read", "write"]}))]
 pub struct CreateApiKeyRequest {
     /// Human-readable name for the key
     #[validate(length(min = 1, max = 255))]
@@ -94,7 +96,8 @@ fn default_permissions() -> Vec<String> {
 }
 
 /// Request to rotate an API key
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "Rotated Key"}))]
 pub struct RotateApiKeyRequest {
     /// Optional new name for the rotated key
     #[validate(length(min = 1, max = 255))]
@@ -105,7 +108,7 @@ pub struct RotateApiKeyRequest {
 }
 
 /// Request to revoke an API key
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct RevokeApiKeyRequest {
     /// Reason for revocation (for audit purposes)
     #[validate(length(max = 1000))]
@@ -118,8 +121,8 @@ pub struct RevokeApiKeyRequest {
 
 /// Response when creating a new API key
 /// This is the ONLY time the full key is returned
-#[derive(Debug, Serialize)]
-pub struct CreateApiKeyResponse {
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ApiKeyCreatedResponse {
     /// The API key ID
     pub id: String,
 
@@ -150,7 +153,7 @@ pub struct CreateApiKeyResponse {
 }
 
 /// Response for API key details (masked - never shows full key)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ApiKeyResponse {
     pub id: String,
     pub name: String,
@@ -192,7 +195,7 @@ impl From<shared::models::ApiKey> for ApiKeyResponse {
 }
 
 /// Response after rotating a key
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RotateApiKeyResponse {
     /// The new API key ID
     pub id: String,
@@ -211,7 +214,7 @@ pub struct RotateApiKeyResponse {
 }
 
 /// Paginated list of API keys
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ApiKeyListResponse {
     pub items: Vec<ApiKeyResponse>,
     pub total: i64,
