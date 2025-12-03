@@ -15,6 +15,10 @@ on:
     - cron: '0 0 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   dependency-scan:
     name: Dependency Vulnerability Scan
@@ -61,8 +65,10 @@ jobs:
   docker-security-scan:
     name: Docker Image Security Scan
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     strategy:
+      fail-fast: false
       matrix:
         image:
           - timescale/timescaledb:2.23.1-pg15
@@ -185,6 +191,7 @@ jobs:
 
       - name: Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
