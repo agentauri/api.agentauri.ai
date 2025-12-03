@@ -120,6 +120,8 @@ jobs:
 
       - name: Run Clippy
         working-directory: rust-backend
+        env:
+          SQLX_OFFLINE: "true"
         run: |
           echo "## Clippy Linting Results" >> $GITHUB_STEP_SUMMARY
           cargo clippy --all-targets --all-features -- -D warnings
@@ -275,7 +277,7 @@ jobs:
       - name: Validate docker-compose.yml
         run: |
           echo "## Docker Compose Validation" >> $GITHUB_STEP_SUMMARY
-          if docker-compose -f docker-compose.yml config > /dev/null 2>&1; then
+          if docker compose -f docker-compose.yml config > /dev/null 2>&1; then
             echo "✅ docker-compose.yml is valid" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ docker-compose.yml has syntax errors" >> $GITHUB_STEP_SUMMARY

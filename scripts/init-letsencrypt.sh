@@ -35,7 +35,6 @@ STAGING=0  # Set to 1 for testing with staging environment
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CERTBOT_DIR="$PROJECT_ROOT/docker/certbot"
-NGINX_CONF="$PROJECT_ROOT/docker/nginx/conf.d/api.conf"
 
 # Colors for output
 RED='\033[0;31m'

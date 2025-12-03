@@ -52,7 +52,8 @@ check_header() {
     local expected_value="${2:-}"
 
     if echo "$HEADERS" | grep -qi "^$header_name:"; then
-        local actual_value=$(echo "$HEADERS" | grep -i "^$header_name:" | cut -d' ' -f2- | tr -d '\r')
+        local actual_value
+        actual_value=$(echo "$HEADERS" | grep -i "^$header_name:" | cut -d' ' -f2- | tr -d '\r')
 
         if [ -z "$expected_value" ]; then
             echo -e "${GREEN}✓${NC} $header_name: $actual_value"

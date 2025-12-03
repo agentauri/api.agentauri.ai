@@ -25,7 +25,6 @@ set -e
 # CONFIGURATION
 # =============================================================================
 DOMAIN="${1:-api.8004.dev}"
-PORT_HTTP=80
 PORT_HTTPS=443
 
 # Colors
