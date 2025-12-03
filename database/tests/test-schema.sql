@@ -696,6 +696,7 @@ END $$;
 \echo '------------------------------------------------------------------------'
 
 -- Test 9.1: Verify critical NOT NULL constraints on users
+-- Note: password_hash is nullable to support social-only authentication (Google, GitHub)
 DO $$
 DECLARE
     not_null_count INTEGER;
@@ -704,12 +705,12 @@ BEGIN
     FROM information_schema.columns
     WHERE table_name = 'users'
     AND is_nullable = 'NO'
-    AND column_name IN ('id', 'username', 'email', 'password_hash');
+    AND column_name IN ('id', 'username', 'email');
 
     PERFORM record_test(
         'T9.1: users has NOT NULL constraints',
-        not_null_count = 4,
-        format('Expected 4 NOT NULL columns on users, found %s', not_null_count)
+        not_null_count = 3,
+        format('Expected 3 NOT NULL columns on users (id, username, email), found %s', not_null_count)
     );
 END $$;
 
