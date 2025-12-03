@@ -19,6 +19,12 @@ pub struct User {
     pub is_active: bool,
     pub primary_auth_provider: Option<String>, // 'email', 'google', 'github', 'wallet'
     pub avatar_url: Option<String>,
+    // Account lockout fields for brute-force protection
+    pub failed_login_attempts: i32,
+    #[serde(skip_serializing)] // Don't expose lockout info to client
+    pub locked_until: Option<DateTime<Utc>>,
+    #[serde(skip_serializing)]
+    pub last_failed_login: Option<DateTime<Utc>>,
 }
 
 /// Organization for multi-tenant account model

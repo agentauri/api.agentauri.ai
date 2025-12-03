@@ -191,8 +191,21 @@ where
             // Check if rate limit exceeded
             if !result.allowed {
                 // Check rate limit mode (shadow or enforcing)
+                // In production (ENVIRONMENT=production), default to enforcing
+                // In development, default to shadow mode for easier testing
+                let is_production = std::env::var("ENVIRONMENT")
+                    .map(|e| e == "production")
+                    .unwrap_or(false);
+                let default_mode = if is_production { "enforcing" } else { "shadow" };
                 let mode =
-                    std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string());
+                    std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| default_mode.to_string());
+
+                // Warn if shadow mode is used in production (should be intentional)
+                if is_production && mode == "shadow" {
+                    warn!(
+                        "Rate limiting is in SHADOW mode in PRODUCTION - requests will NOT be blocked"
+                    );
+                }
 
                 if mode == "shadow" {
                     // Shadow mode: Log violation but allow request
@@ -307,6 +320,57 @@ mod tests {
         // This test verifies that the middleware expects AuthContext in extensions
         // The actual integration test would require Redis and is marked #[ignore]
         // Integration tests should be added in tests/ directory
+    }
+
+    #[test]
+    fn test_rate_limit_mode_defaults() {
+        // Test that rate limit mode defaults correctly based on environment
+        // In production (ENVIRONMENT=production), default should be "enforcing"
+        // In development (ENVIRONMENT unset or != production), default should be "shadow"
+
+        // Clear any existing env vars for clean test
+        std::env::remove_var("RATE_LIMIT_MODE");
+
+        // Test development default (shadow)
+        std::env::remove_var("ENVIRONMENT");
+        let is_production = std::env::var("ENVIRONMENT")
+            .map(|e| e == "production")
+            .unwrap_or(false);
+        let default_mode = if is_production { "enforcing" } else { "shadow" };
+        assert_eq!(default_mode, "shadow");
+
+        // Test production default (enforcing)
+        std::env::set_var("ENVIRONMENT", "production");
+        let is_production = std::env::var("ENVIRONMENT")
+            .map(|e| e == "production")
+            .unwrap_or(false);
+        let default_mode = if is_production { "enforcing" } else { "shadow" };
+        assert_eq!(default_mode, "enforcing");
+
+        // Clean up
+        std::env::remove_var("ENVIRONMENT");
+    }
+
+    #[test]
+    fn test_rate_limit_mode_override() {
+        // Test that RATE_LIMIT_MODE env var can override the default
+
+        // Set production mode
+        std::env::set_var("ENVIRONMENT", "production");
+
+        // Override with shadow mode
+        std::env::set_var("RATE_LIMIT_MODE", "shadow");
+        let mode = std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "enforcing".to_string());
+        assert_eq!(mode, "shadow");
+
+        // Override with enforcing mode
+        std::env::set_var("RATE_LIMIT_MODE", "enforcing");
+        let mode = std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string());
+        assert_eq!(mode, "enforcing");
+
+        // Clean up
+        std::env::remove_var("ENVIRONMENT");
+        std::env::remove_var("RATE_LIMIT_MODE");
     }
 }
 

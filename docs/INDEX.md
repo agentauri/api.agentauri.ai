@@ -1,8 +1,8 @@
 # Documentation Index
 
 **Project**: api.8004.dev - ERC-8004 Backend Infrastructure
-**Last Updated**: December 1, 2025
-**Phase**: Week 15 Complete (Ponder Event Handlers + Documentation Reorganization)
+**Last Updated**: December 2, 2025
+**Phase**: Production Hardening (Social Auth + Account Lockout + Background Tasks)
 
 This index provides a comprehensive overview of all project documentation organized by category.
 
@@ -32,6 +32,7 @@ This index provides a comprehensive overview of all project documentation organi
 
 ## 🔧 Operations & Reliability
 
+- **[operations/BACKGROUND_TASKS.md](operations/BACKGROUND_TASKS.md)** - Background maintenance tasks (nonce cleanup, token expiry, etc.)
 - **[operations/CIRCUIT_BREAKER_GUIDE.md](operations/CIRCUIT_BREAKER_GUIDE.md)** - Circuit breaker practical guide for trigger reliability
 - **[operations/TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide for common issues
 - **[operations/RUNBOOK.md](operations/RUNBOOK.md)** - Operations runbook for system startup/shutdown, health checks, and incident response
@@ -43,6 +44,7 @@ This index provides a comprehensive overview of all project documentation organi
 ## 🔐 Authentication & Security
 
 - **[auth/AUTHENTICATION.md](auth/AUTHENTICATION.md)** - 3-layer authentication model (Anonymous, API Key, Wallet)
+- **[auth/SOCIAL_LOGIN.md](auth/SOCIAL_LOGIN.md)** - Google and GitHub OAuth 2.0 integration
 - **[auth/API_KEYS.md](auth/API_KEYS.md)** - API Key format, generation, and management
 - **[auth/WALLET_SIGNATURES.md](auth/WALLET_SIGNATURES.md)** - EIP-191 wallet signature verification
 - **[auth/RATE_LIMITS_USER_GUIDE.md](auth/RATE_LIMITS_USER_GUIDE.md)** - Comprehensive rate limit rules and tiers
@@ -162,16 +164,22 @@ Historical reports and completed work:
 - **Total Documents**: 59+ markdown files (after Phase 1-3 improvements + new chain guide)
 - **Root Level**: 7 essential files (CLAUDE.md, README, CHANGELOG, etc.)
 - **Architecture Docs**: 5 files
-- **Authentication Docs**: 5 files
+- **Authentication Docs**: 6 files (including Social Login)
 - **Security Docs**: 13 files (DATABASE_ENCRYPTION, SECURITY_HEADERS, SECRETS_MANAGER, etc.)
-- **Operations Docs**: 5 files (circuit breaker, troubleshooting, runbook, link audit, event-processor integration)
+- **Operations Docs**: 6 files (background tasks, circuit breaker, troubleshooting, runbook, link audit, event-processor integration)
 - **API Documentation**: 3 files
 - **Protocol Docs**: 3 files
 - **Development Guides**: 5 files (setup, testing strategy, adding chains, contributing, CI/CD)
 - **Component READMEs**: 7 files
 
-**Last Comprehensive Audit**: December 1, 2025 (Documentation Reorganization Complete)
+**Last Comprehensive Audit**: December 2, 2025 (Production Hardening Documentation)
 **Recent Improvement Actions**:
+- December 2, 2025:
+  - Added auth/SOCIAL_LOGIN.md for Google and GitHub OAuth 2.0
+  - Added operations/BACKGROUND_TASKS.md for cleanup jobs documentation
+  - Updated auth/AUTHENTICATION.md with brute-force protection and social auth
+  - Updated rate-limiting docs with production mode (shadow vs enforcing)
+  - Updated CLAUDE.md with new features and endpoints
 - December 1, 2025:
   - 4 temporary reports archived to operations/archive/
   - DEPLOYMENT.md moved to deployment/PRODUCTION_DEPLOYMENT_GUIDE.md

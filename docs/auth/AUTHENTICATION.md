@@ -137,6 +137,85 @@ Agents must first be linked to an organization account. This enables:
 
 See [WALLET_SIGNATURES.md](./WALLET_SIGNATURES.md) for signature verification and agent linking details.
 
+## Brute-Force Protection
+
+**Status**: Implemented (December 2, 2025)
+
+The authentication system includes account lockout protection to prevent brute-force password attacks.
+
+### Lockout Policy
+
+| Parameter | Value |
+|-----------|-------|
+| Threshold | 5 consecutive failed attempts |
+| Initial lockout | 15 minutes |
+| Maximum lockout | 4 hours |
+| Reset condition | Successful login |
+
+### Progressive Lockout Duration
+
+Lockout duration doubles with each occurrence:
+
+| Lockout # | Duration |
+|-----------|----------|
+| 1st | 15 minutes |
+| 2nd | 30 minutes |
+| 3rd | 1 hour |
+| 4th | 2 hours |
+| 5th+ | 4 hours (max) |
+
+### Lockout Response
+
+```http
+HTTP/1.1 429 Too Many Requests
+
+{
+  "error": {
+    "code": "account_locked",
+    "message": "Account is temporarily locked. Try again in 847 seconds."
+  }
+}
+```
+
+### Database Fields
+
+Fields added to `users` table:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `failed_login_attempts` | INTEGER | Counter, resets on success |
+| `locked_until` | TIMESTAMPTZ | Unlock time, NULL = not locked |
+| `last_failed_login` | TIMESTAMPTZ | Audit timestamp |
+
+### Behavior
+
+1. **Failed login**: Counter incremented, lockout applied if threshold reached
+2. **Successful login**: Counter reset to 0, account unlocked
+3. **Locked account**: Returns 429 with seconds remaining
+4. **Lock expired**: Account automatically unlocked on next attempt
+
+## Social Authentication
+
+**Status**: Implemented (December 2, 2025)
+
+Users can sign in using Google or GitHub OAuth 2.0.
+
+### Supported Providers
+
+| Provider | Endpoint | Callback |
+|----------|----------|----------|
+| Google | `/api/v1/auth/google` | `/api/v1/auth/google/callback` |
+| GitHub | `/api/v1/auth/github` | `/api/v1/auth/github/callback` |
+
+### Features
+
+- **New user**: Account created automatically with verified email
+- **Existing user**: Logs in if email matches existing account
+- **Account linking**: Multiple providers can link to one account
+- **No password required**: Social-only accounts supported
+
+See [SOCIAL_LOGIN.md](./SOCIAL_LOGIN.md) for complete documentation.
+
 ## Authentication Flow
 
 ### Layer Precedence
@@ -172,11 +251,20 @@ When multiple authentication methods are present, the system checks in order:
 
 ## API Endpoints
 
-### User Authentication (existing)
+### User Authentication
 
 ```
 POST /api/v1/auth/register    # Create user account
 POST /api/v1/auth/login       # Get JWT token
+```
+
+### Social Authentication
+
+```
+GET  /api/v1/auth/google           # Initiate Google OAuth
+GET  /api/v1/auth/google/callback  # Google OAuth callback
+GET  /api/v1/auth/github           # Initiate GitHub OAuth
+GET  /api/v1/auth/github/callback  # GitHub OAuth callback
 ```
 
 ### API Key Management (Layer 1)
@@ -216,11 +304,12 @@ DELETE /api/v1/agents/:agent_id/link  # Unlink agent
 ## Related Documentation
 
 - [API_KEYS.md](./API_KEYS.md) - API key format, lifecycle, and management
+- [SOCIAL_LOGIN.md](./SOCIAL_LOGIN.md) - Google and GitHub OAuth 2.0 integration
 - [WALLET_SIGNATURES.md](./WALLET_SIGNATURES.md) - EIP-191 verification and agent linking
-- [OAUTH.md](./OAUTH.md) - OAuth 2.0 authorization code flow (Phase 4-5)
+- [OAUTH.md](./OAUTH.md) - OAuth 2.0 authorization code flow (for third-party apps)
 - [RATE_LIMITING.md](./RATE_LIMITING.md) - Per-tier rate limiting implementation
 - [SECURITY_MODEL.md](./SECURITY_MODEL.md) - Threat model and security best practices
 
 ---
 
-**Last Updated**: November 24, 2025
+**Last Updated**: December 2, 2025

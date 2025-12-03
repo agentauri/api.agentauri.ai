@@ -158,6 +158,120 @@ Authenticate and receive JWT token.
 
 ---
 
+### Social OAuth Login
+
+The API supports OAuth 2.0 login with Google and GitHub. These endpoints implement the authorization code flow and handle user registration, account linking, and login automatically.
+
+#### Google OAuth - Initiate
+
+Redirect users to Google's OAuth consent screen.
+
+**Endpoint**: `GET /api/v1/auth/google`
+
+**No authentication required**
+
+**Query Parameters**:
+- `redirect_after` (optional): URL path to redirect after successful login (e.g., `/dashboard`)
+
+**Response**: `302 Found` - Redirects to Google OAuth consent screen
+
+**Example**:
+```bash
+# Redirect users to this URL in your frontend
+curl -I "http://localhost:8080/api/v1/auth/google?redirect_after=/dashboard"
+
+# Response:
+# HTTP/1.1 302 Found
+# Location: https://accounts.google.com/o/oauth2/v2/auth?client_id=...
+```
+
+**Frontend Integration**:
+```javascript
+// Redirect user to initiate Google login
+window.location.href = '/api/v1/auth/google?redirect_after=/dashboard';
+```
+
+---
+
+#### Google OAuth - Callback
+
+Handle the OAuth callback from Google. This endpoint is called by Google after user authorization.
+
+**Endpoint**: `GET /api/v1/auth/google/callback`
+
+**No authentication required** (callback from Google)
+
+**Query Parameters**:
+- `code`: Authorization code from Google
+- `state`: CSRF protection state (generated during initiation)
+
+**Response**: `302 Found` - Redirects to frontend with JWT token
+
+**Success Redirect**:
+```
+{frontend_url}/dashboard?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Error Redirect**:
+```
+{frontend_url}/auth/error?code=session_expired&message=Your%20session%20has%20expired
+```
+
+**Behavior**:
+1. **Existing Identity**: If the Google account is already linked → logs in the user
+2. **Existing Email**: If email matches an existing user → links Google identity and logs in
+3. **New User**: Creates new user account, personal organization, and links Google identity
+
+**Error Codes**:
+- `session_expired`: OAuth state expired or invalid (try again)
+- `auth_failed`: Failed to authenticate with Google
+- `email_required`: Google account has no verified email
+- `email_not_verified`: Email not verified with Google
+
+---
+
+#### GitHub OAuth - Initiate
+
+Redirect users to GitHub's OAuth consent screen.
+
+**Endpoint**: `GET /api/v1/auth/github`
+
+**No authentication required**
+
+**Query Parameters**:
+- `redirect_after` (optional): URL path to redirect after successful login
+
+**Response**: `302 Found` - Redirects to GitHub OAuth consent screen
+
+**Example**:
+```bash
+curl -I "http://localhost:8080/api/v1/auth/github?redirect_after=/settings"
+
+# Response:
+# HTTP/1.1 302 Found
+# Location: https://github.com/login/oauth/authorize?client_id=...
+```
+
+---
+
+#### GitHub OAuth - Callback
+
+Handle the OAuth callback from GitHub.
+
+**Endpoint**: `GET /api/v1/auth/github/callback`
+
+**No authentication required** (callback from GitHub)
+
+**Query Parameters**:
+- `code`: Authorization code from GitHub
+- `state`: CSRF protection state
+
+**Response**: `302 Found` - Redirects to frontend with JWT token
+
+**Behavior**: Same as Google callback - handles login, account linking, or new user creation.
+
+---
+
 ### Token Refresh
 
 **Status**: Coming in Phase 3
@@ -366,6 +480,156 @@ Delete a trigger and all associated conditions and actions (cascading delete).
 
 **Error Responses**:
 - `404 Not Found`: Trigger not found or doesn't belong to user
+
+---
+
+### Circuit Breaker Management
+
+Each trigger has an associated circuit breaker that protects external services from cascading failures. The circuit breaker tracks action execution failures and can automatically disable trigger actions when failure thresholds are exceeded.
+
+#### Get Circuit Breaker State
+
+View the current circuit breaker state and configuration for a trigger.
+
+**Endpoint**: `GET /api/v1/triggers/{id}/circuit-breaker`
+
+**Headers**:
+- `Authorization: Bearer <token>` or `X-API-Key: sk_live_...`
+- `X-Organization-ID: <organization_id>` (required)
+
+**Response** (200 OK):
+```json
+{
+  "data": {
+    "trigger_id": "550e8400-e29b-41d4-a716-446655440001",
+    "trigger_name": "Low Score Alert",
+    "state": "Closed",
+    "failure_count": 3,
+    "last_failure_time": "2025-12-02T10:00:00Z",
+    "opened_at": null,
+    "half_open_calls": 0,
+    "config": {
+      "failure_threshold": 10,
+      "recovery_timeout_seconds": 3600,
+      "half_open_max_calls": 1
+    }
+  }
+}
+```
+
+**Circuit States**:
+| State | Description | Actions |
+|-------|-------------|---------|
+| `Closed` | Normal operation | All actions execute |
+| `Open` | Circuit tripped due to failures | Actions blocked |
+| `HalfOpen` | Testing recovery | Limited calls allowed |
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8080/api/v1/triggers/trigger_123/circuit-breaker" \
+  -H "Authorization: Bearer eyJhbG..." \
+  -H "X-Organization-ID: org_456"
+```
+
+**Error Responses**:
+- `401 Unauthorized`: Missing or invalid authentication
+- `403 Forbidden`: Not a member of the organization
+- `404 Not Found`: Trigger not found
+
+---
+
+#### Update Circuit Breaker Configuration
+
+Update the circuit breaker configuration for a trigger. Requires write access (admin or member role).
+
+**Endpoint**: `PATCH /api/v1/triggers/{id}/circuit-breaker`
+
+**Headers**:
+- `Authorization: Bearer <token>` or `X-API-Key: sk_live_...`
+- `X-Organization-ID: <organization_id>` (required)
+
+**Request Body** (all fields optional):
+```json
+{
+  "failure_threshold": 20,
+  "recovery_timeout_seconds": 7200,
+  "half_open_max_calls": 3
+}
+```
+
+**Validation**:
+- `failure_threshold`: 1-1000 (number of failures before opening circuit)
+- `recovery_timeout_seconds`: 60-604800 (1 minute to 7 days)
+- `half_open_max_calls`: 1-10 (test calls before full recovery)
+
+**Response** (200 OK): Returns updated circuit breaker state
+
+**Example**:
+```bash
+# Increase failure threshold and recovery timeout
+curl -X PATCH "http://localhost:8080/api/v1/triggers/trigger_123/circuit-breaker" \
+  -H "Authorization: Bearer eyJhbG..." \
+  -H "X-Organization-ID: org_456" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "failure_threshold": 20,
+    "recovery_timeout_seconds": 7200
+  }'
+```
+
+**Error Responses**:
+- `400 Bad Request`: Invalid configuration values
+- `403 Forbidden`: Insufficient permissions (viewer role)
+- `404 Not Found`: Trigger not found
+
+---
+
+#### Reset Circuit Breaker
+
+Manually reset a tripped circuit breaker to Closed state. This clears the failure count and allows actions to execute immediately. Requires write access.
+
+**Endpoint**: `POST /api/v1/triggers/{id}/circuit-breaker/reset`
+
+**Headers**:
+- `Authorization: Bearer <token>` or `X-API-Key: sk_live_...`
+- `X-Organization-ID: <organization_id>` (required)
+
+**Response** (200 OK):
+```json
+{
+  "data": {
+    "trigger_id": "550e8400-e29b-41d4-a716-446655440001",
+    "trigger_name": "Low Score Alert",
+    "state": "Closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "opened_at": null,
+    "half_open_calls": 0,
+    "config": {
+      "failure_threshold": 10,
+      "recovery_timeout_seconds": 3600,
+      "half_open_max_calls": 1
+    }
+  }
+}
+```
+
+**Example**:
+```bash
+# Reset a tripped circuit breaker
+curl -X POST "http://localhost:8080/api/v1/triggers/trigger_123/circuit-breaker/reset" \
+  -H "Authorization: Bearer eyJhbG..." \
+  -H "X-Organization-ID: org_456"
+```
+
+**Use Cases**:
+- After fixing the underlying issue causing failures
+- To immediately resume action execution after maintenance
+- To test trigger actions after configuration changes
+
+**Error Responses**:
+- `403 Forbidden`: Insufficient permissions (viewer role)
+- `404 Not Found`: Trigger not found
 
 ---
 
@@ -1254,6 +1518,216 @@ Rotate an API key (revoke old, create new in one transaction).
 ```
 
 **Security Note**: Save the new `key` value immediately.
+
+---
+
+### OAuth 2.0 Clients
+
+OAuth 2.0 clients allow third-party applications to access the API on behalf of organizations. The API supports the client_credentials and refresh_token grant types.
+
+#### Create OAuth Client
+
+Register a new OAuth 2.0 client for your organization. The client secret is shown **only once** at creation time.
+
+**Endpoint**: `POST /api/v1/oauth/clients`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Request Body**:
+```json
+{
+  "client_name": "My API Integration",
+  "redirect_uris": ["https://myapp.com/callback"],
+  "scopes": ["read", "write"],
+  "grant_types": ["client_credentials", "refresh_token"],
+  "is_trusted": false
+}
+```
+
+**Validation**:
+- `client_name`: 1-100 characters (required)
+- `redirect_uris`: Array of valid URLs (required)
+- `scopes`: Array of scope strings (required)
+- `grant_types`: Array of grant types (required): `client_credentials`, `refresh_token`, `authorization_code`
+- `is_trusted`: Boolean (default: false)
+
+**Response** (201 Created):
+```json
+{
+  "data": {
+    "client_id": "oac_550e8400e29b41d4a716446655440001",
+    "client_secret": "ocs_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+    "client_name": "My API Integration",
+    "redirect_uris": ["https://myapp.com/callback"],
+    "scopes": ["read", "write"],
+    "grant_types": ["client_credentials", "refresh_token"],
+    "is_trusted": false,
+    "created_at": "2024-11-27T10:00:00Z"
+  }
+}
+```
+
+**Security Note**: Save the `client_secret` immediately - it will never be shown again.
+
+**Example**:
+```bash
+curl -X POST "http://localhost:8080/api/v1/oauth/clients" \
+  -H "Authorization: Bearer eyJhbG..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "My API Integration",
+    "redirect_uris": ["https://myapp.com/callback"],
+    "scopes": ["read", "write"],
+    "grant_types": ["client_credentials", "refresh_token"],
+    "is_trusted": false
+  }'
+```
+
+**Error Responses**:
+- `400 Bad Request`: Validation failed
+- `403 Forbidden`: Insufficient permissions
+
+---
+
+#### List OAuth Clients
+
+List all OAuth clients for the authenticated user's organization.
+
+**Endpoint**: `GET /api/v1/oauth/clients?limit=20&offset=0`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Query Parameters**:
+- `limit`: Number of results (1-100, default: 20)
+- `offset`: Number of results to skip (default: 0)
+
+**Response** (200 OK):
+```json
+{
+  "data": {
+    "clients": [
+      {
+        "client_id": "oac_550e8400e29b41d4a716446655440001",
+        "client_name": "My API Integration",
+        "redirect_uris": ["https://myapp.com/callback"],
+        "scopes": ["read", "write"],
+        "grant_types": ["client_credentials", "refresh_token"],
+        "is_trusted": false,
+        "created_at": "2024-11-27T10:00:00Z"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+**Note**: Client secrets are never returned in list responses.
+
+---
+
+#### Delete OAuth Client
+
+Delete an OAuth client. This will also revoke all tokens issued to this client.
+
+**Endpoint**: `DELETE /api/v1/oauth/clients/{client_id}`
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response** (204 No Content)
+
+**Example**:
+```bash
+curl -X DELETE "http://localhost:8080/api/v1/oauth/clients/oac_550e8400" \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
+**Error Responses**:
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Client not found
+
+---
+
+### OAuth 2.0 Token
+
+The token endpoint issues access tokens using the OAuth 2.0 protocol.
+
+#### Token Endpoint
+
+Exchange client credentials or refresh tokens for access tokens.
+
+**Endpoint**: `POST /api/v1/oauth/token`
+
+**No authentication header required** - client authenticates with credentials in body
+
+**Request Body (client_credentials grant)**:
+```json
+{
+  "grant_type": "client_credentials",
+  "client_id": "oac_550e8400e29b41d4a716446655440001",
+  "client_secret": "ocs_a1b2c3d4e5f6...",
+  "scope": "read write"
+}
+```
+
+**Request Body (refresh_token grant)**:
+```json
+{
+  "grant_type": "refresh_token",
+  "client_id": "oac_550e8400e29b41d4a716446655440001",
+  "client_secret": "ocs_a1b2c3d4e5f6...",
+  "refresh_token": "ort_x1y2z3..."
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "access_token": "oat_abc123def456ghi789...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "ort_xyz789abc123def456...",
+  "scope": "read write"
+}
+```
+
+**Token Expiration**:
+- Access tokens: 1 hour (3600 seconds)
+- Refresh tokens: 7 days (604800 seconds)
+
+**Example (client_credentials)**:
+```bash
+curl -X POST "http://localhost:8080/api/v1/oauth/token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "client_credentials",
+    "client_id": "oac_550e8400",
+    "client_secret": "ocs_secret...",
+    "scope": "read write"
+  }'
+```
+
+**Example (refresh_token)**:
+```bash
+curl -X POST "http://localhost:8080/api/v1/oauth/token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "refresh_token",
+    "client_id": "oac_550e8400",
+    "client_secret": "ocs_secret...",
+    "refresh_token": "ort_refresh..."
+  }'
+```
+
+**Supported Grant Types**:
+| Grant Type | Description | Use Case |
+|------------|-------------|----------|
+| `client_credentials` | Authenticate with client ID and secret | Machine-to-machine (M2M) |
+| `refresh_token` | Exchange refresh token for new access token | Token renewal |
+| `authorization_code` | Standard OAuth flow | Coming soon |
+
+**Error Responses**:
+- `400 Bad Request`: Invalid grant_type, missing required fields, or scope not allowed
+- `401 Unauthorized`: Invalid client credentials or refresh token
 
 ---
 

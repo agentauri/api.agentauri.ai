@@ -4,6 +4,8 @@
 //!
 //! - **Nonce Cleanup**: Removes expired wallet authentication nonces
 //! - **OAuth Token Cleanup**: Removes expired OAuth access and refresh tokens
+//! - **Payment Nonce Cleanup**: Removes expired payment idempotency keys
+//! - **Auth Failures Cleanup**: Removes old authentication failure records (30 days retention)
 //! - **Session Cleanup**: (Future) Clean up expired sessions
 //! - **Rate Limit Cleanup**: (Future) Clean up old rate limit counters
 //!
@@ -24,8 +26,9 @@
 //! Environment variables:
 //! - `NONCE_CLEANUP_INTERVAL_SECS`: Interval between nonce cleanups (default: 3600 = 1 hour)
 //! - `OAUTH_TOKEN_CLEANUP_INTERVAL_SECS`: Interval between OAuth token cleanups (default: 3600 = 1 hour)
+//! - `AUTH_FAILURES_RETENTION_DAYS`: Days to retain auth failure records (default: 30)
 //!
-//! Rust guideline compliant 2025-01-28
+//! Rust guideline compliant 2025-12-02
 
 use shared::DbPool;
 use std::env;
@@ -49,6 +52,9 @@ const DEFAULT_OAUTH_TOKEN_CLEANUP_INTERVAL_SECS: u64 = 3600;
 /// Minimum interval for OAuth token cleanup (5 minutes)
 const MIN_OAUTH_TOKEN_CLEANUP_INTERVAL_SECS: u64 = 300;
 
+/// Default retention for auth failures (30 days)
+const DEFAULT_AUTH_FAILURES_RETENTION_DAYS: i32 = 30;
+
 /// Background task configuration
 #[derive(Debug, Clone)]
 pub struct BackgroundTaskConfig {
@@ -56,6 +62,8 @@ pub struct BackgroundTaskConfig {
     pub nonce_cleanup_interval: Duration,
     /// Interval between OAuth token cleanups
     pub oauth_token_cleanup_interval: Duration,
+    /// Retention period for auth failures (in days)
+    pub auth_failures_retention_days: i32,
 }
 
 impl Default for BackgroundTaskConfig {
@@ -72,9 +80,16 @@ impl Default for BackgroundTaskConfig {
             .unwrap_or(DEFAULT_OAUTH_TOKEN_CLEANUP_INTERVAL_SECS)
             .max(MIN_OAUTH_TOKEN_CLEANUP_INTERVAL_SECS);
 
+        let auth_failures_retention_days = env::var("AUTH_FAILURES_RETENTION_DAYS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(DEFAULT_AUTH_FAILURES_RETENTION_DAYS)
+            .max(1); // At least 1 day retention
+
         Self {
             nonce_cleanup_interval: Duration::from_secs(nonce_interval_secs),
             oauth_token_cleanup_interval: Duration::from_secs(oauth_token_interval_secs),
+            auth_failures_retention_days,
         }
     }
 }
@@ -104,7 +119,7 @@ impl BackgroundTaskRunner {
     pub fn start(self) -> CancellationToken {
         let cancel_token = CancellationToken::new();
 
-        // Start nonce cleanup task
+        // Start nonce cleanup task (used_nonces table)
         let nonce_token = cancel_token.clone();
         let nonce_pool = self.pool.clone();
         let nonce_interval = self.config.nonce_cleanup_interval;
@@ -122,9 +137,40 @@ impl BackgroundTaskRunner {
             run_oauth_token_cleanup(oauth_pool, oauth_interval, oauth_token).await;
         });
 
+        // Start payment nonces cleanup task
+        let payment_nonce_token = cancel_token.clone();
+        let payment_nonce_pool = self.pool.clone();
+        let payment_nonce_interval = self.config.nonce_cleanup_interval; // Same interval as nonces
+
+        tokio::spawn(async move {
+            run_payment_nonce_cleanup(
+                payment_nonce_pool,
+                payment_nonce_interval,
+                payment_nonce_token,
+            )
+            .await;
+        });
+
+        // Start auth failures cleanup task
+        let auth_failures_token = cancel_token.clone();
+        let auth_failures_pool = self.pool.clone();
+        let auth_failures_interval = self.config.nonce_cleanup_interval; // Same interval, different retention
+        let auth_failures_retention_days = self.config.auth_failures_retention_days;
+
+        tokio::spawn(async move {
+            run_auth_failures_cleanup(
+                auth_failures_pool,
+                auth_failures_interval,
+                auth_failures_retention_days,
+                auth_failures_token,
+            )
+            .await;
+        });
+
         info!(
             nonce_cleanup_interval_secs = ?self.config.nonce_cleanup_interval.as_secs(),
             oauth_token_cleanup_interval_secs = ?self.config.oauth_token_cleanup_interval.as_secs(),
+            auth_failures_retention_days = self.config.auth_failures_retention_days,
             "Background tasks started"
         );
 
@@ -232,6 +278,157 @@ pub async fn cleanup_oauth_tokens_once(pool: &DbPool) -> Result<u64, anyhow::Err
     OAuthTokenRepository::cleanup_expired_tokens(pool).await
 }
 
+/// Run the payment nonce cleanup task
+async fn run_payment_nonce_cleanup(
+    pool: DbPool,
+    cleanup_interval: Duration,
+    cancel_token: CancellationToken,
+) {
+    let mut interval = interval(cleanup_interval);
+
+    // Skip the first tick (which fires immediately)
+    interval.tick().await;
+
+    loop {
+        tokio::select! {
+            _ = cancel_token.cancelled() => {
+                info!("Payment nonce cleanup task stopping due to shutdown");
+                break;
+            }
+            _ = interval.tick() => {
+                cleanup_expired_payment_nonces(&pool).await;
+            }
+        }
+    }
+}
+
+/// Perform the actual payment nonce cleanup
+async fn cleanup_expired_payment_nonces(pool: &DbPool) {
+    debug!("Starting payment nonce cleanup");
+
+    // Delete payment nonces that expired more than 24 hours ago
+    // Keep a 24h buffer to allow for late payment confirmations
+    let result = sqlx::query(
+        r#"
+        DELETE FROM payment_nonces
+        WHERE expires_at < NOW() - INTERVAL '24 hours'
+        "#,
+    )
+    .execute(pool)
+    .await;
+
+    match result {
+        Ok(result) => {
+            let count = result.rows_affected();
+            if count > 0 {
+                info!(deleted_count = count, "Cleaned up expired payment nonces");
+            } else {
+                debug!("No expired payment nonces to clean up");
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to cleanup expired payment nonces");
+        }
+    }
+}
+
+/// Run the auth failures cleanup task
+async fn run_auth_failures_cleanup(
+    pool: DbPool,
+    cleanup_interval: Duration,
+    retention_days: i32,
+    cancel_token: CancellationToken,
+) {
+    let mut interval = interval(cleanup_interval);
+
+    // Skip the first tick (which fires immediately)
+    interval.tick().await;
+
+    loop {
+        tokio::select! {
+            _ = cancel_token.cancelled() => {
+                info!("Auth failures cleanup task stopping due to shutdown");
+                break;
+            }
+            _ = interval.tick() => {
+                cleanup_old_auth_failures(&pool, retention_days).await;
+            }
+        }
+    }
+}
+
+/// Perform the actual auth failures cleanup
+async fn cleanup_old_auth_failures(pool: &DbPool, retention_days: i32) {
+    debug!("Starting auth failures cleanup");
+
+    // Delete auth failures older than the retention period
+    let result = sqlx::query(
+        r#"
+        DELETE FROM auth_failures
+        WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+        "#,
+    )
+    .bind(retention_days.to_string())
+    .execute(pool)
+    .await;
+
+    match result {
+        Ok(result) => {
+            let count = result.rows_affected();
+            if count > 0 {
+                info!(
+                    deleted_count = count,
+                    retention_days = retention_days,
+                    "Cleaned up old auth failures"
+                );
+            } else {
+                debug!("No old auth failures to clean up");
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to cleanup old auth failures");
+        }
+    }
+}
+
+/// Standalone function to run payment nonce cleanup once
+///
+/// Useful for manual cleanup or testing.
+#[allow(dead_code)] // Used in tests and manual cleanup scripts
+pub async fn cleanup_payment_nonces_once(pool: &DbPool) -> Result<u64, anyhow::Error> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM payment_nonces
+        WHERE expires_at < NOW() - INTERVAL '24 hours'
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
+/// Standalone function to run auth failures cleanup once
+///
+/// Useful for manual cleanup or testing.
+#[allow(dead_code)] // Used in tests and manual cleanup scripts
+pub async fn cleanup_auth_failures_once(
+    pool: &DbPool,
+    retention_days: i32,
+) -> Result<u64, anyhow::Error> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM auth_failures
+        WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+        "#,
+    )
+    .bind(retention_days.to_string())
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,6 +438,15 @@ mod tests {
         let config = BackgroundTaskConfig::default();
         assert!(
             config.nonce_cleanup_interval >= Duration::from_secs(MIN_NONCE_CLEANUP_INTERVAL_SECS)
+        );
+        assert!(
+            config.oauth_token_cleanup_interval
+                >= Duration::from_secs(MIN_OAUTH_TOKEN_CLEANUP_INTERVAL_SECS)
+        );
+        assert!(config.auth_failures_retention_days >= 1);
+        assert_eq!(
+            config.auth_failures_retention_days,
+            DEFAULT_AUTH_FAILURES_RETENTION_DAYS
         );
     }
 
@@ -262,5 +468,18 @@ mod tests {
         assert!(!token.is_cancelled());
         token.cancel();
         assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn test_auth_failures_retention_minimum() {
+        // Auth failures retention should be at least 1 day
+        let config = BackgroundTaskConfig::default();
+        assert!(config.auth_failures_retention_days >= 1);
+    }
+
+    #[test]
+    fn test_default_retention_days() {
+        // Default retention is 30 days
+        assert_eq!(DEFAULT_AUTH_FAILURES_RETENTION_DAYS, 30);
     }
 }

@@ -310,10 +310,35 @@ rate_limit_cost_multiplier{tier="0|1|2|3"}
 
 ## Configuration
 
+### Rate Limit Mode
+
+**Status**: Updated December 2, 2025
+
+The rate limiter supports two modes:
+
+| Mode | Behavior | Default Environment |
+|------|----------|---------------------|
+| `shadow` | Log violations, but allow requests through | Development |
+| `enforcing` | Block requests that exceed limits | Production |
+
+**Automatic Mode Selection**:
+- When `ENVIRONMENT=production`: defaults to `enforcing`
+- When `ENVIRONMENT` is not set or any other value: defaults to `shadow`
+- `RATE_LIMIT_MODE` environment variable always takes precedence
+
+**Warning**: If `shadow` mode is used in production, a warning is logged:
+```
+WARN: Rate limiting is in SHADOW mode in PRODUCTION - requests will NOT be blocked
+```
+
 ### Environment Variables
 
 ```bash
+# Environment (affects rate limit mode default)
+ENVIRONMENT=production                       # Set to "production" for production deployments
+
 # Rate Limiting
+RATE_LIMIT_MODE=enforcing                    # "shadow" (log only) or "enforcing" (block)
 RATE_LIMIT_ENABLED=true                      # Enable/disable rate limiting
 RATE_LIMIT_FAIL_OPEN=true                    # Allow requests if Redis down
 RATE_LIMIT_WINDOW_SECONDS=3600               # Window size (default: 1 hour)

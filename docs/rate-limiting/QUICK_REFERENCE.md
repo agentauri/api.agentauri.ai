@@ -218,10 +218,31 @@ async fn test_rate_limit_enforcement() {
 
 ## Configuration
 
+### Rate Limit Mode (Shadow vs Enforcing)
+
+```bash
+# Production: defaults to "enforcing" (blocks requests)
+export ENVIRONMENT=production
+
+# Development: defaults to "shadow" (logs only, allows requests)
+# Unset ENVIRONMENT or set to any other value
+
+# Override: explicitly set mode regardless of environment
+export RATE_LIMIT_MODE=enforcing   # or "shadow"
+```
+
+**Behavior**:
+- `shadow`: Log rate limit violations but allow requests through
+- `enforcing`: Block requests that exceed limits (return 429)
+
 ### Environment Variables
 
 ```bash
+# Environment (affects rate limit mode)
+export ENVIRONMENT=production
+
 # Rate limiting
+export RATE_LIMIT_MODE=enforcing         # "shadow" or "enforcing"
 export RATE_LIMIT_ENABLED=true
 export RATE_LIMIT_FAIL_OPEN=true
 export RATE_LIMIT_WINDOW_SECONDS=3600

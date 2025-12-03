@@ -193,4 +193,116 @@ impl UserRepository {
 
         Ok(user)
     }
+
+    // ========================================================================
+    // Account Lockout Methods
+    // ========================================================================
+
+    /// Record a failed login attempt and potentially lock the account
+    ///
+    /// Implements progressive lockout:
+    /// - Threshold: 5 failed attempts
+    /// - Lockout duration: 15min base, doubles each time (up to 4h max)
+    ///
+    /// Returns the number of failed attempts after this failure.
+    pub async fn record_failed_login(pool: &DbPool, user_id: &str) -> Result<i32> {
+        let now = chrono::Utc::now();
+
+        // Lockout configuration constants
+        const MAX_FAILED_ATTEMPTS: i32 = 5;
+        const BASE_LOCKOUT_MINUTES: i64 = 15;
+        const MAX_LOCKOUT_MULTIPLIER: i32 = 4; // Max 4h lockout (15 * 2^4 = 240min)
+
+        // Get current failed attempts to calculate lockout duration
+        let current = sqlx::query_scalar::<_, i32>(
+            r#"SELECT failed_login_attempts FROM users WHERE id = $1"#,
+        )
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to get current failed attempts")?;
+
+        let new_attempts = current + 1;
+
+        // Calculate lockout time if threshold reached
+        let locked_until = if new_attempts >= MAX_FAILED_ATTEMPTS {
+            // Progressive lockout: 15min, 30min, 60min, 120min, 240min (max 4h)
+            let lockout_cycles = ((new_attempts - MAX_FAILED_ATTEMPTS) / MAX_FAILED_ATTEMPTS)
+                .min(MAX_LOCKOUT_MULTIPLIER);
+            let multiplier = 2_i64.pow(lockout_cycles as u32);
+            let lockout_duration = chrono::Duration::minutes(BASE_LOCKOUT_MINUTES * multiplier);
+            Some(now + lockout_duration)
+        } else {
+            None
+        };
+
+        sqlx::query(
+            r#"
+            UPDATE users SET
+                failed_login_attempts = $1,
+                last_failed_login = $2,
+                locked_until = $3
+            WHERE id = $4
+            "#,
+        )
+        .bind(new_attempts)
+        .bind(now)
+        .bind(locked_until)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .context("Failed to record failed login")?;
+
+        Ok(new_attempts)
+    }
+
+    /// Reset failed login attempts (call on successful login)
+    ///
+    /// This clears the failed_login_attempts counter, locked_until, and last_failed_login
+    /// fields, effectively unlocking the account.
+    pub async fn reset_failed_login(pool: &DbPool, user_id: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE users SET
+                failed_login_attempts = 0,
+                locked_until = NULL,
+                last_failed_login = NULL
+            WHERE id = $1
+            "#,
+        )
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .context("Failed to reset failed login")?;
+
+        Ok(())
+    }
+
+    /// Check if an account is currently locked
+    ///
+    /// Returns:
+    /// - Ok(None) if account is not locked
+    /// - Ok(Some(seconds_remaining)) if account is locked
+    pub async fn check_account_lockout(pool: &DbPool, user_id: &str) -> Result<Option<i64>> {
+        let locked_until: Option<chrono::DateTime<chrono::Utc>> =
+            sqlx::query_scalar(r#"SELECT locked_until FROM users WHERE id = $1"#)
+                .bind(user_id)
+                .fetch_one(pool)
+                .await
+                .context("Failed to check account lockout")?;
+
+        match locked_until {
+            Some(until) => {
+                let now = chrono::Utc::now();
+                if until > now {
+                    let remaining = (until - now).num_seconds();
+                    Ok(Some(remaining))
+                } else {
+                    // Lock has expired
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
+        }
+    }
 }

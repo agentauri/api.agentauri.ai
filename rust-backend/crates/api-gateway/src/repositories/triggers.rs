@@ -260,4 +260,112 @@ impl TriggerRepository {
 
         Ok(result)
     }
+
+    /// Get circuit breaker info for a trigger
+    ///
+    /// Returns trigger name along with circuit breaker config and state.
+    pub async fn get_circuit_breaker_info(
+        pool: &DbPool,
+        trigger_id: &str,
+    ) -> Result<Option<CircuitBreakerInfo>> {
+        let record = sqlx::query_as::<_, CircuitBreakerInfo>(
+            r#"
+            SELECT
+                id,
+                name,
+                circuit_breaker_config,
+                circuit_breaker_state
+            FROM triggers
+            WHERE id = $1
+            "#,
+        )
+        .bind(trigger_id)
+        .fetch_optional(pool)
+        .await
+        .context("Failed to fetch circuit breaker info")?;
+
+        Ok(record)
+    }
+
+    /// Update circuit breaker configuration
+    ///
+    /// Merges the provided config values with existing config (COALESCE pattern).
+    pub async fn update_circuit_breaker_config(
+        pool: &DbPool,
+        trigger_id: &str,
+        failure_threshold: Option<u32>,
+        recovery_timeout_seconds: Option<u64>,
+        half_open_max_calls: Option<u32>,
+    ) -> Result<()> {
+        let now = chrono::Utc::now();
+
+        // Build the new config by merging with existing (or default)
+        // Using jsonb_set operations for partial updates
+        sqlx::query(
+            r#"
+            UPDATE triggers SET
+                updated_at = $1,
+                circuit_breaker_config = jsonb_strip_nulls(
+                    COALESCE(circuit_breaker_config, '{"failure_threshold": 10, "recovery_timeout_seconds": 3600, "half_open_max_calls": 1}'::jsonb)
+                    || jsonb_strip_nulls(jsonb_build_object(
+                        'failure_threshold', $2::int,
+                        'recovery_timeout_seconds', $3::bigint,
+                        'half_open_max_calls', $4::int
+                    ))
+                )
+            WHERE id = $5
+            "#,
+        )
+        .bind(now)
+        .bind(failure_threshold.map(|v| v as i32))
+        .bind(recovery_timeout_seconds.map(|v| v as i64))
+        .bind(half_open_max_calls.map(|v| v as i32))
+        .bind(trigger_id)
+        .execute(pool)
+        .await
+        .context("Failed to update circuit breaker config")?;
+
+        Ok(())
+    }
+
+    /// Reset circuit breaker state to Closed
+    ///
+    /// Resets failure_count, clears timestamps, and sets state to "Closed".
+    pub async fn reset_circuit_breaker_state(pool: &DbPool, trigger_id: &str) -> Result<()> {
+        let now = chrono::Utc::now();
+
+        let default_state = serde_json::json!({
+            "state": "Closed",
+            "failure_count": 0,
+            "last_failure_time": null,
+            "opened_at": null,
+            "half_open_calls": 0
+        });
+
+        sqlx::query(
+            r#"
+            UPDATE triggers SET
+                updated_at = $1,
+                circuit_breaker_state = $2
+            WHERE id = $3
+            "#,
+        )
+        .bind(now)
+        .bind(&default_state)
+        .bind(trigger_id)
+        .execute(pool)
+        .await
+        .context("Failed to reset circuit breaker state")?;
+
+        Ok(())
+    }
+}
+
+/// Circuit breaker info from database
+#[derive(Debug, sqlx::FromRow)]
+pub struct CircuitBreakerInfo {
+    pub id: String,
+    pub name: String,
+    pub circuit_breaker_config: Option<serde_json::Value>,
+    pub circuit_breaker_state: Option<serde_json::Value>,
 }

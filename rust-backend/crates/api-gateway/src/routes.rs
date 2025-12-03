@@ -108,6 +108,19 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("/{id}", web::get().to(handlers::get_trigger))
                             .route("/{id}", web::put().to(handlers::update_trigger))
                             .route("/{id}", web::delete().to(handlers::delete_trigger))
+                            // Circuit breaker management endpoints
+                            .route(
+                                "/{id}/circuit-breaker",
+                                web::get().to(handlers::get_circuit_breaker_state),
+                            )
+                            .route(
+                                "/{id}/circuit-breaker",
+                                web::patch().to(handlers::update_circuit_breaker_config),
+                            )
+                            .route(
+                                "/{id}/circuit-breaker/reset",
+                                web::post().to(handlers::reset_circuit_breaker),
+                            )
                             // Nested condition endpoints
                             .route(
                                 "/{trigger_id}/conditions",
