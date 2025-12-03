@@ -74,6 +74,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set sanitized image name
+        id: sanitize
+        run: |
+          SANITIZED=$(echo "${{ matrix.image }}" | tr '/:' '__')
+          echo "filename=$SANITIZED" >> $GITHUB_OUTPUT
+
       - name: Pull Docker image
         run: docker pull ${{ matrix.image }}
 
@@ -82,7 +88,7 @@ jobs:
         with:
           image-ref: ${{ matrix.image }}
           format: 'sarif'
-          output: 'trivy-results-${{ matrix.image }}.sarif'
+          output: 'trivy-results-${{ steps.sanitize.outputs.filename }}.sarif'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
@@ -90,8 +96,8 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: 'trivy-results-${{ matrix.image }}.sarif'
-          category: 'docker-${{ matrix.image }}'
+          sarif_file: 'trivy-results-${{ steps.sanitize.outputs.filename }}.sarif'
+          category: 'docker-${{ steps.sanitize.outputs.filename }}'
 
       - name: Generate security summary
         run: |
@@ -159,8 +165,8 @@ jobs:
 
       - name: Check for hardcoded credentials
         run: |
-          # Check for common password patterns
-          if grep -ri "password.*=.*['\"]" database/ --include="*.sql" 2>/dev/null | grep -v "placeholder\|example\|CHANGE_THIS"; then
+          # Check for common password patterns (excluding schema definitions and test data)
+          if grep -ri "password.*=.*['\"]" database/ --include="*.sql" 2>/dev/null | grep -v "placeholder\|example\|CHANGE_THIS\|password_hash\|column_name\|test_\|ci_"; then
             echo "⚠️ Warning: Potential hardcoded credentials found" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
