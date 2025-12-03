@@ -25,7 +25,8 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 - **Layer 0**: Anonymous access with x402 micropayments, IP-based rate limiting
 - **Layer 1**: API Key authentication (`sk_live_xxx`), per-plan rate limits
 - **Layer 2**: Wallet signature (EIP-191), agent → account linking
-- **OAuth 2.0**: Third-party application integrations (future)
+- **Social Login**: Google and GitHub OAuth 2.0 with automatic account linking
+- **Account Security**: Progressive lockout after failed attempts (15min → 4h)
 
 ## Quick Start
 
@@ -65,10 +66,10 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 5. **Run tests** (optional, to verify setup):
    ```bash
    ./scripts/run-tests.sh
-   # Should show: All 7 test suites passing (352 tests)
+   # Should show all test suites passing
    ```
 
-**Note**: Phase 3, Phase 3.5, and Phase 4 Week 14 (Stateful Triggers) are complete. Ready for Week 15 development. See roadmap for details.
+**Note**: Phase 3, Phase 3.5, and Phase 4 are complete. OpenAPI documentation with Swagger UI is available at `/api-docs/`. See roadmap for details.
 
 ### 6. Run Rust Services (optional)
 
@@ -125,9 +126,11 @@ See [CLAUDE.md](./CLAUDE.md) for comprehensive architecture documentation.
 - [CLAUDE.md](./CLAUDE.md) - Complete project documentation
 - [docs/architecture/](./docs/architecture/) - System architecture and diagrams
 - [docs/protocols/](./docs/protocols/) - ERC-8004, MCP, OASF, A2A integration guides
-- [docs/auth/](./docs/auth/) - Authentication system (API keys, wallet signatures, rate limiting)
+- [docs/auth/](./docs/auth/) - Authentication system (API keys, wallet signatures, social login)
+- [docs/auth/SOCIAL_LOGIN.md](./docs/auth/SOCIAL_LOGIN.md) - Google & GitHub OAuth 2.0 setup
 - [docs/database/](./docs/database/) - Database schema and migration strategy
 - [API Documentation](./rust-backend/crates/api-gateway/API_DOCUMENTATION.md) - REST API specification
+- **Swagger UI**: Available at `/api-docs/` when running the API gateway
 
 ## Development
 
@@ -155,7 +158,7 @@ cd ponder-indexers
 pnpm test
 ```
 
-**Current Status**: ✅ 119+ tests passing in event-processor (Week 14 integration tests), 352 tests total across workspace
+**Current Status**: ✅ 170+ Rust tests passing, 40+ database tests, comprehensive coverage across all crates
 
 ### Local Testing
 
@@ -371,15 +374,15 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 - ✅ Agent Linking with on-chain verification (Week 12)
 - ✅ API Key Authentication Layer 1 with security hardening (Week 11)
 - ✅ Role-based access (admin, member, viewer)
-- 352 tests passing
 
-### Phase 4: Advanced Triggers & Actions (Weeks 13-15)
+### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - ✅ COMPLETE
 - ✅ Auth Completion + Rate Limiting + OAuth 2.0 (Week 13)
 - ✅ Stateful Triggers (EMA + Rate Counters) (Week 14)
-  - 119+ tests passing (integration + unit)
-  - Comprehensive test coverage for state management
-- ⏳ REST/HTTP action worker (Week 15)
-- ⏳ Discovery endpoint + Circuit breaker (Week 15)
+- ✅ Social Login (Google + GitHub OAuth 2.0)
+- ✅ Account Lockout (progressive: 15min → 4h)
+- ✅ Circuit Breaker for trigger resilience
+- ✅ Discovery endpoint (`/.well-known/agent.json`)
+- ✅ OpenAPI 3.0 documentation with Swagger UI (`/api-docs/`)
 
 ### Phase 5: MCP + A2A Integration (Weeks 16-18)
 - ⏳ A2A Protocol (Google Agent-to-Agent)
@@ -395,7 +398,7 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and m
 ### Phase 7: Production Deployment (Weeks 22-24)
 - ⏳ CI/CD pipelines
 - ⏳ Security audit and hardening
-- ⏳ API documentation (OpenAPI/Swagger)
+- ✅ API documentation (OpenAPI/Swagger) - completed in Phase 4
 
 ### Phase 8: AI Integration (Week 25+)
 - ⏳ Natural language trigger creation
