@@ -247,6 +247,35 @@ cargo clippy
 pnpm lint
 ```
 
+## API Documentation
+
+The API Gateway provides interactive OpenAPI 3.0 documentation via Swagger UI.
+
+### Accessing the Documentation
+
+1. **Start the API Gateway**:
+   ```bash
+   cd rust-backend
+   cargo run -p api-gateway
+   # Server starts at http://localhost:8080
+   ```
+
+2. **Open Swagger UI** in your browser:
+   - **Interactive docs**: http://localhost:8080/api-docs/
+   - **OpenAPI JSON**: http://localhost:8080/api/v1/openapi.json
+
+### Using Swagger UI
+
+- **Browse endpoints**: All available endpoints are grouped by tags (Auth, Triggers, Organizations, etc.)
+- **Try it out**: Click "Try it out" on any endpoint to test it directly
+- **Authentication**: Click "Authorize" and enter your JWT token (`Bearer <token>`) or API key (`sk_live_xxx`)
+- **View schemas**: Expand the "Schemas" section to see all request/response models
+
+### Alternative: Static Documentation
+
+For offline reference, see:
+- [API_DOCUMENTATION.md](./rust-backend/crates/api-gateway/API_DOCUMENTATION.md) - Complete REST API specification with examples
+
 ## API Usage
 
 ### Create a Trigger
@@ -287,8 +316,6 @@ Content-Type: application/json
   ]
 }
 ```
-
-See [API Documentation](./rust-backend/crates/api-gateway/API_DOCUMENTATION.md) for complete API documentation.
 
 ## Supported Networks
 
