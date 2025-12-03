@@ -281,6 +281,8 @@ jobs:
           echo "## Docker Compose Validation" >> $GITHUB_STEP_SUMMARY
           # Provide dummy env vars for required variables (validation only, not for actual use)
           export DB_PASSWORD="validation-dummy"
+          export REDIS_PASSWORD="validation-dummy"
+          export GRAFANA_ADMIN_PASSWORD="validation-dummy"
           if docker compose -f docker-compose.yml config > /dev/null 2>&1; then
             echo "✅ docker-compose.yml is valid" >> $GITHUB_STEP_SUMMARY
           else
