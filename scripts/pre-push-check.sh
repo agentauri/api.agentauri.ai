@@ -49,12 +49,13 @@ fi
 echo ""
 
 # 2. Clippy check (using SQLx offline mode via .sqlx cache)
+# Skip test targets as they have queries not in SQLx cache (tested in CI with DB)
 echo -e "${YELLOW}[2/3]${NC} Running Clippy linter..."
-if env -u DATABASE_URL cargo clippy --all-targets --all-features -- -D warnings > /dev/null 2>&1; then
+if env SQLX_OFFLINE=true cargo clippy --workspace --lib --bins --all-features -- -D warnings > /dev/null 2>&1; then
     print_result "Clippy linter" 0
 else
     print_result "Clippy linter" 1
-    echo -e "${RED}      Run 'cargo clippy --all-targets --all-features -- -D warnings' to see issues${NC}"
+    echo -e "${RED}      Run 'env SQLX_OFFLINE=true cargo clippy --workspace --lib --bins --all-features -- -D warnings' to see issues${NC}"
 fi
 echo ""
 
@@ -62,7 +63,10 @@ echo ""
 echo -e "${YELLOW}[3/3]${NC} Running unit tests..."
 # Integration tests marked with #[ignore] require DATABASE_URL
 # These are run in CI with: cargo test -- --ignored
-if env -u DATABASE_URL cargo test --workspace --lib --bins > /dev/null 2>&1; then
+# event-processor has test queries not in SQLx cache - tested in CI with DB
+# Use all CPU cores for parallel test execution
+NUM_CPUS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+if env SQLX_OFFLINE=true cargo test --workspace --lib --bins --exclude event-processor -- --test-threads="$NUM_CPUS" > /dev/null 2>&1; then
     print_result "Unit tests" 0
 else
     print_result "Unit tests" 1

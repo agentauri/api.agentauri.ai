@@ -3,6 +3,8 @@
 [build]
 # Use all CPU cores for parallel compilation
 jobs = -1
+# Enable incremental compilation for faster rebuilds
+incremental = true
 
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"
@@ -20,5 +22,5 @@ rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/ld"]
 rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/ld"]
 
 # Environment variables for SQLx
-[env]
-SQLX_OFFLINE = "false"
+# NOTE: SQLX_OFFLINE is NOT set here - let scripts control it explicitly
+# Scripts set SQLX_OFFLINE=true for offline compilation, empty for live DB

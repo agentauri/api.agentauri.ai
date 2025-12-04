@@ -15,7 +15,9 @@ license = "MIT"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.42", features = ["full"] }
+# Optimized features: removed "full" to speed up compilation
+# Required features: rt-multi-thread, macros, time, sync, net, io-util, signal, fs
+tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "signal", "fs"] }
 tokio-util = "0.7"
 futures-util = "0.3"
 
