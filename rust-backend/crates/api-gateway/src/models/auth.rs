@@ -2,11 +2,92 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use validator::Validate;
+use validator::{Validate, ValidationError};
+
+/// Validate password strength
+///
+/// Requirements:
+/// - Minimum 12 characters (NIST SP 800-63B recommendation)
+/// - At least 1 uppercase letter
+/// - At least 1 lowercase letter
+/// - At least 1 digit
+/// - At least 1 special character
+/// - Not a common password
+fn validate_password_strength(password: &str) -> Result<(), ValidationError> {
+    // Length check (min 12)
+    if password.len() < 12 {
+        let mut err = ValidationError::new("password_too_short");
+        err.message = Some("Password must be at least 12 characters".into());
+        return Err(err);
+    }
+
+    // Uppercase check
+    if !password.chars().any(|c| c.is_ascii_uppercase()) {
+        let mut err = ValidationError::new("password_no_uppercase");
+        err.message = Some("Password must contain at least one uppercase letter".into());
+        return Err(err);
+    }
+
+    // Lowercase check
+    if !password.chars().any(|c| c.is_ascii_lowercase()) {
+        let mut err = ValidationError::new("password_no_lowercase");
+        err.message = Some("Password must contain at least one lowercase letter".into());
+        return Err(err);
+    }
+
+    // Digit check
+    if !password.chars().any(|c| c.is_ascii_digit()) {
+        let mut err = ValidationError::new("password_no_digit");
+        err.message = Some("Password must contain at least one digit".into());
+        return Err(err);
+    }
+
+    // Special character check
+    let special_chars = "!@#$%^&*()_+-=[]{}|;':\",./<>?`~";
+    if !password.chars().any(|c| special_chars.contains(c)) {
+        let mut err = ValidationError::new("password_no_special");
+        err.message = Some("Password must contain at least one special character".into());
+        return Err(err);
+    }
+
+    // Common password check (top 20 most common)
+    const COMMON_PASSWORDS: &[&str] = &[
+        "password123456",
+        "123456password",
+        "qwerty123456",
+        "admin123456!",
+        "letmein12345",
+        "welcome12345",
+        "monkey123456",
+        "dragon123456",
+        "master123456",
+        "login1234567",
+        "abc123456789",
+        "password1234",
+        "iloveyou1234",
+        "sunshine1234",
+        "princess1234",
+        "football1234",
+        "baseball1234",
+        "trustno1234!",
+        "shadow123456",
+        "michael12345",
+    ];
+    let password_lower = password.to_lowercase();
+    for common in COMMON_PASSWORDS {
+        if password_lower.contains(common) {
+            let mut err = ValidationError::new("password_too_common");
+            err.message = Some("Password is too common".into());
+            return Err(err);
+        }
+    }
+
+    Ok(())
+}
 
 /// Register request
 #[derive(Debug, Deserialize, Validate, ToSchema)]
-#[schema(example = json!({"username": "johndoe", "email": "john@example.com", "password": "securepassword123"}))]
+#[schema(example = json!({"username": "johndoe", "email": "john@example.com", "password": "SecurePass123!"}))]
 pub struct RegisterRequest {
     #[validate(length(min = 3, max = 50))]
     pub username: String,
@@ -14,7 +95,10 @@ pub struct RegisterRequest {
     #[validate(email)]
     pub email: String,
 
-    #[validate(length(min = 8, max = 100))]
+    #[validate(
+        length(min = 12, max = 128),
+        custom(function = "validate_password_strength")
+    )]
     pub password: String,
 }
 
@@ -97,7 +181,7 @@ mod tests {
         let req = RegisterRequest {
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            password: "securepassword123".to_string(),
+            password: "SecurePass123!".to_string(), // Valid: 12+ chars, upper, lower, digit, special
         };
         assert!(req.validate().is_ok());
     }
@@ -107,7 +191,7 @@ mod tests {
         let req = RegisterRequest {
             username: "ab".to_string(), // min 3 chars
             email: "test@example.com".to_string(),
-            password: "securepassword123".to_string(),
+            password: "SecurePass123!".to_string(),
         };
         let result = req.validate();
         assert!(result.is_err());
@@ -120,7 +204,7 @@ mod tests {
         let req = RegisterRequest {
             username: "a".repeat(51), // max 50 chars
             email: "test@example.com".to_string(),
-            password: "securepassword123".to_string(),
+            password: "SecurePass123!".to_string(),
         };
         let result = req.validate();
         assert!(result.is_err());
@@ -133,7 +217,7 @@ mod tests {
         let req = RegisterRequest {
             username: "testuser".to_string(),
             email: "not-an-email".to_string(),
-            password: "securepassword123".to_string(),
+            password: "SecurePass123!".to_string(),
         };
         let result = req.validate();
         assert!(result.is_err());
@@ -146,7 +230,7 @@ mod tests {
         let req = RegisterRequest {
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            password: "short".to_string(), // min 8 chars
+            password: "Short1!".to_string(), // min 12 chars
         };
         let result = req.validate();
         assert!(result.is_err());
@@ -159,12 +243,65 @@ mod tests {
         let req = RegisterRequest {
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            password: "a".repeat(101), // max 100 chars
+            password: format!("{}Aa1!", "a".repeat(125)), // max 128 chars
         };
         let result = req.validate();
         assert!(result.is_err());
         let errors = result.unwrap_err();
         assert!(errors.field_errors().contains_key("password"));
+    }
+
+    // ========================================================================
+    // Password strength validation tests
+    // ========================================================================
+
+    #[test]
+    fn test_password_strength_valid() {
+        assert!(validate_password_strength("SecurePass123!").is_ok());
+        assert!(validate_password_strength("MyP@ssw0rd!123").is_ok());
+        assert!(validate_password_strength("C0mpl3x_P@ss!").is_ok());
+    }
+
+    #[test]
+    fn test_password_strength_no_uppercase() {
+        let result = validate_password_strength("securepass123!");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code, "password_no_uppercase");
+    }
+
+    #[test]
+    fn test_password_strength_no_lowercase() {
+        let result = validate_password_strength("SECUREPASS123!");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code, "password_no_lowercase");
+    }
+
+    #[test]
+    fn test_password_strength_no_digit() {
+        let result = validate_password_strength("SecurePassword!");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code, "password_no_digit");
+    }
+
+    #[test]
+    fn test_password_strength_no_special() {
+        let result = validate_password_strength("SecurePass1234");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code, "password_no_special");
+    }
+
+    #[test]
+    fn test_password_strength_too_short() {
+        let result = validate_password_strength("Short1!");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code, "password_too_short");
+    }
+
+    #[test]
+    fn test_password_strength_common_password() {
+        let result = validate_password_strength("Password123456!");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code, "password_too_common");
     }
 
     // ========================================================================

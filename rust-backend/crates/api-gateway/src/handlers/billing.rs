@@ -14,10 +14,18 @@
 //! # Authorization
 //!
 //! All endpoints except webhook require JWT authentication and organization membership.
+//!
+//! # Security
+//!
+//! The Stripe webhook endpoint validates:
+//! 1. Webhook signature (cryptographic verification)
+//! 2. Source IP address (optional whitelist for defense in depth)
 
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use shared::{Config, DbPool};
-use tracing::{info, warn};
+use std::net::IpAddr;
+use std::str::FromStr;
+use tracing::{debug, info, warn};
 
 use crate::{
     handlers::helpers::{extract_user_id_or_unauthorized, handle_db_error, validate_request},
@@ -389,6 +397,122 @@ pub async fn get_subscription(
 }
 
 // ============================================================================
+// Stripe IP Whitelist (Defense in Depth)
+// ============================================================================
+
+/// Stripe webhook IP ranges (from https://stripe.com/docs/ips)
+/// These are the IP addresses Stripe uses to send webhook events.
+/// This is an additional security layer on top of signature verification.
+///
+/// Note: This list should be periodically updated from Stripe's documentation.
+/// Last updated: 2025-01-28
+const STRIPE_WEBHOOK_IP_RANGES: &[&str] = &[
+    // Stripe webhook IPs (CIDR ranges)
+    "3.18.12.63/32",
+    "3.130.192.231/32",
+    "13.235.14.237/32",
+    "13.235.122.149/32",
+    "18.211.135.69/32",
+    "35.154.171.200/32",
+    "52.15.183.38/32",
+    "54.88.130.119/32",
+    "54.88.130.237/32",
+    "54.187.174.169/32",
+    "54.187.205.235/32",
+    "54.187.216.72/32",
+];
+
+/// Check if an IP address is from Stripe's webhook servers
+///
+/// # Arguments
+/// * `ip` - The IP address string to check
+///
+/// # Returns
+/// * `true` if the IP is in Stripe's known webhook IP ranges
+/// * `false` otherwise
+fn is_stripe_ip(ip: &str) -> bool {
+    let ip_addr = match IpAddr::from_str(ip) {
+        Ok(addr) => addr,
+        Err(_) => return false,
+    };
+
+    for cidr in STRIPE_WEBHOOK_IP_RANGES {
+        if ip_in_cidr(&ip_addr, cidr) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Check if an IP is within a CIDR range
+fn ip_in_cidr(ip: &IpAddr, cidr: &str) -> bool {
+    let parts: Vec<&str> = cidr.split('/').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+
+    let network_addr = match IpAddr::from_str(parts[0]) {
+        Ok(addr) => addr,
+        Err(_) => return false,
+    };
+
+    let prefix_len: u8 = match parts[1].parse() {
+        Ok(len) => len,
+        Err(_) => return false,
+    };
+
+    match (ip, network_addr) {
+        (IpAddr::V4(ip_v4), IpAddr::V4(net_v4)) => {
+            if prefix_len > 32 {
+                return false;
+            }
+            let ip_u32 = u32::from(*ip_v4);
+            let net_u32 = u32::from(net_v4);
+            let mask = if prefix_len == 0 {
+                0
+            } else {
+                !0u32 << (32 - prefix_len)
+            };
+            (ip_u32 & mask) == (net_u32 & mask)
+        }
+        (IpAddr::V6(ip_v6), IpAddr::V6(net_v6)) => {
+            if prefix_len > 128 {
+                return false;
+            }
+            let ip_u128 = u128::from(*ip_v6);
+            let net_u128 = u128::from(net_v6);
+            let mask = if prefix_len == 0 {
+                0
+            } else {
+                !0u128 << (128 - prefix_len)
+            };
+            (ip_u128 & mask) == (net_u128 & mask)
+        }
+        _ => false,
+    }
+}
+
+/// Extract client IP from request (simplified version)
+fn extract_client_ip(req: &HttpRequest) -> String {
+    // Check X-Forwarded-For first (from trusted proxies)
+    if let Some(forwarded) = req.headers().get("X-Forwarded-For") {
+        if let Ok(value) = forwarded.to_str() {
+            // Take the first IP (client IP)
+            if let Some(first_ip) = value.split(',').next() {
+                return first_ip.trim().to_string();
+            }
+        }
+    }
+
+    // Fall back to peer address
+    req.connection_info()
+        .peer_addr()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+// ============================================================================
 // Stripe Webhook Handler
 // ============================================================================
 
@@ -400,6 +524,11 @@ pub async fn get_subscription(
 /// - checkout.session.completed: Add credits
 /// - checkout.session.async_payment_failed: Log failure
 /// - customer.subscription.created/updated/deleted: Update subscription
+///
+/// # Security
+///
+/// 1. Validates source IP against Stripe's known webhook IPs (configurable)
+/// 2. Verifies webhook signature cryptographically
 #[utoipa::path(
     post,
     path = "/api/v1/billing/webhook",
@@ -408,6 +537,7 @@ pub async fn get_subscription(
     responses(
         (status = 200, description = "Webhook processed"),
         (status = 400, description = "Invalid signature or payload", body = ErrorResponse),
+        (status = 403, description = "IP not in Stripe whitelist", body = ErrorResponse),
         (status = 503, description = "Payment service unavailable", body = ErrorResponse)
     )
 )]
@@ -417,6 +547,32 @@ pub async fn handle_stripe_webhook(
     req_http: HttpRequest,
     payload: web::Bytes,
 ) -> impl Responder {
+    // SECURITY: Validate source IP (defense in depth)
+    // This is configurable via STRIPE_IP_WHITELIST_ENABLED env var (default: true in production)
+    let ip_whitelist_enabled = std::env::var("STRIPE_IP_WHITELIST_ENABLED")
+        .map(|v| v.to_lowercase() != "false")
+        .unwrap_or_else(|_| !cfg!(debug_assertions)); // Enabled by default in release builds
+
+    if ip_whitelist_enabled {
+        let client_ip = extract_client_ip(&req_http);
+
+        // Strip port if present (e.g., "127.0.0.1:8080" -> "127.0.0.1")
+        let ip_only = client_ip.split(':').next().unwrap_or(&client_ip);
+
+        if !is_stripe_ip(ip_only) {
+            warn!(
+                client_ip = %client_ip,
+                "Stripe webhook rejected: IP not in whitelist"
+            );
+            return HttpResponse::Forbidden().json(ErrorResponse::new(
+                "ip_not_allowed",
+                "Request IP not in allowed webhook sources",
+            ));
+        }
+
+        debug!(client_ip = %client_ip, "Stripe webhook IP validated");
+    }
+
     // Get Stripe-Signature header
     let signature = match req_http
         .headers()
@@ -690,4 +846,122 @@ fn get_stripe_config(_config: &Config) -> Result<StripeConfig, &'static str> {
         webhook_secret,
         currency: "usd".to_string(),
     })
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // IP Whitelist Tests
+    // ========================================================================
+
+    #[test]
+    fn test_is_stripe_ip_valid_stripe_ip() {
+        // All IPs from STRIPE_WEBHOOK_IP_RANGES should be valid
+        assert!(is_stripe_ip("3.18.12.63"));
+        assert!(is_stripe_ip("3.130.192.231"));
+        assert!(is_stripe_ip("13.235.14.237"));
+        assert!(is_stripe_ip("54.88.130.119"));
+        assert!(is_stripe_ip("54.187.216.72"));
+    }
+
+    #[test]
+    fn test_is_stripe_ip_invalid_ip() {
+        // Random IPs should not be in whitelist
+        assert!(!is_stripe_ip("1.2.3.4"));
+        assert!(!is_stripe_ip("192.168.1.1"));
+        assert!(!is_stripe_ip("10.0.0.1"));
+        assert!(!is_stripe_ip("8.8.8.8"));
+    }
+
+    #[test]
+    fn test_is_stripe_ip_localhost() {
+        // Localhost should not be in whitelist
+        assert!(!is_stripe_ip("127.0.0.1"));
+        assert!(!is_stripe_ip("::1"));
+    }
+
+    #[test]
+    fn test_is_stripe_ip_malformed() {
+        // Malformed IPs should return false, not panic
+        assert!(!is_stripe_ip("not-an-ip"));
+        assert!(!is_stripe_ip(""));
+        assert!(!is_stripe_ip("256.256.256.256"));
+        assert!(!is_stripe_ip("1.2.3.4.5"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_exact_match() {
+        let ip = IpAddr::from_str("3.18.12.63").unwrap();
+        assert!(ip_in_cidr(&ip, "3.18.12.63/32"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_network_range() {
+        let ip1 = IpAddr::from_str("10.0.0.1").unwrap();
+        let ip2 = IpAddr::from_str("10.0.0.254").unwrap();
+        let ip_outside = IpAddr::from_str("10.0.1.1").unwrap();
+
+        assert!(ip_in_cidr(&ip1, "10.0.0.0/24"));
+        assert!(ip_in_cidr(&ip2, "10.0.0.0/24"));
+        assert!(!ip_in_cidr(&ip_outside, "10.0.0.0/24"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_wide_range() {
+        let ip = IpAddr::from_str("192.168.100.50").unwrap();
+        assert!(ip_in_cidr(&ip, "192.168.0.0/16"));
+
+        let ip_outside = IpAddr::from_str("192.169.0.1").unwrap();
+        assert!(!ip_in_cidr(&ip_outside, "192.168.0.0/16"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_ipv6() {
+        let ip = IpAddr::from_str("2001:db8::1").unwrap();
+        assert!(ip_in_cidr(&ip, "2001:db8::/32"));
+
+        let ip_outside = IpAddr::from_str("2001:db9::1").unwrap();
+        assert!(!ip_in_cidr(&ip_outside, "2001:db8::/32"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_invalid_cidr() {
+        let ip = IpAddr::from_str("10.0.0.1").unwrap();
+
+        // Missing prefix length
+        assert!(!ip_in_cidr(&ip, "10.0.0.0"));
+
+        // Invalid prefix length
+        assert!(!ip_in_cidr(&ip, "10.0.0.0/33"));
+
+        // Malformed CIDR
+        assert!(!ip_in_cidr(&ip, "not-a-cidr/24"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_type_mismatch() {
+        // IPv4 address against IPv6 CIDR
+        let ipv4 = IpAddr::from_str("10.0.0.1").unwrap();
+        assert!(!ip_in_cidr(&ipv4, "2001:db8::/32"));
+
+        // IPv6 address against IPv4 CIDR
+        let ipv6 = IpAddr::from_str("2001:db8::1").unwrap();
+        assert!(!ip_in_cidr(&ipv6, "10.0.0.0/8"));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_zero_prefix() {
+        // /0 should match everything (of the same IP family)
+        let ipv4 = IpAddr::from_str("1.2.3.4").unwrap();
+        assert!(ip_in_cidr(&ipv4, "0.0.0.0/0"));
+
+        let ipv6 = IpAddr::from_str("2001:db8::1").unwrap();
+        assert!(ip_in_cidr(&ipv6, "::/0"));
+    }
 }
