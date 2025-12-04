@@ -22,7 +22,7 @@ use crate::models;
         contact(
             name = "AgentAuri Team",
             email = "support@agentauri.ai",
-            url = "https://github.com/erc-8004/api.agentauri.ai"
+            url = "https://github.com/agentauri/api.agentauri.ai"
         ),
         license(
             name = "MIT",

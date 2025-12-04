@@ -97,7 +97,7 @@ fn generate_agent_card() -> AgentCardResponse {
     let contact_email =
         std::env::var("CONTACT_EMAIL").unwrap_or_else(|_| "support@agentauri.ai".to_string());
     let contact_github = std::env::var("CONTACT_GITHUB")
-        .unwrap_or_else(|_| "https://github.com/erc-8004/api.agentauri.ai".to_string());
+        .unwrap_or_else(|_| "https://github.com/agentauri/api.agentauri.ai".to_string());
     let documentation_url = std::env::var("DOCUMENTATION_URL")
         .unwrap_or_else(|_| "https://docs.agentauri.ai".to_string());
 
@@ -251,13 +251,13 @@ pub async fn get_security_txt() -> Result<HttpResponse> {
     let contact_email = std::env::var("SECURITY_CONTACT_EMAIL")
         .unwrap_or_else(|_| "security@agentauri.ai".to_string());
     let contact_url = std::env::var("SECURITY_CONTACT_URL").unwrap_or_else(|_| {
-        "https://github.com/erc-8004/api.agentauri.ai/security/advisories".to_string()
+        "https://github.com/agentauri/api.agentauri.ai/security/advisories".to_string()
     });
     let policy_url = std::env::var("SECURITY_POLICY_URL").unwrap_or_else(|_| {
-        "https://github.com/erc-8004/api.agentauri.ai/security/policy".to_string()
+        "https://github.com/agentauri/api.agentauri.ai/security/policy".to_string()
     });
     let acknowledgments_url = std::env::var("SECURITY_ACKNOWLEDGMENTS_URL").unwrap_or_else(|_| {
-        "https://github.com/erc-8004/api.agentauri.ai/security/advisories".to_string()
+        "https://github.com/agentauri/api.agentauri.ai/security/advisories".to_string()
     });
     let hiring_url = std::env::var("SECURITY_HIRING_URL").ok();
     let canonical_url = std::env::var("BASE_URL")

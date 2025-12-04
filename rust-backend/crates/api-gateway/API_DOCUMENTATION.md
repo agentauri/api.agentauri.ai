@@ -1029,7 +1029,7 @@ Get system capabilities and metadata.
   },
   "contact": {
     "email": "support@agentauri.ai",
-    "github": "https://github.com/erc-8004/api.agentauri.ai",
+    "github": "https://github.com/agentauri/api.agentauri.ai",
     "documentation": "https://docs.agentauri.ai"
   },
   "protocol_version": "erc-8004-v1.0",
@@ -1042,7 +1042,7 @@ Get system capabilities and metadata.
 The following values can be customized via environment variables:
 - `BASE_URL` - Base URL for the API (default: `https://api.agentauri.ai`)
 - `CONTACT_EMAIL` - Support email (default: `support@agentauri.ai`)
-- `CONTACT_GITHUB` - GitHub repository (default: `https://github.com/erc-8004/api.agentauri.ai`)
+- `CONTACT_GITHUB` - GitHub repository (default: `https://github.com/agentauri/api.agentauri.ai`)
 - `DOCUMENTATION_URL` - Documentation site (default: `https://docs.agentauri.ai`)
 
 **Use Cases**:

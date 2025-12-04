@@ -174,7 +174,7 @@ mod unit_tests {
     fn test_contact_structure() {
         let contact = Contact {
             email: "support@agentauri.ai".to_string(),
-            github: "https://github.com/erc-8004/api.agentauri.ai".to_string(),
+            github: "https://github.com/agentauri/api.agentauri.ai".to_string(),
             documentation: "https://docs.agentauri.ai".to_string(),
         };
 
@@ -348,7 +348,7 @@ mod unit_tests {
             },
             contact: Contact {
                 email: "support@agentauri.ai".to_string(),
-                github: "https://github.com/erc-8004/api.agentauri.ai".to_string(),
+                github: "https://github.com/agentauri/api.agentauri.ai".to_string(),
                 documentation: "https://docs.agentauri.ai".to_string(),
             },
             protocol_version: "erc-8004-v1.0".to_string(),
