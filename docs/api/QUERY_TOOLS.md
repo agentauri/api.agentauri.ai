@@ -1,3 +1,6 @@
+<!-- STATUS: PHASE 5 - NOT YET IMPLEMENTED -->
+<!-- This is a design document for Phase 5 (Weeks 16-18) -->
+
 # MCP Query Tools
 
 This document describes the MCP Query Tools available in the Pull Layer, organized into 4 tiers based on complexity and pricing.

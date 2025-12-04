@@ -1,3 +1,6 @@
+<!-- STATUS: PHASE 5 - NOT YET IMPLEMENTED -->
+<!-- This is a design document for Phase 5 (Weeks 16-18) -->
+
 # MCP Integration Guide
 
 ## Overview

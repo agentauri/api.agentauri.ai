@@ -1,8 +1,8 @@
 # Documentation Index
 
 **Project**: api.8004.dev - ERC-8004 Backend Infrastructure
-**Last Updated**: December 2, 2025
-**Phase**: Production Hardening (Social Auth + Account Lockout + Background Tasks)
+**Last Updated**: December 4, 2025
+**Phase**: Phase 4 Complete (REST Worker + Circuit Breaker + Agent Discovery)
 
 This index provides a comprehensive overview of all project documentation organized by category.
 
@@ -13,7 +13,6 @@ This index provides a comprehensive overview of all project documentation organi
 - **[QUICK_START.md](QUICK_START.md)** - Get started with API usage in 4 languages (curl, Python, JavaScript, Rust)
 - **[../CLAUDE.md](../CLAUDE.md)** - Complete project overview and development guidelines for Claude Code
 - **[../README.md](../README.md)** - User-facing project introduction
-- **[ROADMAP.md](ROADMAP.md)** - Development phases and weekly progress tracking
 
 ---
 
@@ -62,8 +61,11 @@ This index provides a comprehensive overview of all project documentation organi
 ## 🔌 Protocol Integrations
 
 - **[protocols/erc-8004-integration.md](protocols/erc-8004-integration.md)** - ERC-8004 standard integration
-- **[protocols/mcp-integration.md](protocols/mcp-integration.md)** - Model Context Protocol for agent communication
-- **[protocols/A2A_INTEGRATION.md](protocols/A2A_INTEGRATION.md)** - Agent-to-Agent (A2A) protocol
+
+### Phase 5 Design Documents (Not Yet Implemented)
+- **[protocols/mcp-integration.md](protocols/mcp-integration.md)** - Model Context Protocol for agent communication *(Phase 5)*
+- **[protocols/A2A_INTEGRATION.md](protocols/A2A_INTEGRATION.md)** - Agent-to-Agent (A2A) protocol *(Phase 5)*
+- **[api/QUERY_TOOLS.md](api/QUERY_TOOLS.md)** - MCP query tools (Tier 0-3) *(Phase 5)*
 
 ---
 
@@ -88,7 +90,6 @@ This index provides a comprehensive overview of all project documentation organi
 ## 📡 API Reference
 
 - **[../rust-backend/crates/api-gateway/API_DOCUMENTATION.md](../rust-backend/crates/api-gateway/API_DOCUMENTATION.md)** - Complete REST API reference
-- **[api/QUERY_TOOLS.md](api/QUERY_TOOLS.md)** - MCP query tools (Tier 0-3)
 - **[examples/trigger-examples.md](examples/trigger-examples.md)** - Trigger configuration examples
 
 ---
@@ -106,17 +107,25 @@ This index provides a comprehensive overview of all project documentation organi
 
 ## 📝 Project Tracking
 
-- **[ROADMAP.md](ROADMAP.md)** - Phase-by-phase development roadmap
 - **[../CHANGELOG.md](../CHANGELOG.md)** - Weekly changelog with all changes
 - **[deployment/PRODUCTION_DEPLOYMENT_GUIDE.md](deployment/PRODUCTION_DEPLOYMENT_GUIDE.md)** - Deployment guide and environment configuration
 - **[operations/PRODUCTION_READINESS_PLAN.md](operations/PRODUCTION_READINESS_PLAN.md)** - 6-week plan to achieve production readiness
+
+### Phase 6 Design Documents (Production Deployment)
+- **[security/SECRETS_MANAGEMENT.md](security/SECRETS_MANAGEMENT.md)** - Secrets management for production *(Phase 6)*
+- **[security/DATABASE_ENCRYPTION.md](security/DATABASE_ENCRYPTION.md)** - Database encryption guide *(Phase 6)*
 
 ---
 
 ## 📦 Archive
 
-Historical reports and completed work:
+Historical reports, completed work, and superseded documents:
 
+### December 2025
+- **[archive/FRONTEND_PRD.md](archive/FRONTEND_PRD.md)** - Frontend PRD draft (Nov 2024, not in scope)
+- **[archive/ROADMAP.md](archive/ROADMAP.md)** - Legacy roadmap (superseded by README.md)
+
+### Operations Archive
 - **[operations/archive/2025-12-01-ponder-event-fix.md](operations/archive/2025-12-01-ponder-event-fix.md)** - Ponder event handler fixes (Week 15)
 - **[operations/archive/2025-12-01-quality-plan.md](operations/archive/2025-12-01-quality-plan.md)** - Quality & security remediation plan
 - **[operations/archive/2025-12-01-fixes-completed.md](operations/archive/2025-12-01-fixes-completed.md)** - Fixes completion summary
@@ -161,19 +170,26 @@ Historical reports and completed work:
 
 ## 📊 Documentation Statistics
 
-- **Total Documents**: 59+ markdown files (after Phase 1-3 improvements + new chain guide)
+- **Total Documents**: 60+ markdown files (Phase 4 complete)
 - **Root Level**: 7 essential files (CLAUDE.md, README, CHANGELOG, etc.)
 - **Architecture Docs**: 5 files
 - **Authentication Docs**: 6 files (including Social Login)
 - **Security Docs**: 13 files (DATABASE_ENCRYPTION, SECURITY_HEADERS, SECRETS_MANAGER, etc.)
 - **Operations Docs**: 6 files (background tasks, circuit breaker, troubleshooting, runbook, link audit, event-processor integration)
-- **API Documentation**: 3 files
-- **Protocol Docs**: 3 files
+- **API Documentation**: 2 files (API_DOCUMENTATION.md, trigger-examples.md)
+- **Protocol Docs**: 3 files (1 implemented, 2 Phase 5 design docs)
 - **Development Guides**: 5 files (setup, testing strategy, adding chains, contributing, CI/CD)
 - **Component READMEs**: 7 files
+- **Archived Documents**: 6 files
 
-**Last Comprehensive Audit**: December 2, 2025 (Production Hardening Documentation)
+**Last Comprehensive Audit**: December 4, 2025 (Phase 4 Complete)
 **Recent Improvement Actions**:
+- December 4, 2025:
+  - Marked Week 15 as complete in CLAUDE.md (REST Worker, Circuit Breaker, Agent Discovery)
+  - Archived FRONTEND_PRD.md and ROADMAP.md (superseded documents)
+  - Added Phase 5/6 status markers to design documents
+  - Reorganized INDEX.md with design document sections
+  - Updated production readiness assessment to 65%
 - December 2, 2025:
   - Added auth/SOCIAL_LOGIN.md for Google and GitHub OAuth 2.0
   - Added operations/BACKGROUND_TASKS.md for cleanup jobs documentation
@@ -188,10 +204,6 @@ Historical reports and completed work:
   - Cross-references added between rate-limiting docs
   - Security documentation enhanced with comprehensive links
   - Archive section added to INDEX.md
-- January 30, 2025 (Phase 1-3):
-  - 8 temporary summary documents deleted, 1 file moved to operations/
-  - 2 redundant security docs deleted, 1 .txt converted to .md
-  - Testing strategy guide created, link audit performed (16 broken links found, 8 fixed)
 
 ---
 

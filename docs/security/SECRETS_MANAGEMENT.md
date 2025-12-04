@@ -1,3 +1,6 @@
+<!-- STATUS: PHASE 6 - DESIGN DOCUMENT -->
+<!-- This is a design document for Phase 6 (Production Deployment) -->
+
 # Secrets Management
 
 Complete guide to secrets management for the ERC-8004 backend infrastructure.

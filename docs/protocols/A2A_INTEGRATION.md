@@ -1,3 +1,6 @@
+<!-- STATUS: PHASE 5 - NOT YET IMPLEMENTED -->
+<!-- This is a design document for Phase 5 (Weeks 16-18) -->
+
 # A2A Protocol Integration
 
 This document describes the integration of Google's Agent-to-Agent (A2A) protocol for the Pull Layer, enabling agents to query reputation and validation data through a standardized async task interface.

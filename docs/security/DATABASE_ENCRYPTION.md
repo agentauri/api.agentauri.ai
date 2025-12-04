@@ -1,3 +1,6 @@
+<!-- STATUS: PHASE 6 - DESIGN DOCUMENT -->
+<!-- This is a design document for Phase 6 (Production Deployment) -->
+
 # Database Encryption Guide
 
 ## Overview
