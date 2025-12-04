@@ -4,7 +4,7 @@
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use anyhow::Context;
-use shared::{db, Config, RateLimiter};
+use shared::{db, secrets, Config, RateLimiter};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -32,7 +32,42 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting API Gateway...");
 
-    // Load configuration
+    // Log secrets backend configuration
+    // In production, set SECRETS_BACKEND=aws or SECRETS_BACKEND=vault
+    let secrets_backend = secrets::SecretsBackend::from_env();
+    tracing::info!(
+        backend = ?secrets_backend,
+        "Secrets backend configured (set SECRETS_BACKEND=aws or vault for production)"
+    );
+
+    // Load secrets from configured backend (AWS/Vault in prod, .env in dev)
+    // This validates that secrets loading works and logs any issues early
+    match secrets::load_secrets().await {
+        Ok(app_secrets) => {
+            tracing::info!(
+                redacted = ?app_secrets.redacted(),
+                "Application secrets loaded successfully"
+            );
+        }
+        Err(e) => {
+            // In development, this is a warning (secrets may not all be configured)
+            // In production with AWS/Vault backend, this should be fatal
+            if matches!(secrets_backend, secrets::SecretsBackend::Env) {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to load all secrets from .env (some features may be disabled)"
+                );
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Failed to load secrets from {:?}: {}",
+                    secrets_backend,
+                    e
+                ));
+            }
+        }
+    }
+
+    // Load configuration from environment
     let config = Config::from_env().context("Failed to load configuration")?;
 
     // Create database connection pool

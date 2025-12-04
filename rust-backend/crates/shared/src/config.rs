@@ -46,14 +46,19 @@ pub struct DatabaseConfig {
 
     /// Maximum number of connections in the pool
     pub max_connections: u32,
+
+    /// SSL mode for database connection
+    /// Options: disable, allow, prefer, require, verify-ca, verify-full
+    /// Default: prefer (development), verify-full (production)
+    pub ssl_mode: String,
 }
 
 impl DatabaseConfig {
-    /// Build a PostgreSQL connection URL
+    /// Build a PostgreSQL connection URL with SSL mode
     pub fn connection_url(&self) -> String {
         format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.user, self.password, self.host, self.port, self.name
+            "postgres://{}:{}@{}:{}/{}?sslmode={}",
+            self.user, self.password, self.host, self.port, self.name, self.ssl_mode
         )
     }
 }
@@ -116,6 +121,13 @@ impl Config {
                     .unwrap_or_else(|_| "10".to_string())
                     .parse()
                     .map_err(|e| Error::config(format!("Invalid DB_MAX_CONNECTIONS: {}", e)))?,
+                ssl_mode: env::var("DB_SSL_MODE").unwrap_or_else(|_| {
+                    if cfg!(debug_assertions) {
+                        "prefer".to_string() // Development: prefer TLS but don't require
+                    } else {
+                        "verify-full".to_string() // Production: require TLS with certificate verification
+                    }
+                }),
             },
             redis: RedisConfig {
                 host: env::var("REDIS_HOST").unwrap_or_else(|_| "localhost".to_string()),
@@ -241,11 +253,30 @@ mod tests {
             user: "testuser".to_string(),
             password: "testpass".to_string(),
             max_connections: 10,
+            ssl_mode: "prefer".to_string(),
         };
 
         assert_eq!(
             config.connection_url(),
-            "postgres://testuser:testpass@localhost:5432/testdb"
+            "postgres://testuser:testpass@localhost:5432/testdb?sslmode=prefer"
+        );
+    }
+
+    #[test]
+    fn test_database_connection_url_with_verify_full() {
+        let config = DatabaseConfig {
+            host: "db.production.example.com".to_string(),
+            port: 5432,
+            name: "proddb".to_string(),
+            user: "appuser".to_string(),
+            password: "secure_password".to_string(),
+            max_connections: 50,
+            ssl_mode: "verify-full".to_string(),
+        };
+
+        assert_eq!(
+            config.connection_url(),
+            "postgres://appuser:secure_password@db.production.example.com:5432/proddb?sslmode=verify-full"
         );
     }
 

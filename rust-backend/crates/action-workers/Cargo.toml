@@ -41,6 +41,9 @@ redis = { workspace = true }
 # HTTP client
 reqwest = { workspace = true }
 
+# URL parsing (for SSRF protection)
+url = "2"
+
 # Telegram
 teloxide = { workspace = true }
 

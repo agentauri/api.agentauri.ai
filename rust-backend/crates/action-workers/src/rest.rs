@@ -125,7 +125,87 @@ fn validate_url(url: &str) -> Result<(), WorkerError> {
         )));
     }
 
+    // Security: Block requests to private/internal IP ranges (SSRF protection)
+    if let Some(host) = parsed.host() {
+        if is_private_host(&host) {
+            return Err(WorkerError::invalid_config(format!(
+                "URL host '{}' is a private/internal address (SSRF protection)",
+                host
+            )));
+        }
+    }
+
     Ok(())
+}
+
+/// Check if a URL host is a private/internal address
+///
+/// # Security
+///
+/// Prevents SSRF attacks by blocking:
+/// - localhost (127.0.0.0/8)
+/// - Private IPv4 ranges (10.x, 172.16.x, 192.168.x)
+/// - AWS metadata endpoint (169.254.169.254)
+/// - IPv6 private ranges
+fn is_private_host(host: &url::Host<&str>) -> bool {
+    match host {
+        url::Host::Ipv4(ipv4) => {
+            ipv4.is_loopback()           // 127.0.0.0/8
+                || ipv4.is_private()     // 10.x, 172.16.x, 192.168.x
+                || ipv4.is_link_local()  // 169.254.x.x (AWS metadata!)
+                || ipv4.is_broadcast()   // 255.255.255.255
+                || ipv4.is_unspecified() // 0.0.0.0
+        }
+        url::Host::Ipv6(ipv6) => {
+            ipv6.is_loopback()       // ::1
+                || ipv6.is_unspecified() // ::
+                // Check for IPv4-mapped IPv6 addresses
+                || ipv6.to_ipv4_mapped().map(|v4| {
+                    v4.is_loopback() || v4.is_private() || v4.is_link_local()
+                }).unwrap_or(false)
+        }
+        url::Host::Domain(domain) => {
+            let lower = domain.to_lowercase();
+            lower == "localhost"
+                || lower == "localhost.localdomain"
+                || lower.ends_with(".localhost")
+                || lower.ends_with(".local")
+        }
+    }
+}
+
+/// Check if a host string is a private/internal IP address (for testing)
+#[cfg(test)]
+fn is_private_ip(host: &str) -> bool {
+    use std::net::IpAddr;
+
+    // Try to parse as IP address
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return match ip {
+            IpAddr::V4(ipv4) => {
+                ipv4.is_loopback()           // 127.0.0.0/8
+                    || ipv4.is_private()     // 10.x, 172.16.x, 192.168.x
+                    || ipv4.is_link_local()  // 169.254.x.x (AWS metadata!)
+                    || ipv4.is_broadcast()   // 255.255.255.255
+                    || ipv4.is_unspecified() // 0.0.0.0
+            }
+            IpAddr::V6(ipv6) => {
+                ipv6.is_loopback()       // ::1
+                    || ipv6.is_unspecified() // ::
+                    // Check for IPv4-mapped IPv6 addresses
+                    || ipv6.to_ipv4_mapped().map(|v4| {
+                        v4.is_loopback() || v4.is_private() || v4.is_link_local()
+                    }).unwrap_or(false)
+            }
+        };
+    }
+
+    // Check for localhost hostnames
+    let lower = host.to_lowercase();
+    lower == "localhost"
+        || lower == "localhost.localdomain"
+        || lower.ends_with(".localhost")
+        || lower.ends_with(".local")
 }
 
 /// Validate HTTP method
@@ -577,8 +657,8 @@ mod tests {
     #[test]
     fn test_validate_url_valid() {
         assert!(validate_url("https://example.com").is_ok());
-        assert!(validate_url("http://localhost:8080/webhook").is_ok());
         assert!(validate_url("https://api.example.com/path?query=value").is_ok());
+        assert!(validate_url("https://8.8.8.8/dns").is_ok());
     }
 
     #[test]
@@ -587,6 +667,67 @@ mod tests {
         assert!(validate_url("not-a-url").is_err());
         assert!(validate_url("ftp://invalid.com").is_err());
         assert!(validate_url(&"a".repeat(3000)).is_err());
+    }
+
+    #[test]
+    fn test_validate_url_blocks_ssrf() {
+        // localhost IPv4
+        assert!(validate_url("http://127.0.0.1/path").is_err());
+        assert!(validate_url("http://127.0.0.255/path").is_err());
+
+        // localhost hostname
+        assert!(validate_url("http://localhost/path").is_err());
+        assert!(validate_url("https://localhost:8080").is_err());
+        assert!(validate_url("http://localhost.localdomain/path").is_err());
+        assert!(validate_url("http://test.localhost/path").is_err());
+        assert!(validate_url("http://myapp.local/path").is_err());
+
+        // Private IPv4 Class A (10.x.x.x)
+        assert!(validate_url("http://10.0.0.1/internal").is_err());
+        assert!(validate_url("http://10.255.255.255/internal").is_err());
+
+        // Private IPv4 Class B (172.16.x.x - 172.31.x.x)
+        assert!(validate_url("http://172.16.0.1/internal").is_err());
+        assert!(validate_url("http://172.31.255.255/internal").is_err());
+
+        // Private IPv4 Class C (192.168.x.x)
+        assert!(validate_url("http://192.168.1.1/internal").is_err());
+        assert!(validate_url("http://192.168.255.255/internal").is_err());
+
+        // AWS metadata endpoint (CRITICAL!)
+        assert!(validate_url("http://169.254.169.254/latest/meta-data/").is_err());
+        assert!(validate_url("http://169.254.169.254/latest/user-data/").is_err());
+
+        // IPv6 localhost
+        assert!(validate_url("http://[::1]/path").is_err());
+
+        // Unspecified addresses
+        assert!(validate_url("http://0.0.0.0/path").is_err());
+    }
+
+    #[test]
+    fn test_is_private_ip() {
+        // IPv4 private ranges
+        assert!(is_private_ip("127.0.0.1"));
+        assert!(is_private_ip("10.0.0.1"));
+        assert!(is_private_ip("172.16.0.1"));
+        assert!(is_private_ip("192.168.1.1"));
+        assert!(is_private_ip("169.254.169.254")); // AWS metadata
+
+        // IPv6
+        assert!(is_private_ip("::1"));
+
+        // Hostnames
+        assert!(is_private_ip("localhost"));
+        assert!(is_private_ip("LOCALHOST")); // case insensitive
+        assert!(is_private_ip("test.localhost"));
+        assert!(is_private_ip("app.local"));
+
+        // Public IPs should NOT be private
+        assert!(!is_private_ip("8.8.8.8"));
+        assert!(!is_private_ip("1.1.1.1"));
+        assert!(!is_private_ip("example.com"));
+        assert!(!is_private_ip("api.stripe.com"));
     }
 
     #[test]
