@@ -653,32 +653,12 @@ pub async fn handle_stripe_webhook(
                 "Processing checkout completed"
             );
 
-            // SECURITY: Check if this session was already processed (idempotency)
-            match TransactionRepository::exists_by_reference_id(&pool, &session_id).await {
-                Ok(true) => {
-                    info!(
-                        session_id = %session_id,
-                        "Webhook already processed, skipping (idempotency check)"
-                    );
-                    return HttpResponse::Ok().json(serde_json::json!({
-                        "received": true,
-                        "status": "duplicate"
-                    }));
-                }
-                Ok(false) => {} // Continue processing
-                Err(e) => {
-                    warn!("Failed to check transaction existence: {}", e);
-                    return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                        "internal_error",
-                        "Failed to verify webhook idempotency",
-                    ));
-                }
-            }
-
             // Convert cents to micro-USDC
             let micro_usdc = StripeService::cents_to_micro_usdc(amount_paid);
 
-            // Add credits in a transaction
+            // SECURITY: Use atomic transaction with idempotency guarantee
+            // This prevents race conditions where two concurrent webhook requests
+            // could both pass an EXISTS check before either records the transaction
             let mut tx = match pool.begin().await {
                 Ok(t) => t,
                 Err(e) => {
@@ -688,7 +668,7 @@ pub async fn handle_stripe_webhook(
                 }
             };
 
-            // Add credits
+            // Add credits first (will be rolled back if transaction insert fails)
             let new_balance =
                 match CreditRepository::add_credits(&mut *tx, &organization_id, micro_usdc).await {
                     Ok(b) => b,
@@ -701,8 +681,9 @@ pub async fn handle_stripe_webhook(
                     }
                 };
 
-            // Record transaction
-            if let Err(e) = TransactionRepository::create(
+            // SECURITY: Atomic idempotency check using INSERT ... ON CONFLICT DO NOTHING
+            // This prevents the TOCTOU race condition in webhook replay attacks
+            let tx_result = match TransactionRepository::create_idempotent(
                 &mut *tx,
                 crate::repositories::billing::CreateTransactionParams {
                     organization_id: &organization_id,
@@ -716,14 +697,30 @@ pub async fn handle_stripe_webhook(
             )
             .await
             {
-                warn!("Failed to record transaction: {}", e);
-                return HttpResponse::InternalServerError().json(ErrorResponse::new(
-                    "internal_error",
-                    "Failed to record transaction",
-                ));
-            }
+                Ok(Some(created_tx)) => created_tx,
+                Ok(None) => {
+                    // Transaction already exists - this is a duplicate webhook
+                    // Rollback the credit addition (it was a duplicate)
+                    info!(
+                        session_id = %session_id,
+                        "Webhook already processed, rolling back (atomic idempotency)"
+                    );
+                    // tx is automatically rolled back when dropped
+                    return HttpResponse::Ok().json(serde_json::json!({
+                        "received": true,
+                        "status": "duplicate"
+                    }));
+                }
+                Err(e) => {
+                    warn!("Failed to record transaction: {}", e);
+                    return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                        "internal_error",
+                        "Failed to record transaction",
+                    ));
+                }
+            };
 
-            // Commit transaction
+            // Commit transaction - credits and transaction record are now persisted atomically
             if let Err(e) = tx.commit().await {
                 warn!("Failed to commit transaction: {}", e);
                 return HttpResponse::InternalServerError().json(ErrorResponse::new(
@@ -736,7 +733,8 @@ pub async fn handle_stripe_webhook(
                 organization_id = %organization_id,
                 amount = micro_usdc,
                 new_balance = new_balance,
-                "Credits added successfully"
+                transaction_id = %tx_result.id,
+                "Credits added successfully (atomic)"
             );
         }
 

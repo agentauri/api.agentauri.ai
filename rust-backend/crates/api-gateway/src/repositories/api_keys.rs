@@ -137,6 +137,23 @@ impl ApiKeyRepository {
         Ok(key)
     }
 
+    /// Find API key by ID with row lock for atomic operations
+    ///
+    /// SECURITY: Uses SELECT FOR UPDATE to prevent race conditions in
+    /// rotation and revocation operations. Must be called within a transaction.
+    pub async fn find_by_id_for_update<'e, E>(executor: E, key_id: &str) -> Result<Option<ApiKey>>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let key = sqlx::query_as::<_, ApiKey>(r#"SELECT * FROM api_keys WHERE id = $1 FOR UPDATE"#)
+            .bind(key_id)
+            .fetch_optional(executor)
+            .await
+            .context("Failed to find API key by ID with lock")?;
+
+        Ok(key)
+    }
+
     /// List API keys for an organization with pagination
     ///
     /// By default only returns active (non-revoked) keys.

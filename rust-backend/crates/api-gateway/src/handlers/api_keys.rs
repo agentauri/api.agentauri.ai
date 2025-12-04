@@ -514,9 +514,17 @@ pub async fn rotate_api_key(
         }
     }
 
-    // Get the old key
+    // SECURITY: Start transaction FIRST, then use SELECT FOR UPDATE
+    // This prevents TOCTOU race condition where two concurrent requests
+    // could both pass the "is revoked" check before either completes
+    let mut tx = match handle_db_error(pool.begin().await, "start transaction") {
+        Ok(tx) => tx,
+        Err(resp) => return resp,
+    };
+
+    // Get the old key WITH ROW LOCK to prevent concurrent modifications
     let old_key = match handle_db_error(
-        ApiKeyRepository::find_by_id(&pool, &old_key_id).await,
+        ApiKeyRepository::find_by_id_for_update(&mut *tx, &old_key_id).await,
         "fetch API key",
     ) {
         Ok(Some(k)) => k,
@@ -524,7 +532,7 @@ pub async fn rotate_api_key(
         Err(resp) => return resp,
     };
 
-    // Check if already revoked
+    // Check if already revoked (now safe - we have an exclusive lock)
     if old_key.revoked_at.is_some() {
         return bad_request("Cannot rotate a revoked API key");
     }
@@ -570,13 +578,7 @@ pub async fn rotate_api_key(
         None => old_key.expires_at,
     };
 
-    // Use a transaction for atomicity
-    let mut tx = match handle_db_error(pool.begin().await, "start transaction") {
-        Ok(tx) => tx,
-        Err(resp) => return resp,
-    };
-
-    // Revoke old key
+    // Revoke old key (within the same transaction that holds the lock)
     if let Err(resp) = handle_db_error(
         ApiKeyRepository::revoke_with_executor(&mut *tx, &old_key_id, &user_id, Some("rotated"))
             .await,

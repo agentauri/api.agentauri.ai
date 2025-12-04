@@ -205,6 +205,10 @@ pub struct TransactionRepository;
 
 impl TransactionRepository {
     /// Check if a transaction with the given reference_id already exists (for idempotency)
+    ///
+    /// NOTE: This is a non-atomic check. For atomic idempotency in webhooks,
+    /// use `create_idempotent()` instead which uses INSERT ... ON CONFLICT.
+    #[allow(dead_code)] // Kept for non-critical idempotency checks
     pub async fn exists_by_reference_id(pool: &DbPool, reference_id: &str) -> Result<bool> {
         let result = sqlx::query_scalar::<_, bool>(
             r#"
@@ -222,7 +226,53 @@ impl TransactionRepository {
         Ok(result)
     }
 
+    /// Atomically create a transaction with idempotency guarantee
+    ///
+    /// Uses INSERT ... ON CONFLICT DO NOTHING to prevent race conditions.
+    /// Returns Ok(Some(transaction)) if created, Ok(None) if already exists (duplicate).
+    ///
+    /// SECURITY: This prevents Stripe webhook replay attacks by ensuring
+    /// the same reference_id can only be processed once, even under concurrent requests.
+    pub async fn create_idempotent<'e, E>(
+        executor: E,
+        params: CreateTransactionParams<'_>,
+    ) -> Result<Option<CreditTransaction>>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        // Use INSERT ... ON CONFLICT DO NOTHING for atomic idempotency
+        // The UNIQUE index on (reference_id) WHERE reference_id IS NOT NULL AND transaction_type = 'purchase'
+        // ensures this works for purchase transactions
+        let tx = sqlx::query_as::<_, CreditTransaction>(
+            r#"
+            INSERT INTO credit_transactions (
+                organization_id, amount, transaction_type,
+                description, reference_id, balance_after, metadata, created_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            ON CONFLICT (reference_id) WHERE reference_id IS NOT NULL AND transaction_type = 'purchase'
+            DO NOTHING
+            RETURNING *
+            "#,
+        )
+        .bind(params.organization_id)
+        .bind(params.amount)
+        .bind(params.transaction_type)
+        .bind(params.description)
+        .bind(params.reference_id)
+        .bind(params.balance_after)
+        .bind(params.metadata)
+        .fetch_optional(executor)
+        .await
+        .context("Failed to create idempotent transaction")?;
+
+        Ok(tx)
+    }
+
     /// Record a credit transaction
+    ///
+    /// NOTE: For webhook handlers, prefer `create_idempotent()` which prevents race conditions.
+    #[allow(dead_code)] // Kept for internal/admin transaction creation
     pub async fn create<'e, E>(
         executor: E,
         params: CreateTransactionParams<'_>,

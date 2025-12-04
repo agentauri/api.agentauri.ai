@@ -9,16 +9,16 @@ global:
     cluster: 'agentauri-dev'
     environment: 'development'
 
-# Alertmanager configuration (optional, for production)
+# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
-          # - alertmanager:9093
+        - targets:
+            - alertmanager:9093
 
 # Load rules once and periodically evaluate them
 rule_files:
-  # - "rules/*.yml"
+  - "alerts/*.yml"
 
 # Scrape configurations
 scrape_configs:
@@ -37,14 +37,20 @@ scrape_configs:
   #   static_configs:
   #     - targets: ['redis-exporter:9121']
 
-  # API Gateway metrics (when implemented)
-  # - job_name: 'api-gateway'
-  #   static_configs:
-  #     - targets: ['api-gateway:8000']
-  #   metrics_path: '/metrics'
+  # API Gateway metrics
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: '/metrics'
 
   # Event Processor metrics (when implemented)
   # - job_name: 'event-processor'
   #   static_configs:
   #     - targets: ['event-processor:8001']
+  #   metrics_path: '/metrics'
+
+  # Action Workers metrics (when implemented)
+  # - job_name: 'action-workers'
+  #   static_configs:
+  #     - targets: ['action-workers:8002']
   #   metrics_path: '/metrics'

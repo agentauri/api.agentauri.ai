@@ -311,8 +311,18 @@ pub async fn login(
             // Account is not locked, proceed
         }
         Err(e) => {
-            // Log error but don't block login (fail open for better availability)
-            tracing::error!("Failed to check account lockout: {}", e);
+            // SECURITY: Fail closed - deny login when lockout check fails
+            // This prevents brute-force attacks from bypassing lockout protection
+            // during database issues
+            tracing::error!(
+                user_id = %user.id,
+                error = %e,
+                "Failed to check account lockout - denying login for security"
+            );
+            return HttpResponse::ServiceUnavailable().json(ErrorResponse::new(
+                "service_unavailable",
+                "Unable to verify account status. Please try again later.",
+            ));
         }
     }
 

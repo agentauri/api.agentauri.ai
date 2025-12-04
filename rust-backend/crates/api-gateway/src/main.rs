@@ -20,6 +20,7 @@ mod validators;
 
 use background_tasks::BackgroundTaskRunner;
 use middleware::auth_extractor::AuthExtractor;
+use middleware::metrics::{init_metrics, metrics_handler, PrometheusMetrics};
 use middleware::query_tier::QueryTierExtractor;
 use middleware::request_id::RequestId;
 use middleware::security_headers::SecurityHeaders;
@@ -118,6 +119,10 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| "shadow".to_string())
     );
 
+    // Initialize Prometheus metrics recorder (must be done before any metrics are recorded)
+    let _prometheus_handle = init_metrics();
+    tracing::info!("Prometheus metrics initialized (endpoint: /metrics)");
+
     // Start background tasks (nonce cleanup, payment nonce cleanup, auth failures cleanup)
     let bg_runner = BackgroundTaskRunner::new(db_pool.clone());
     let shutdown_token = bg_runner.start();
@@ -131,6 +136,8 @@ async fn main() -> anyhow::Result<()> {
     // Start HTTP server
     let server = HttpServer::new(move || {
         App::new()
+            // Add Prometheus metrics middleware (should be early to capture all requests)
+            .wrap(PrometheusMetrics::new())
             // Add request ID middleware (must be first for tracing)
             .wrap(RequestId::new())
             // Add security headers middleware
@@ -155,6 +162,8 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(wallet_service.clone()))
             // Store SocialAuthService in app state (shared across all requests)
             .app_data(web::Data::new(social_auth_service.clone()))
+            // Prometheus metrics endpoint (for scraping)
+            .route("/metrics", web::get().to(metrics_handler))
             // Configure routes
             .configure(routes::configure)
             // OpenAPI documentation endpoints

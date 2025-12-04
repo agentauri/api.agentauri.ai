@@ -57,4 +57,6 @@ vaultrs = { version = "0.7", optional = true }
 # Secrets management backends
 aws-secrets = ["aws-config", "aws-sdk-secretsmanager"]
 vault-secrets = ["vaultrs"]
-default = []
+# Enable aws-secrets by default for production deployments
+# In development, use SECRETS_BACKEND=env to skip AWS calls
+default = ["aws-secrets"]

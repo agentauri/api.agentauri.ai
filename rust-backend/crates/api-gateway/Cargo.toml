@@ -94,6 +94,10 @@ redis = { workspace = true }
 utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 
+# Metrics and observability
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+
 [dev-dependencies]
 mockall = { workspace = true }
 actix-rt = { workspace = true }

@@ -47,6 +47,7 @@
 pub mod auth_extractor;
 pub mod cors;
 pub mod ip_extractor;
+pub mod metrics;
 pub mod query_tier;
 pub mod request_id;
 pub mod security_headers;
@@ -159,8 +160,10 @@ where
                 None => return Err(ErrorUnauthorized("Missing authorization header")),
             };
 
-            // Validate JWT token
+            // Validate JWT token with explicit algorithm restriction
+            // SECURITY: Explicitly set allowed algorithms to prevent algorithm confusion attacks
             let mut validation = Validation::new(Algorithm::HS256);
+            validation.algorithms = vec![Algorithm::HS256]; // Only allow HS256, reject 'none' and others
             validation.validate_exp = true; // Explicitly enable expiration validation
             validation.leeway = 60; // 60 seconds clock skew tolerance
 
@@ -520,8 +523,10 @@ where
                 None => return Err(ErrorUnauthorized("Missing authorization header")),
             };
 
-            // Validate JWT token
+            // Validate JWT token with explicit algorithm restriction
+            // SECURITY: Explicitly set allowed algorithms to prevent algorithm confusion attacks
             let mut validation = Validation::new(Algorithm::HS256);
+            validation.algorithms = vec![Algorithm::HS256]; // Only allow HS256, reject 'none' and others
             validation.validate_exp = true;
             validation.leeway = 60;
 
@@ -578,7 +583,7 @@ async fn validate_api_key(
             tracing::warn!(ip = ip, "API key auth rate limited: {}", e.message);
 
             // Log to auth_failures table (no org context for rate limits)
-            let _ = AuthFailureRepository::log(
+            if let Err(log_err) = AuthFailureRepository::log(
                 pool,
                 "rate_limited",
                 None,
@@ -587,7 +592,15 @@ async fn validate_api_key(
                 endpoint,
                 Some(serde_json::json!({"message": e.message})),
             )
-            .await;
+            .await
+            {
+                // SECURITY: Log audit failure but don't expose to client
+                tracing::error!(
+                    error = %log_err,
+                    ip = ?ip_address,
+                    "CRITICAL: Failed to log rate limit event to audit trail"
+                );
+            }
 
             return Err(e.message);
         }
@@ -598,7 +611,7 @@ async fn validate_api_key(
     // Validate key format
     if !ApiKeyService::is_valid_format(key) {
         // Log to auth_failures table
-        let _ = AuthFailureRepository::log(
+        if let Err(log_err) = AuthFailureRepository::log(
             pool,
             "invalid_format",
             key.chars().take(16).collect::<String>().as_str().into(),
@@ -607,7 +620,14 @@ async fn validate_api_key(
             endpoint,
             Some(serde_json::json!({"key_length": key.len()})),
         )
-        .await;
+        .await
+        {
+            tracing::error!(
+                error = %log_err,
+                ip = ?ip_address,
+                "CRITICAL: Failed to log invalid format event to audit trail"
+            );
+        }
 
         return Err("Invalid API key format".to_string());
     }
@@ -627,7 +647,7 @@ async fn validate_api_key(
             // Now safe to log (timing attack already mitigated)
             // Note: This is async and adds latency, but that's acceptable since
             // we've already maintained constant-time behavior above
-            let _ = AuthFailureRepository::log(
+            if let Err(log_err) = AuthFailureRepository::log(
                 pool,
                 "prefix_not_found",
                 Some(&prefix),
@@ -636,7 +656,15 @@ async fn validate_api_key(
                 endpoint,
                 None,
             )
-            .await;
+            .await
+            {
+                tracing::error!(
+                    error = %log_err,
+                    prefix = %prefix,
+                    ip = ?ip_address,
+                    "CRITICAL: Failed to log prefix not found event to audit trail"
+                );
+            }
 
             tracing::warn!("API key not found for prefix: {}", prefix);
             return Err("Invalid API key".to_string());
@@ -657,7 +685,7 @@ async fn validate_api_key(
 
     if !valid {
         // Log failed auth attempt
-        let _ = ApiKeyAuditRepository::log(
+        if let Err(log_err) = ApiKeyAuditRepository::log(
             pool,
             Some(&api_key.id),
             &api_key.organization_id,
@@ -668,7 +696,15 @@ async fn validate_api_key(
             None,
             Some(serde_json::json!({"reason": "invalid_key"})),
         )
-        .await;
+        .await
+        {
+            tracing::error!(
+                error = %log_err,
+                api_key_id = %api_key.id,
+                org_id = %api_key.organization_id,
+                "CRITICAL: Failed to log auth failure to audit trail"
+            );
+        }
 
         return Err("Invalid API key".to_string());
     }
@@ -682,7 +718,7 @@ async fn validate_api_key(
         };
 
         // Log failed auth attempt
-        let _ = ApiKeyAuditRepository::log(
+        if let Err(log_err) = ApiKeyAuditRepository::log(
             pool,
             Some(&api_key.id),
             &api_key.organization_id,
@@ -693,7 +729,16 @@ async fn validate_api_key(
             None,
             Some(serde_json::json!({"reason": reason})),
         )
-        .await;
+        .await
+        {
+            tracing::error!(
+                error = %log_err,
+                api_key_id = %api_key.id,
+                org_id = %api_key.organization_id,
+                reason = %reason,
+                "CRITICAL: Failed to log key revoked/expired to audit trail"
+            );
+        }
 
         return Err(format!("API key is {}", reason.replace('_', " ")));
     }
@@ -703,7 +748,7 @@ async fn validate_api_key(
         .unwrap_or_else(|_| vec!["read".to_string()]);
 
     // Log successful auth
-    let _ = ApiKeyAuditRepository::log(
+    if let Err(log_err) = ApiKeyAuditRepository::log(
         pool,
         Some(&api_key.id),
         &api_key.organization_id,
@@ -714,14 +759,30 @@ async fn validate_api_key(
         None,
         None,
     )
-    .await;
+    .await
+    {
+        tracing::error!(
+            error = %log_err,
+            api_key_id = %api_key.id,
+            org_id = %api_key.organization_id,
+            "CRITICAL: Failed to log successful auth to audit trail"
+        );
+    }
 
-    // Update last used timestamp (fire and forget)
+    // Update last used timestamp (fire and forget with error logging)
     let pool_clone = pool.clone();
     let key_id = api_key.id.clone();
     let ip = ip_address.map(|s| s.to_string());
     tokio::spawn(async move {
-        let _ = ApiKeyRepository::update_last_used(&pool_clone, &key_id, ip.as_deref()).await;
+        if let Err(e) =
+            ApiKeyRepository::update_last_used(&pool_clone, &key_id, ip.as_deref()).await
+        {
+            tracing::warn!(
+                error = %e,
+                api_key_id = %key_id,
+                "Failed to update API key last_used timestamp"
+            );
+        }
     });
 
     Ok(ApiKeyAuth {

@@ -116,9 +116,17 @@ pub async fn create_organization(
                 || error_string.contains("unique constraint")
                 || error_string.contains("organizations_slug_key")
             {
-                return HttpResponse::Conflict().json(ErrorResponse::new(
-                    "conflict",
-                    "Organization slug already exists",
+                // SECURITY: Return a generic error to prevent slug enumeration attacks
+                // An attacker could probe for existing organization slugs to gather
+                // business intelligence about competitors or targets
+                tracing::info!(
+                    slug = %req.slug,
+                    user_id = %user_id,
+                    "Organization creation failed - slug conflict"
+                );
+                return HttpResponse::BadRequest().json(ErrorResponse::new(
+                    "invalid_slug",
+                    "Unable to create organization with this slug. Please choose a different slug.",
                 ));
             }
             tracing::error!("Failed to create organization: {}", e);
