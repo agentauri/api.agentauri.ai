@@ -121,8 +121,9 @@ oauth2 = "4.4"
 urlencoding = "2.1"
 
 # OpenAPI documentation
+# NOTE: vendored feature embeds Swagger UI assets in the binary for both debug and release builds
 utoipa = { version = "5", features = ["actix_extras", "chrono", "uuid"] }
-utoipa-swagger-ui = { version = "8", features = ["actix-web"] }
+utoipa-swagger-ui = { version = "8", features = ["actix-web", "vendored"] }
 
 # System utilities
 hostname = "0.4"

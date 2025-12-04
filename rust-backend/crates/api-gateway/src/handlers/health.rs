@@ -1,9 +1,11 @@
-//! Health check endpoint
+//! Health check and service endpoints
 
 use actix_web::{web, HttpResponse, Responder};
 use serde::Serialize;
 use shared::DbPool;
-use utoipa::ToSchema;
+use utoipa::{OpenApi, ToSchema};
+
+use crate::openapi::ApiDoc;
 
 /// Health check response
 #[derive(Debug, Serialize, ToSchema)]
@@ -48,6 +50,26 @@ pub async fn health_check(pool: web::Data<DbPool>) -> impl Responder {
     } else {
         HttpResponse::ServiceUnavailable().json(response)
     }
+}
+
+/// OpenAPI JSON endpoint
+///
+/// Returns the OpenAPI 3.0 specification for the API.
+/// This endpoint is public and does not require authentication.
+#[utoipa::path(
+    get,
+    path = "/api/v1/openapi.json",
+    tag = "Discovery",
+    responses(
+        (status = 200, description = "OpenAPI specification", content_type = "application/json")
+    )
+)]
+pub async fn openapi_json() -> impl Responder {
+    HttpResponse::Ok().content_type("application/json").body(
+        ApiDoc::openapi()
+            .to_json()
+            .unwrap_or_else(|_| "{}".to_string()),
+    )
 }
 
 #[cfg(test)]

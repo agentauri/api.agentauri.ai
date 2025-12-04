@@ -8,24 +8,16 @@ use shared::{db, secrets, Config, RateLimiter};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-mod background_tasks;
-mod handlers;
-mod middleware;
-mod models;
-mod openapi;
-mod repositories;
-mod routes;
-mod services;
-mod validators;
-
-use background_tasks::BackgroundTaskRunner;
-use middleware::auth_extractor::AuthExtractor;
-use middleware::metrics::{init_metrics, metrics_handler, PrometheusMetrics};
-use middleware::query_tier::QueryTierExtractor;
-use middleware::request_id::RequestId;
-use middleware::security_headers::SecurityHeaders;
-use middleware::unified_rate_limiter::UnifiedRateLimiter;
-use services::{SocialAuthService, WalletService};
+use api_gateway::background_tasks::BackgroundTaskRunner;
+use api_gateway::middleware::auth_extractor::AuthExtractor;
+use api_gateway::middleware::metrics::{init_metrics, metrics_handler, PrometheusMetrics};
+use api_gateway::middleware::query_tier::QueryTierExtractor;
+use api_gateway::middleware::request_id::RequestId;
+use api_gateway::middleware::security_headers::SecurityHeaders;
+use api_gateway::middleware::unified_rate_limiter::UnifiedRateLimiter;
+use api_gateway::openapi::ApiDoc;
+use api_gateway::services::{SocialAuthService, WalletService};
+use api_gateway::{middleware, routes};
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -168,8 +160,7 @@ async fn main() -> anyhow::Result<()> {
             .configure(routes::configure)
             // OpenAPI documentation endpoints
             .service(
-                SwaggerUi::new("/api-docs/{_:.*}")
-                    .url("/api/v1/openapi.json", openapi::ApiDoc::openapi()),
+                SwaggerUi::new("/api-docs/{_:.*}").url("/api/v1/openapi.json", ApiDoc::openapi()),
             )
     })
     .bind(&server_addr)

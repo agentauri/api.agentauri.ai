@@ -53,6 +53,7 @@ use crate::models;
         // Health
         handlers::health_check,
         // Discovery
+        handlers::openapi_json,
         handlers::get_agent_card,
         handlers::get_security_txt,
         // Authentication
