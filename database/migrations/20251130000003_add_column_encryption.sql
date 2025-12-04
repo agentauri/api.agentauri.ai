@@ -118,30 +118,34 @@ ON CONFLICT (key_name) DO NOTHING;
 -- ============================================================================
 -- Tracks when encrypted data is accessed (for compliance)
 
+-- Note: Using accessed_at as part of composite key for TimescaleDB hypertable compatibility
+-- TimescaleDB requires partitioning column in unique indexes
 CREATE TABLE IF NOT EXISTS encrypted_data_access_log (
-  id BIGSERIAL PRIMARY KEY,
+  id BIGSERIAL NOT NULL,
   table_name TEXT NOT NULL,
   column_name TEXT NOT NULL,
   row_id TEXT NOT NULL,                    -- ID of accessed row
   accessed_by TEXT NOT NULL,               -- User who accessed data
   access_type TEXT NOT NULL,               -- 'read', 'write', 'delete'
-  accessed_at TIMESTAMPTZ DEFAULT NOW(),
+  accessed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   client_ip INET,
 
   CONSTRAINT chk_access_type CHECK (access_type IN ('read', 'write', 'delete'))
 );
 
-CREATE INDEX idx_encrypted_access_table_row ON encrypted_data_access_log(table_name, row_id);
-CREATE INDEX idx_encrypted_access_user ON encrypted_data_access_log(accessed_by);
-CREATE INDEX idx_encrypted_access_time ON encrypted_data_access_log(accessed_at);
-
--- Convert to hypertable for time-series optimization
+-- Convert to hypertable BEFORE creating indexes
+-- This allows TimescaleDB to manage indexes properly
 SELECT create_hypertable(
   'encrypted_data_access_log',
   'accessed_at',
   chunk_time_interval => INTERVAL '7 days',
   if_not_exists => TRUE
 );
+
+-- Create indexes after hypertable conversion
+CREATE INDEX idx_encrypted_access_table_row ON encrypted_data_access_log(table_name, row_id, accessed_at);
+CREATE INDEX idx_encrypted_access_user ON encrypted_data_access_log(accessed_by, accessed_at);
+CREATE INDEX idx_encrypted_access_time ON encrypted_data_access_log(accessed_at DESC);
 
 COMMENT ON TABLE encrypted_data_access_log IS
 'Audit log for access to encrypted data (GDPR/HIPAA compliance)';

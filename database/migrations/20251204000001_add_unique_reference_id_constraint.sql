@@ -6,7 +6,9 @@
 -- Add unique partial index on reference_id for purchases only
 -- This ensures atomic idempotency for Stripe webhooks
 -- Only applies to non-NULL reference_ids (partial index)
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_credit_transactions_reference_unique
+-- Note: Removed CONCURRENTLY for SQLx migration compatibility (runs in transaction)
+-- For production, consider running this index creation outside a transaction
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_transactions_reference_unique
 ON credit_transactions(reference_id)
 WHERE reference_id IS NOT NULL AND transaction_type = 'purchase';
 
