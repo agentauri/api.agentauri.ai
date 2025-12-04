@@ -541,6 +541,61 @@ async fn create_new_user(
     generate_jwt_and_redirect(config, social_auth, user, redirect_after)
 }
 
+/// Validate redirect path to prevent open redirect attacks
+///
+/// This function blocks various open redirect attack vectors:
+/// - Protocol-relative URLs (`//evil.com`)
+/// - Backslash escape attacks (`/\evil.com`)
+/// - Absolute URLs in path (`https://evil.com`)
+/// - URL-encoded bypass attempts (`%2f%2fevil.com`)
+///
+/// # Arguments
+/// * `path` - The redirect path to validate
+///
+/// # Returns
+/// * `Ok(String)` - The validated path (or "/" for empty paths)
+/// * `Err(&'static str)` - Error message describing the validation failure
+fn validate_redirect_path(path: &str) -> Result<String, &'static str> {
+    // Empty or whitespace → use default "/"
+    let path = path.trim();
+    if path.is_empty() {
+        return Ok("/".to_string());
+    }
+
+    // Must start with single /
+    if !path.starts_with('/') {
+        return Err("Redirect path must start with /");
+    }
+
+    // Block protocol-relative URLs (//evil.com)
+    if path.starts_with("//") {
+        return Err("Protocol-relative URLs not allowed");
+    }
+
+    // Block backslash escape (/\evil.com)
+    if path.contains("/\\") || path.contains("\\") {
+        return Err("Backslash in path not allowed");
+    }
+
+    // Block absolute URLs in path
+    if path.contains("://") {
+        return Err("Absolute URLs not allowed in path");
+    }
+
+    // URL decode and revalidate (catch %2f%2f, %3a%2f%2f, %5c bypass attempts)
+    if let Ok(decoded) = urlencoding::decode(path) {
+        let decoded_str = decoded.as_ref();
+        if decoded_str.starts_with("//")
+            || decoded_str.contains("://")
+            || decoded_str.contains("\\")
+        {
+            return Err("Encoded redirect bypass detected");
+        }
+    }
+
+    Ok(path.to_string())
+}
+
 /// Generate JWT token and redirect to frontend
 fn generate_jwt_and_redirect(
     config: web::Data<Config>,
@@ -562,19 +617,22 @@ fn generate_jwt_and_redirect(
         }
     };
 
-    // Build redirect URL
+    // Validate and sanitize redirect path to prevent open redirect attacks
+    let redirect_path = match redirect_after {
+        Some(ref path) => validate_redirect_path(path).unwrap_or_else(|e| {
+            tracing::warn!(
+                path = %path,
+                error = %e,
+                "Invalid redirect path detected, using default"
+            );
+            "/".to_string()
+        }),
+        None => "/".to_string(),
+    };
+
+    // Build redirect URL with validated path
     let frontend_url = social_auth.frontend_url();
-    let redirect_path = redirect_after.unwrap_or_else(|| "/".to_string());
-    let redirect_url = format!(
-        "{}{}?token={}",
-        frontend_url,
-        if redirect_path.starts_with('/') {
-            redirect_path
-        } else {
-            format!("/{}", redirect_path)
-        },
-        token
-    );
+    let redirect_url = format!("{}{}?token={}", frontend_url, redirect_path, token);
 
     HttpResponse::Found()
         .insert_header((header::LOCATION, redirect_url))
@@ -773,5 +831,83 @@ mod tests {
         // Ensure internal details are NOT leaked
         assert!(!msg.contains("database"));
         assert!(!msg.contains("connection"));
+    }
+
+    // ==================== Open Redirect Validation Tests ====================
+
+    #[test]
+    fn test_validate_redirect_path_valid_paths() {
+        // Valid paths should pass
+        assert_eq!(validate_redirect_path("/").unwrap(), "/");
+        assert_eq!(validate_redirect_path("/dashboard").unwrap(), "/dashboard");
+        assert_eq!(
+            validate_redirect_path("/api/v1/triggers").unwrap(),
+            "/api/v1/triggers"
+        );
+        assert_eq!(
+            validate_redirect_path("/path?query=value").unwrap(),
+            "/path?query=value"
+        );
+        assert_eq!(
+            validate_redirect_path("/path#fragment").unwrap(),
+            "/path#fragment"
+        );
+    }
+
+    #[test]
+    fn test_validate_redirect_path_empty_returns_default() {
+        assert_eq!(validate_redirect_path("").unwrap(), "/");
+        assert_eq!(validate_redirect_path("  ").unwrap(), "/");
+        assert_eq!(validate_redirect_path("\t\n").unwrap(), "/");
+    }
+
+    #[test]
+    fn test_validate_redirect_path_blocks_protocol_relative() {
+        // Protocol-relative URLs (//evil.com) should be blocked
+        assert!(validate_redirect_path("//evil.com").is_err());
+        assert!(validate_redirect_path("//evil.com/path").is_err());
+        assert!(validate_redirect_path("//localhost").is_err());
+    }
+
+    #[test]
+    fn test_validate_redirect_path_blocks_no_leading_slash() {
+        // Paths without leading / should be blocked
+        assert!(validate_redirect_path("evil.com").is_err());
+        assert!(validate_redirect_path("dashboard").is_err());
+        assert!(validate_redirect_path("https://evil.com").is_err());
+    }
+
+    #[test]
+    fn test_validate_redirect_path_blocks_backslash_escape() {
+        // Backslash attacks should be blocked
+        assert!(validate_redirect_path("/\\evil.com").is_err());
+        assert!(validate_redirect_path("/path\\evil.com").is_err());
+        assert!(validate_redirect_path("\\evil.com").is_err());
+    }
+
+    #[test]
+    fn test_validate_redirect_path_blocks_absolute_url_in_path() {
+        // Absolute URLs in path should be blocked
+        assert!(validate_redirect_path("/https://evil.com").is_err());
+        assert!(validate_redirect_path("/path?url=https://evil.com").is_err());
+        assert!(validate_redirect_path("/javascript://alert(1)").is_err());
+    }
+
+    #[test]
+    fn test_validate_redirect_path_blocks_encoded_bypasses() {
+        // URL-encoded bypass attempts should be blocked
+        // %2f = /, %5c = \, %3a = :
+        assert!(validate_redirect_path("/%2f%2fevil.com").is_err()); // //evil.com
+        assert!(validate_redirect_path("/%2Fevil.com").is_err()); // /evil.com (starts ok, but decoded would be //evil.com after first /)
+        assert!(validate_redirect_path("/%5cevil.com").is_err()); // \evil.com
+        assert!(validate_redirect_path("/path%3a%2f%2fevil.com").is_err()); // path://evil.com
+    }
+
+    #[test]
+    fn test_validate_redirect_path_allows_safe_encoded_chars() {
+        // Safe encoded characters should be allowed
+        // %20 = space, %3F = ?, %26 = &
+        assert!(validate_redirect_path("/path%20with%20spaces").is_ok());
+        assert!(validate_redirect_path("/search%3Fquery%3Dtest").is_ok());
     }
 }

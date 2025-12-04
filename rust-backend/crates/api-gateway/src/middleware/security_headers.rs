@@ -111,6 +111,35 @@ impl SecurityHeaders {
         };
         Self::new(config)
     }
+
+    /// Create with Swagger UI-friendly CSP
+    ///
+    /// This configuration allows the Swagger UI to function properly by:
+    /// - Allowing inline scripts and styles (required by Swagger UI)
+    /// - Allowing resources from cdn.jsdelivr.net (Swagger UI assets)
+    /// - Restricting other sources to 'self'
+    ///
+    /// Note: Currently not used in main.rs but available for when Swagger UI
+    /// needs its own security middleware scope.
+    #[allow(dead_code)]
+    pub fn for_swagger_ui() -> Self {
+        let config = SecurityHeadersConfig {
+            content_security_policy: Some(
+                "default-src 'self'; \
+                 script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; \
+                 style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; \
+                 img-src 'self' data: https:; \
+                 font-src 'self' https://cdn.jsdelivr.net; \
+                 connect-src 'self'; \
+                 frame-ancestors 'none'; \
+                 form-action 'self'; \
+                 base-uri 'self'"
+                    .to_string(),
+            ),
+            ..Default::default()
+        };
+        Self::new(config)
+    }
 }
 
 impl Default for SecurityHeaders {
@@ -305,6 +334,36 @@ mod tests {
         // But should have other security headers
         assert!(resp.headers().contains_key("x-content-type-options"));
         assert!(resp.headers().contains_key("x-frame-options"));
+    }
+
+    #[actix_web::test]
+    async fn test_swagger_ui_config_has_csp() {
+        let app = test::init_service(
+            App::new()
+                .wrap(SecurityHeaders::for_swagger_ui())
+                .route("/api-docs", web::get().to(test_handler)),
+        )
+        .await;
+
+        let req = test::TestRequest::get().uri("/api-docs").to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Swagger UI config should have CSP
+        assert!(resp.headers().contains_key("content-security-policy"));
+
+        let csp = resp
+            .headers()
+            .get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        // Verify CSP allows Swagger UI requirements
+        assert!(csp.contains("script-src"));
+        assert!(csp.contains("'unsafe-inline'")); // Required for Swagger UI
+        assert!(csp.contains("cdn.jsdelivr.net")); // Swagger UI assets
+        assert!(csp.contains("frame-ancestors 'none'")); // Clickjacking protection
+        assert!(csp.contains("base-uri 'self'")); // Base tag protection
     }
 
     #[actix_web::test]
