@@ -48,6 +48,7 @@ pub mod auth_extractor;
 pub mod cors;
 pub mod ip_extractor;
 pub mod query_tier;
+pub mod request_id;
 pub mod security_headers;
 pub mod unified_rate_limiter;
 use actix_web::{

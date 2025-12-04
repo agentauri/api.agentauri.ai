@@ -21,6 +21,7 @@ mod validators;
 use background_tasks::BackgroundTaskRunner;
 use middleware::auth_extractor::AuthExtractor;
 use middleware::query_tier::QueryTierExtractor;
+use middleware::request_id::RequestId;
 use middleware::security_headers::SecurityHeaders;
 use middleware::unified_rate_limiter::UnifiedRateLimiter;
 use services::{SocialAuthService, WalletService};
@@ -130,7 +131,9 @@ async fn main() -> anyhow::Result<()> {
     // Start HTTP server
     let server = HttpServer::new(move || {
         App::new()
-            // Add security headers middleware (must be first to apply to all responses)
+            // Add request ID middleware (must be first for tracing)
+            .wrap(RequestId::new())
+            // Add security headers middleware
             .wrap(SecurityHeaders::for_api())
             // Add logger middleware
             .wrap(Logger::default())

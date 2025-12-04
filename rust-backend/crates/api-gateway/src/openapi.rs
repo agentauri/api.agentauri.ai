@@ -54,6 +54,7 @@ use crate::models;
         handlers::health_check,
         // Discovery
         handlers::get_agent_card,
+        handlers::get_security_txt,
         // Authentication
         handlers::register,
         handlers::login,

@@ -1,6 +1,8 @@
-//! Discovery endpoint handler
+//! Discovery endpoint handlers
 //!
-//! Implements the /.well-known/agent.json endpoint for system discoverability.
+//! Implements the /.well-known/ endpoints for system discoverability and security:
+//! - `/.well-known/agent.json` - Agent Card for API discovery
+//! - `/.well-known/security.txt` - Security contact information (RFC 9116)
 
 use actix_web::{web, HttpResponse, Result};
 use chrono::Utc;
@@ -209,6 +211,101 @@ fn generate_agent_card() -> AgentCardResponse {
         protocol_version: "erc-8004-v1.0".to_string(),
         generated_at: Utc::now(),
     }
+}
+
+// ============================================================================
+// Security.txt Endpoint (RFC 9116)
+// ============================================================================
+
+/// GET /.well-known/security.txt
+///
+/// Returns security contact information following RFC 9116.
+/// This is a public endpoint used by security researchers.
+///
+/// # RFC 9116 Compliance
+///
+/// Required fields:
+/// - Contact: Security contact email or URL
+/// - Expires: Expiration date for the security.txt file
+///
+/// Optional fields:
+/// - Acknowledgments: URL to hall of fame page
+/// - Preferred-Languages: Preferred languages for communication
+/// - Canonical: Canonical URL for the security.txt file
+/// - Policy: URL to vulnerability disclosure policy
+/// - Hiring: URL to security job openings
+#[utoipa::path(
+    get,
+    path = "/.well-known/security.txt",
+    tag = "Discovery",
+    responses(
+        (status = 200, description = "Security contact information (RFC 9116)", content_type = "text/plain")
+    )
+)]
+#[instrument]
+pub async fn get_security_txt() -> Result<HttpResponse> {
+    debug!("Security.txt endpoint called");
+
+    // Use environment variables for dynamic values
+    let contact_email =
+        std::env::var("SECURITY_CONTACT_EMAIL").unwrap_or_else(|_| "security@8004.dev".to_string());
+    let contact_url = std::env::var("SECURITY_CONTACT_URL").unwrap_or_else(|_| {
+        "https://github.com/erc-8004/api.8004.dev/security/advisories".to_string()
+    });
+    let policy_url = std::env::var("SECURITY_POLICY_URL")
+        .unwrap_or_else(|_| "https://github.com/erc-8004/api.8004.dev/security/policy".to_string());
+    let acknowledgments_url = std::env::var("SECURITY_ACKNOWLEDGMENTS_URL").unwrap_or_else(|_| {
+        "https://github.com/erc-8004/api.8004.dev/security/advisories".to_string()
+    });
+    let hiring_url = std::env::var("SECURITY_HIRING_URL").ok();
+    let canonical_url = std::env::var("BASE_URL")
+        .map(|base| format!("{}/.well-known/security.txt", base))
+        .unwrap_or_else(|_| "https://api.8004.dev/.well-known/security.txt".to_string());
+
+    // Expiration date: 1 year from now (RFC 9116 requirement)
+    let expires = Utc::now()
+        .checked_add_signed(chrono::Duration::days(365))
+        .unwrap_or_else(Utc::now)
+        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+        .to_string();
+
+    // Build security.txt content (RFC 9116 format)
+    let mut content = String::new();
+
+    // Header comment
+    content.push_str("# Security contact information for api.8004.dev\n");
+    content.push_str("# This file follows RFC 9116 (https://www.rfc-editor.org/rfc/rfc9116)\n\n");
+
+    // Required: Contact (can have multiple)
+    content.push_str(&format!("Contact: mailto:{}\n", contact_email));
+    content.push_str(&format!("Contact: {}\n", contact_url));
+
+    // Required: Expires
+    content.push_str(&format!("Expires: {}\n", expires));
+
+    // Optional: Policy
+    content.push_str(&format!("Policy: {}\n", policy_url));
+
+    // Optional: Acknowledgments
+    content.push_str(&format!("Acknowledgments: {}\n", acknowledgments_url));
+
+    // Optional: Canonical
+    content.push_str(&format!("Canonical: {}\n", canonical_url));
+
+    // Optional: Preferred-Languages
+    content.push_str("Preferred-Languages: en\n");
+
+    // Optional: Hiring (only if configured)
+    if let Some(url) = hiring_url {
+        content.push_str(&format!("Hiring: {}\n", url));
+    }
+
+    info!("Generated security.txt response");
+
+    Ok(HttpResponse::Ok()
+        .content_type("text/plain; charset=utf-8")
+        .insert_header(("Cache-Control", "public, max-age=86400")) // 24 hours
+        .body(content))
 }
 
 #[cfg(test)]
