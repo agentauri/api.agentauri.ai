@@ -550,7 +550,7 @@ MIT License - see [LICENSE](../LICENSE) for details.
 ## Support
 
 - Documentation: [CLAUDE.md](../CLAUDE.md)
-- Issues: [GitHub Issues](https://github.com/matteoscurati/api.8004.dev/issues)
+- Issues: [GitHub Issues](https://github.com/matteoscurati/api.agentauri.ai/issues)
 - Ponder Docs: https://ponder.sh
 
 ## Related Links

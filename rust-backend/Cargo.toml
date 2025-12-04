@@ -10,7 +10,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["api.8004.dev Team"]
+authors = ["api.agentauri.ai Team"]
 license = "MIT"
 
 [workspace.dependencies]

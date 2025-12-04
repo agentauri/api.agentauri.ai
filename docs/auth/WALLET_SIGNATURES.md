@@ -1,6 +1,6 @@
 # Wallet Signature Authentication
 
-This document describes the wallet signature authentication system (Layer 2) for api.8004.dev.
+This document describes the wallet signature authentication system (Layer 2) for api.agentauri.ai.
 
 ## Overview
 
@@ -18,7 +18,7 @@ Wallet signature authentication enables on-chain agents to authenticate using th
 The message to be signed follows EIP-191 personal sign format:
 
 ```
-api.8004.dev Authentication
+api.agentauri.ai Authentication
 
 Agent ID: 42
 Chain ID: 84532
@@ -54,7 +54,7 @@ Content-Type: application/json
 **Response**:
 ```json
 {
-  "challenge": "api.8004.dev Authentication\n\nAgent ID: 42\nChain ID: 84532\nTimestamp: 1705312800\nNonce: abc123xyz789",
+  "challenge": "api.agentauri.ai Authentication\n\nAgent ID: 42\nChain ID: 84532\nTimestamp: 1705312800\nNonce: abc123xyz789",
   "nonce": "abc123xyz789",
   "expires_at": "2025-01-15T10:05:00Z"
 }
@@ -326,7 +326,7 @@ X-Signature: 0x1234...abcd
 ### Signed Message Format
 
 ```
-api.8004.dev Request
+api.agentauri.ai Request
 
 Method: GET
 Path: /api/v1/queries/getMyFeedbacks

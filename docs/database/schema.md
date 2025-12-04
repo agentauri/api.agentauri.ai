@@ -2,7 +2,7 @@
 
 ## Overview
 
-The api.8004.dev backend uses PostgreSQL 15+ with TimescaleDB extension for efficient time-series data management. The schema is designed for high-performance event processing, flexible trigger definitions, and comprehensive audit trails.
+The api.agentauri.ai backend uses PostgreSQL 15+ with TimescaleDB extension for efficient time-series data management. The schema is designed for high-performance event processing, flexible trigger definitions, and comprehensive audit trails.
 
 ## Database Configuration
 
@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS timescaledb;
 CREATE EXTENSION IF NOT EXISTS pgcrypto; -- For UUID generation
 
 -- Create database (if not exists)
--- createdb erc8004_backend
+-- createdb agentauri_backend
 ```
 
 ## Schema Design Principles
@@ -804,7 +804,7 @@ let pool = PgPoolOptions::new()
         PgConnectOptions::new()
             .host("localhost")
             .port(5432)
-            .database("erc8004_backend")
+            .database("agentauri_backend")
             .username("postgres")
             .password("password")
     )
@@ -829,13 +829,13 @@ VACUUM FULL triggers;
 
 ```bash
 # Full database backup
-pg_dump -Fc erc8004_backend > backup_$(date +%Y%m%d).dump
+pg_dump -Fc agentauri_backend > backup_$(date +%Y%m%d).dump
 
 # Schema-only backup
-pg_dump -s erc8004_backend > schema.sql
+pg_dump -s agentauri_backend > schema.sql
 
 # Data-only backup
-pg_dump -a erc8004_backend > data.sql
+pg_dump -a agentauri_backend > data.sql
 ```
 
 ### Point-in-Time Recovery (PITR)
@@ -852,10 +852,10 @@ archive_command = 'cp %p /var/lib/postgresql/wal_archive/%f'
 
 ```bash
 # Restore from dump
-pg_restore -d erc8004_backend backup_20250123.dump
+pg_restore -d agentauri_backend backup_20250123.dump
 
 # Restore from SQL
-psql erc8004_backend < backup.sql
+psql agentauri_backend < backup.sql
 ```
 
 ## Security Considerations
@@ -890,7 +890,7 @@ Use PostgreSQL encryption features or cloud provider encryption (AWS RDS encrypt
 
 **Active connections**:
 ```sql
-SELECT count(*) FROM pg_stat_activity WHERE datname = 'erc8004_backend';
+SELECT count(*) FROM pg_stat_activity WHERE datname = 'agentauri_backend';
 ```
 
 **Table sizes**:

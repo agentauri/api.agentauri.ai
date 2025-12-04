@@ -5,7 +5,7 @@
 
 ## Overview
 
-This document outlines the complete implementation roadmap for the api.8004.dev backend infrastructure, including phases, milestones, deliverables, and subagent assignments.
+This document outlines the complete implementation roadmap for the api.agentauri.ai backend infrastructure, including phases, milestones, deliverables, and subagent assignments.
 
 ## Current Status (November 2024)
 

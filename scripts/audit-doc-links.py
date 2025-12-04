@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
-PROJECT_ROOT = Path("/Users/matteoscurati/work/api.8004.dev")
+PROJECT_ROOT = Path("/Users/matteoscurati/work/api.agentauri.ai")
 
 def is_external_link(link):
     """Check if link is external (http/https/mailto)"""

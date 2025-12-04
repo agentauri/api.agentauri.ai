@@ -49,7 +49,7 @@ CREATE INDEX idx_events_request_uri ON events(request_uri) WHERE request_uri IS 
 **Verification**:
 ```bash
 # After migration
-psql erc8004_backend -c "\d events" | grep request_uri
+psql agentauri_backend -c "\d events" | grep request_uri
 ```
 
 ---
@@ -244,7 +244,7 @@ CREATE INDEX idx_events_validator_address
 
 **Implementation**:
 ```bash
-psql erc8004_backend < database/migrations/20251201000001_add_event_indexes.sql
+psql agentauri_backend < database/migrations/20251201000001_add_event_indexes.sql
 ```
 
 **Verification**:

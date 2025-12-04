@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Project**: api.8004.dev - ERC-8004 Backend Infrastructure
+**Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
 **Last Updated**: December 4, 2025
 **Phase**: Phase 4 Complete (REST Worker + Circuit Breaker + Agent Discovery)
 

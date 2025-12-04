@@ -1,6 +1,6 @@
 # Operations Runbook
 
-**Project**: api.8004.dev - ERC-8004 Backend Infrastructure
+**Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
 **Last Updated**: January 30, 2025
 **Audience**: DevOps, SREs, On-call Engineers
 
@@ -100,8 +100,8 @@ docker compose ps postgres redis
 **Expected Output**:
 ```
 NAME                         STATUS          PORTS
-api.8004.dev-postgres-1      Up 30 seconds   0.0.0.0:5432->5432/tcp
-api.8004.dev-redis-1         Up 30 seconds   0.0.0.0:6379->6379/tcp
+api.agentauri.ai-postgres-1      Up 30 seconds   0.0.0.0:5432->5432/tcp
+api.agentauri.ai-redis-1         Up 30 seconds   0.0.0.0:6379->6379/tcp
 ```
 
 #### Step 3: Apply Database Migrations
@@ -113,7 +113,7 @@ sqlx migrate run
 cd ..
 
 # Verify schema version
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "SELECT version FROM _sqlx_migrations ORDER BY version DESC LIMIT 1;"
 ```
 
@@ -320,8 +320,8 @@ docker compose exec postgres psql -U postgres -c \
   "SELECT COUNT(*) as active_connections FROM pg_stat_activity WHERE state = 'active';"
 
 # Database size
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
-  "SELECT pg_size_pretty(pg_database_size('erc8004_backend'));"
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
+  "SELECT pg_size_pretty(pg_database_size('agentauri_backend'));"
 ```
 
 **Expected Values**:
@@ -531,7 +531,7 @@ docker compose restart event-processor
 docker compose logs event-processor | grep "Polling fallback"
 
 # Check recent processed events
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "SELECT COUNT(*) FROM processed_events WHERE processed_at > NOW() - INTERVAL '5 minutes';"
 ```
 
@@ -596,7 +596,7 @@ docker compose logs action-workers | grep "ERROR"
 **Diagnosis**:
 ```bash
 # Check circuit breaker states
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "SELECT trigger_id, state, failure_count, last_failure_at FROM circuit_breaker_state WHERE state = 'open';"
 
 # Check Action Worker errors
@@ -610,7 +610,7 @@ docker compose logs action-workers --since 30m | grep "Action execution failed"
 
 # Wait for auto-recovery (60 seconds to half-open)
 # Or manually reset (use with caution):
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "UPDATE circuit_breaker_state SET state = 'closed', failure_count = 0 WHERE trigger_id = 'YOUR_TRIGGER_ID';"
 ```
 
@@ -637,7 +637,7 @@ Production databases should have automated daily backups configured via cloud pr
 **Verify backup schedule**:
 ```bash
 # AWS RDS example
-aws rds describe-db-instances --db-instance-identifier erc8004-prod \
+aws rds describe-db-instances --db-instance-identifier agentauri-prod \
   --query 'DBInstances[0].[BackupRetentionPeriod,PreferredBackupWindow]'
 ```
 
@@ -645,10 +645,10 @@ aws rds describe-db-instances --db-instance-identifier erc8004-prod \
 
 ```bash
 # Full database dump
-docker compose exec postgres pg_dump -U postgres -Fc erc8004_backend > backup_$(date +%Y%m%d_%H%M%S).dump
+docker compose exec postgres pg_dump -U postgres -Fc agentauri_backend > backup_$(date +%Y%m%d_%H%M%S).dump
 
 # Schema only
-docker compose exec postgres pg_dump -U postgres --schema-only erc8004_backend > schema_backup.sql
+docker compose exec postgres pg_dump -U postgres --schema-only agentauri_backend > schema_backup.sql
 
 # Verify backup size
 ls -lh backup_*.dump
@@ -661,7 +661,7 @@ ls -lh backup_*.dump
 docker compose stop api-gateway event-processor action-workers ponder-indexers
 
 # Restore database
-docker compose exec -T postgres pg_restore -U postgres -d erc8004_backend -c < backup_20250130_120000.dump
+docker compose exec -T postgres pg_restore -U postgres -d agentauri_backend -c < backup_20250130_120000.dump
 
 # Run migrations (if needed)
 cd rust-backend && sqlx migrate run && cd ..
@@ -806,7 +806,7 @@ Before escalating, ensure you have:
 |------|---------|--------------|
 | On-call Engineer | Slack `@oncall` | 24/7 |
 | Database Admin | Slack `@dba-team` | Business hours |
-| Security Team | Email: security@8004.dev | 24/7 |
+| Security Team | Email: security@agentauri.ai | 24/7 |
 | RPC Provider Support | Alchemy/Infura support portals | 24/7 |
 
 ---

@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Description: Tests for PostgreSQL NOTIFY/LISTEN functionality
 -- Purpose: Verify events trigger NOTIFY correctly for real-time processing
--- Usage: psql -d test_erc8004_backend -f database/tests/test-notifications.sql
+-- Usage: psql -d test_agentauri_backend -f database/tests/test-notifications.sql
 -- ============================================================================
 
 \set ON_ERROR_STOP on

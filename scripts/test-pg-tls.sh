@@ -10,7 +10,7 @@ set -e
 # Default connection parameters
 DB_HOST="${1:-localhost}"
 DB_PORT="${2:-5432}"
-DB_NAME="${3:-erc8004_backend}"
+DB_NAME="${3:-agentauri_backend}"
 DB_USER="${4:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-postgres}"
 

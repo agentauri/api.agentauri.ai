@@ -1,6 +1,6 @@
 # Integration Test Suite
 
-This directory contains integration tests for the api.8004.dev backend infrastructure.
+This directory contains integration tests for the api.agentauri.ai backend infrastructure.
 
 ## Test Scripts
 
@@ -282,4 +282,4 @@ RATE_LIMIT_MODE=shadow cargo run --bin api-gateway
 
 ## License
 
-Copyright (c) 2025 api.8004.dev
+Copyright (c) 2025 api.agentauri.ai

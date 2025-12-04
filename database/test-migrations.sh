@@ -18,11 +18,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TEST_DB_NAME="${TEST_DB_NAME:-test_erc8004_backend}"
+TEST_DB_NAME="${TEST_DB_NAME:-test_agentauri_backend}"
 DB_USER="${DB_USER:-postgres}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-DOCKER_CONTAINER="${DOCKER_CONTAINER:-erc8004-postgres}"
+DOCKER_CONTAINER="${DOCKER_CONTAINER:-agentauri-postgres}"
 
 # Test results
 TOTAL_TESTS=0

@@ -197,7 +197,7 @@ Remain in `.env`:
    {
        "Effect": "Allow",
        "Action": ["secretsmanager:GetSecretValue"],
-       "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:erc8004/*"
+       "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:agentauri/*"
    }
    ```
 
@@ -224,10 +224,10 @@ With 1-hour caching: ~720 API calls/month (one per service restart) = **~$4.04/m
 
 ### Secret Naming Convention
 
-All secrets use `erc8004/` prefix:
-- `erc8004/database_url`
-- `erc8004/redis_url`
-- `erc8004/jwt_secret`
+All secrets use `agentauri/` prefix:
+- `agentauri/database_url`
+- `agentauri/redis_url`
+- `agentauri/jwt_secret`
 - etc.
 
 ---
@@ -255,13 +255,13 @@ All secrets use `erc8004/` prefix:
    export VAULT_ADDR='http://localhost:8200'
    export VAULT_TOKEN='dev-root-token'
 
-   vault kv put secret/erc8004/database_url \
+   vault kv put secret/agentauri/database_url \
      value="postgresql://user:password@host:5432/db"
    ```
 
 3. **Create Policy**:
    ```hcl
-   path "secret/data/erc8004/*" {
+   path "secret/data/agentauri/*" {
      capabilities = ["read"]
    }
    ```
@@ -288,10 +288,10 @@ All secrets use `erc8004/` prefix:
 
 ### Secret Path Convention
 
-All secrets under `secret/data/erc8004/` path:
-- `secret/data/erc8004/database_url`
-- `secret/data/erc8004/redis_url`
-- `secret/data/erc8004/jwt_secret`
+All secrets under `secret/data/agentauri/` path:
+- `secret/data/agentauri/database_url`
+- `secret/data/agentauri/redis_url`
+- `secret/data/agentauri/jwt_secret`
 - etc.
 
 ---
@@ -416,7 +416,7 @@ async fn test_cache_expiration() {
 
    # Vault
    docker-compose -f docker-compose.vault.yml up -d
-   vault kv put secret/erc8004/database_url value="..."
+   vault kv put secret/agentauri/database_url value="..."
    ```
 
 4. **Update Configuration**:

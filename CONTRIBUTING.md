@@ -1,6 +1,6 @@
-# Contributing to api.8004.dev
+# Contributing to api.agentauri.ai
 
-Thank you for your interest in contributing to api.8004.dev! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to api.agentauri.ai! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -35,8 +35,8 @@ This project follows standard open-source etiquette:
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/api.8004.dev.git
-   cd api.8004.dev
+   git clone https://github.com/YOUR_USERNAME/api.agentauri.ai.git
+   cd api.agentauri.ai
    ```
 3. Follow setup instructions in [README.md](./README.md#development)
 4. Run initial tests to verify setup:
@@ -305,7 +305,7 @@ Update documentation when:
 ## Project Structure
 
 ```
-api.8004.dev/
+api.agentauri.ai/
 ├── rust-backend/          # Rust microservices
 │   ├── crates/shared/     # Shared utilities
 │   ├── crates/api-gateway/   # REST API
@@ -321,13 +321,13 @@ api.8004.dev/
 ## Getting Help
 
 - **Documentation**: See [CLAUDE.md](./CLAUDE.md) for comprehensive technical reference
-- **Issues**: Check existing [GitHub Issues](https://github.com/your-org/api.8004.dev/issues)
+- **Issues**: Check existing [GitHub Issues](https://github.com/your-org/api.agentauri.ai/issues)
 - **Questions**: Open a new issue with the `question` label
 
 ## License
 
-By contributing to api.8004.dev, you agree that your contributions will be licensed under the MIT License.
+By contributing to api.agentauri.ai, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-**Thank you for contributing to api.8004.dev!**
+**Thank you for contributing to api.agentauri.ai!**

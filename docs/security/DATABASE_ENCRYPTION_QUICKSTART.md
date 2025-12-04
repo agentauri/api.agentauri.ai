@@ -55,7 +55,7 @@ notAfter=Nov 29 12:00:00 2026 GMT
 
 Subject Alternative Names (SAN):
 Subject Alternative Name:
-    DNS:localhost, DNS:*.localhost, DNS:postgres, DNS:erc8004-postgres, IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1
+    DNS:localhost, DNS:*.localhost, DNS:postgres, DNS:agentauri-postgres, IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1
 
 ========================================================================
 SECURITY WARNINGS
@@ -77,7 +77,7 @@ Next Steps
    ./scripts/test-pg-tls.sh
 
 3. Update DATABASE_URL in .env:
-   DATABASE_URL=postgresql://postgres:password@localhost:5432/erc8004_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/agentauri_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
 
 Certificate generation complete!
 ```
@@ -88,10 +88,10 @@ Edit `.env`:
 
 ```bash
 # Before (no encryption)
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/agentauri_backend
 
 # After (with TLS)
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/agentauri_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
 
 # Add encryption key (from secrets manager in production)
 DB_ENCRYPTION_KEY=your_secret_key_here_change_in_production
@@ -119,7 +119,7 @@ cd rust-backend
 sqlx migrate run
 
 # Verify pgcrypto extension is enabled
-docker compose exec postgres psql -U postgres -d erc8004_backend -c "\dx pgcrypto"
+docker compose exec postgres psql -U postgres -d agentauri_backend -c "\dx pgcrypto"
 ```
 
 **Expected output**:
@@ -143,7 +143,7 @@ docker compose exec postgres psql -U postgres -d erc8004_backend -c "\dx pgcrypt
 
 ```bash
 # Connect to database
-docker compose exec postgres psql -U postgres -d erc8004_backend
+docker compose exec postgres psql -U postgres -d agentauri_backend
 
 # Test encryption/decryption
 SELECT encrypt_text('hello@example.com', 'test_key');
@@ -173,7 +173,7 @@ Your database now has:
 1. **Use encrypted connections in your app**:
    ```rust
    let pool = PgPool::connect(
-       "postgresql://postgres:password@localhost:5432/erc8004_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt"
+       "postgresql://postgres:password@localhost:5432/agentauri_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt"
    ).await?;
    ```
 
@@ -278,4 +278,4 @@ Production (before going live):
 - Documentation: `docs/security/DATABASE_ENCRYPTION.md`
 - Test script: `./scripts/test-pg-tls.sh`
 - Certificate generation: `./scripts/generate-pg-certs.sh`
-- GitHub Issues: https://github.com/erc-8004/api.8004.dev/issues
+- GitHub Issues: https://github.com/erc-8004/api.agentauri.ai/issues

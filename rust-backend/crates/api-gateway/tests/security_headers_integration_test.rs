@@ -29,7 +29,7 @@ async fn triggers_handler() -> HttpResponse {
 /// Test handler for discovery endpoint
 async fn discovery_handler() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
-        "name": "API 8004 Backend",
+        "name": "AgentAuri API",
         "version": "1.0.0"
     }))
 }

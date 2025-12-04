@@ -28,10 +28,10 @@
 //!
 //! # Secret Naming Convention
 //!
-//! All secrets are prefixed with `erc8004/` for organization:
-//! - `erc8004/database_url`
-//! - `erc8004/redis_url`
-//! - `erc8004/jwt_secret`
+//! All secrets are prefixed with `agentauri/` for organization:
+//! - `agentauri/database_url`
+//! - `agentauri/redis_url`
+//! - `agentauri/jwt_secret`
 //! - etc.
 //!
 //! # Usage
@@ -250,7 +250,7 @@ impl SecretsManager {
     /// Get all application secrets
     ///
     /// This method fetches all required secrets for the application from
-    /// AWS Secrets Manager using the `erc8004/` prefix naming convention.
+    /// AWS Secrets Manager using the `agentauri/` prefix naming convention.
     ///
     /// # Errors
     ///
@@ -269,16 +269,16 @@ impl SecretsManager {
             api_encryption_key,
             telegram_bot_token,
         ) = tokio::try_join!(
-            self.get_secret("erc8004/database_url"),
-            self.get_secret("erc8004/redis_url"),
-            self.get_secret("erc8004/jwt_secret"),
-            self.get_secret("erc8004/stripe_secret_key"),
-            self.get_secret("erc8004/stripe_webhook_secret"),
-            self.get_secret("erc8004/ethereum_sepolia_rpc_url"),
-            self.get_secret("erc8004/base_sepolia_rpc_url"),
-            self.get_secret_optional("erc8004/linea_sepolia_rpc_url"),
-            self.get_secret("erc8004/api_encryption_key"),
-            self.get_secret_optional("erc8004/telegram_bot_token"),
+            self.get_secret("agentauri/database_url"),
+            self.get_secret("agentauri/redis_url"),
+            self.get_secret("agentauri/jwt_secret"),
+            self.get_secret("agentauri/stripe_secret_key"),
+            self.get_secret("agentauri/stripe_webhook_secret"),
+            self.get_secret("agentauri/ethereum_sepolia_rpc_url"),
+            self.get_secret("agentauri/base_sepolia_rpc_url"),
+            self.get_secret_optional("agentauri/linea_sepolia_rpc_url"),
+            self.get_secret("agentauri/api_encryption_key"),
+            self.get_secret_optional("agentauri/telegram_bot_token"),
         )?;
 
         let secrets = AppSecrets {

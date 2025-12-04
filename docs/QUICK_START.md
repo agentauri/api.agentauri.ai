@@ -1,6 +1,6 @@
 # API Quick Start Guide
 
-This guide will help you get started with the api.8004.dev API quickly, including authentication, rate limiting, and best practices.
+This guide will help you get started with the api.agentauri.ai API quickly, including authentication, rate limiting, and best practices.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ The API supports 3 authentication layers:
 No authentication required - perfect for testing:
 
 ```bash
-curl https://api.8004.dev/api/v1/queries/tier0/getAgentProfile?agentId=42
+curl https://api.agentauri.ai/api/v1/queries/tier0/getAgentProfile?agentId=42
 ```
 
 **Limitations**:
@@ -38,7 +38,7 @@ curl https://api.8004.dev/api/v1/queries/tier0/getAgentProfile?agentId=42
 
 1. **Register an account**:
 ```bash
-curl -X POST https://api.8004.dev/api/v1/auth/register \
+curl -X POST https://api.agentauri.ai/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "your_username",
@@ -49,7 +49,7 @@ curl -X POST https://api.8004.dev/api/v1/auth/register \
 
 2. **Create an organization** (using JWT from registration):
 ```bash
-curl -X POST https://api.8004.dev/api/v1/organizations \
+curl -X POST https://api.agentauri.ai/api/v1/organizations \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -60,7 +60,7 @@ curl -X POST https://api.8004.dev/api/v1/organizations \
 
 3. **Create an API key**:
 ```bash
-curl -X POST https://api.8004.dev/api/v1/api-keys?organization_id=YOUR_ORG_ID \
+curl -X POST https://api.agentauri.ai/api/v1/api-keys?organization_id=YOUR_ORG_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -75,7 +75,7 @@ curl -X POST https://api.8004.dev/api/v1/api-keys?organization_id=YOUR_ORG_ID \
 
 4. **Use your API key**:
 ```bash
-curl https://api.8004.dev/api/v1/queries/tier0/getAgentProfile?agentId=42 \
+curl https://api.agentauri.ai/api/v1/queries/tier0/getAgentProfile?agentId=42 \
   -H "Authorization: Bearer sk_live_YOUR_API_KEY"
 ```
 
@@ -113,7 +113,7 @@ Different queries have different costs:
 ### Step 1: Check API Health
 
 ```bash
-curl https://api.8004.dev/api/v1/health
+curl https://api.agentauri.ai/api/v1/health
 ```
 
 Response:
@@ -128,7 +128,7 @@ Response:
 ### Step 2: Make an Anonymous Query
 
 ```bash
-curl -v https://api.8004.dev/api/v1/queries/tier0/getAgentProfile?agentId=42
+curl -v https://api.agentauri.ai/api/v1/queries/tier0/getAgentProfile?agentId=42
 ```
 
 ### Step 3: Check Rate Limit Headers
@@ -149,7 +149,7 @@ X-RateLimit-Window: 3600
 Every response includes rate limit information:
 
 ```bash
-curl -v https://api.8004.dev/api/v1/queries/tier0/getAgentProfile?agentId=42 2>&1 | grep -i ratelimit
+curl -v https://api.agentauri.ai/api/v1/queries/tier0/getAgentProfile?agentId=42 2>&1 | grep -i ratelimit
 ```
 
 Output:
@@ -191,7 +191,7 @@ from typing import Optional
 
 class API8004Client:
     def __init__(self, api_key: Optional[str] = None):
-        self.base_url = "https://api.8004.dev/api/v1"
+        self.base_url = "https://api.agentauri.ai/api/v1"
         self.headers = {}
         if api_key:
             self.headers["Authorization"] = f"Bearer {api_key}"
@@ -243,7 +243,7 @@ print(data)
 ```javascript
 class API8004Client {
   constructor(apiKey = null) {
-    this.baseUrl = 'https://api.8004.dev/api/v1';
+    this.baseUrl = 'https://api.agentauri.ai/api/v1';
     this.headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 
@@ -307,7 +307,7 @@ console.log(data);
 #!/bin/bash
 
 API_KEY="sk_live_YOUR_KEY"
-BASE_URL="https://api.8004.dev/api/v1"
+BASE_URL="https://api.agentauri.ai/api/v1"
 
 make_request() {
   local endpoint="$1"
@@ -387,7 +387,7 @@ type API8004Client struct {
 
 func NewClient(apiKey string) *API8004Client {
     return &API8004Client{
-        BaseURL: "https://api.8004.dev/api/v1",
+        BaseURL: "https://api.agentauri.ai/api/v1",
         APIKey:  apiKey,
         Client:  &http.Client{Timeout: 30 * time.Second},
     }
@@ -645,7 +645,7 @@ def get_data_with_fallback(agent_id):
 
 **Solution**: Check which tier your queries are using:
 ```bash
-curl -v https://api.8004.dev/api/v1/queries/tier3/... 2>&1 | grep -i tier
+curl -v https://api.agentauri.ai/api/v1/queries/tier3/... 2>&1 | grep -i tier
 ```
 
 ### Issue: Can't make Tier 2/3 queries
@@ -671,9 +671,9 @@ curl -v https://api.8004.dev/api/v1/queries/tier3/... 2>&1 | grep -i tier
 
 ## Support
 
-- GitHub Issues: https://github.com/erc-8004/api.8004.dev/issues
-- Documentation: https://docs.8004.dev
-- Email: support@8004.dev
+- GitHub Issues: https://github.com/erc-8004/api.agentauri.ai/issues
+- Documentation: https://docs.agentauri.ai
+- Email: support@agentauri.ai
 
 ---
 

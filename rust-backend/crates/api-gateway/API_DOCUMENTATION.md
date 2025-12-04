@@ -2,7 +2,7 @@
 
 ## Overview
 
-The API Gateway provides a RESTful API for managing triggers, conditions, and actions in the api.8004.dev multi-chain agent notification system.
+The API Gateway provides a RESTful API for managing triggers, conditions, and actions in the api.agentauri.ai multi-chain agent notification system.
 
 **Base URL**: `http://localhost:8080/api/v1` (development)
 
@@ -945,11 +945,11 @@ Get system capabilities and metadata.
 **Response** (200 OK):
 ```json
 {
-  "name": "ERC-8004 Backend API",
+  "name": "AgentAuri API",
   "version": "1.0.0",
   "description": "Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events",
   "api_version": "v1",
-  "base_url": "https://api.8004.dev",
+  "base_url": "https://api.agentauri.ai",
   "capabilities": {
     "push_layer": {
       "enabled": true,
@@ -1019,18 +1019,18 @@ Get system capabilities and metadata.
     }
   },
   "endpoints": {
-    "api_documentation": "https://api.8004.dev/docs",
-    "health_check": "https://api.8004.dev/api/v1/health",
+    "api_documentation": "https://api.agentauri.ai/docs",
+    "health_check": "https://api.agentauri.ai/api/v1/health",
     "authentication": {
-      "register": "https://api.8004.dev/api/v1/auth/register",
-      "login": "https://api.8004.dev/api/v1/auth/login"
+      "register": "https://api.agentauri.ai/api/v1/auth/register",
+      "login": "https://api.agentauri.ai/api/v1/auth/login"
     },
-    "triggers": "https://api.8004.dev/api/v1/triggers"
+    "triggers": "https://api.agentauri.ai/api/v1/triggers"
   },
   "contact": {
-    "email": "support@8004.dev",
-    "github": "https://github.com/erc-8004/api.8004.dev",
-    "documentation": "https://docs.8004.dev"
+    "email": "support@agentauri.ai",
+    "github": "https://github.com/erc-8004/api.agentauri.ai",
+    "documentation": "https://docs.agentauri.ai"
   },
   "protocol_version": "erc-8004-v1.0",
   "generated_at": "2025-01-30T12:00:00Z"
@@ -1040,10 +1040,10 @@ Get system capabilities and metadata.
 **Environment Variables**:
 
 The following values can be customized via environment variables:
-- `BASE_URL` - Base URL for the API (default: `https://api.8004.dev`)
-- `CONTACT_EMAIL` - Support email (default: `support@8004.dev`)
-- `CONTACT_GITHUB` - GitHub repository (default: `https://github.com/erc-8004/api.8004.dev`)
-- `DOCUMENTATION_URL` - Documentation site (default: `https://docs.8004.dev`)
+- `BASE_URL` - Base URL for the API (default: `https://api.agentauri.ai`)
+- `CONTACT_EMAIL` - Support email (default: `support@agentauri.ai`)
+- `CONTACT_GITHUB` - GitHub repository (default: `https://github.com/erc-8004/api.agentauri.ai`)
+- `DOCUMENTATION_URL` - Documentation site (default: `https://docs.agentauri.ai`)
 
 **Use Cases**:
 - Client discovery of API capabilities
@@ -2087,7 +2087,7 @@ Content-Type: application/json
    ```bash
    # Check remaining quota before making expensive queries
    curl -H "Authorization: Bearer sk_live_..." \
-     https://api.8004.dev/api/v1/billing/credits?organization_id=org_123
+     https://api.agentauri.ai/api/v1/billing/credits?organization_id=org_123
    ```
 
 2. **Check Headers Before Retrying**
@@ -2294,7 +2294,7 @@ Required:
 Optional:
 - `DB_HOST`: Database host (default: localhost)
 - `DB_PORT`: Database port (default: 5432)
-- `DB_NAME`: Database name (default: erc8004_backend)
+- `DB_NAME`: Database name (default: agentauri_backend)
 - `DB_USER`: Database user (default: postgres)
 - `DB_MAX_CONNECTIONS`: Max DB connections (default: 10)
 - `SERVER_HOST`: Server host (default: 0.0.0.0)

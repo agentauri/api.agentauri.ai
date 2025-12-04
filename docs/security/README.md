@@ -138,7 +138,7 @@ cargo build --release --features vault-secrets
 aws secretsmanager list-secrets --query 'SecretList[].Name'
 
 # Vault: List secrets
-vault kv list secret/erc8004
+vault kv list secret/agentauri
 ```
 
 ### "Access denied"

@@ -1,6 +1,6 @@
 # Production Readiness Roadmap
 
-**Project**: api.8004.dev - ERC-8004 Backend Infrastructure
+**Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
 **Current Status**: 65% Complete (Week 15/24 - Phase 4 Complete)
 **Target**: Production-Ready MVP in 5 weeks
 **Document Version**: 1.1
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This document outlines the 5-week plan to bring api.8004.dev from its current state (65% complete, Week 15/Phase 4 complete) to a production-ready MVP. The project has excellent code quality (95%) and test coverage (950+ tests) but lacks critical production infrastructure (observability, security hardening, deployment automation).
+This document outlines the 5-week plan to bring api.agentauri.ai from its current state (65% complete, Week 15/Phase 4 complete) to a production-ready MVP. The project has excellent code quality (95%) and test coverage (950+ tests) but lacks critical production infrastructure (observability, security hardening, deployment automation).
 
 **Key Metrics**:
 - **Current Production Readiness**: 60%

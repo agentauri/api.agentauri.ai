@@ -21,7 +21,7 @@ version: '3.8'
 services:
   vault:
     image: hashicorp/vault:1.15
-    container_name: erc8004_vault_dev
+    container_name: agentauri_vault_dev
     ports:
       - "8200:8200"
     environment:
@@ -42,12 +42,12 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - erc8004_network
+      - agentauri_network
 
   # Vault initializer (runs once to set up secrets engine)
   vault-init:
     image: hashicorp/vault:1.15
-    container_name: erc8004_vault_init
+    container_name: agentauri_vault_init
     environment:
       VAULT_ADDR: "http://vault:8200"
       VAULT_TOKEN: "dev-root-token"
@@ -66,35 +66,35 @@ services:
         echo "Creating example secrets for development..."
 
         # Tier 1: Critical secrets
-        vault kv put secret/erc8004/database_url \
-          value="postgresql://postgres:password@postgres:5432/erc8004_backend"
+        vault kv put secret/agentauri/database_url \
+          value="postgresql://postgres:password@postgres:5432/agentauri_backend"
 
-        vault kv put secret/erc8004/redis_url \
+        vault kv put secret/agentauri/redis_url \
           value="redis://redis:6379"
 
-        vault kv put secret/erc8004/jwt_secret \
+        vault kv put secret/agentauri/jwt_secret \
           value="dev_vault_jwt_secret_32_characters_long"
 
-        vault kv put secret/erc8004/stripe_secret_key \
+        vault kv put secret/agentauri/stripe_secret_key \
           value="sk_test_dev_vault_stripe_key"
 
-        vault kv put secret/erc8004/stripe_webhook_secret \
+        vault kv put secret/agentauri/stripe_webhook_secret \
           value="whsec_dev_vault_webhook_secret"
 
         # Tier 2: Important secrets
-        vault kv put secret/erc8004/ethereum_sepolia_rpc_url \
+        vault kv put secret/agentauri/ethereum_sepolia_rpc_url \
           value="https://eth-sepolia.public.blastapi.io"
 
-        vault kv put secret/erc8004/base_sepolia_rpc_url \
+        vault kv put secret/agentauri/base_sepolia_rpc_url \
           value="https://base-sepolia.public.blastapi.io"
 
-        vault kv put secret/erc8004/linea_sepolia_rpc_url \
+        vault kv put secret/agentauri/linea_sepolia_rpc_url \
           value="https://linea-sepolia.public.blastapi.io"
 
-        vault kv put secret/erc8004/api_encryption_key \
+        vault kv put secret/agentauri/api_encryption_key \
           value="dev_vault_api_encryption_key_32_chars"
 
-        vault kv put secret/erc8004/telegram_bot_token \
+        vault kv put secret/agentauri/telegram_bot_token \
           value="123456:ABC-DEF1234ghIkl-dev-vault"
 
         echo "Vault initialization complete!"
@@ -106,7 +106,7 @@ services:
         echo "To access secrets:"
         echo "  export VAULT_ADDR='http://localhost:8200'"
         echo "  export VAULT_TOKEN='dev-root-token'"
-        echo "  vault kv get secret/erc8004/database_url"
+        echo "  vault kv get secret/agentauri/database_url"
         echo ""
         echo "To use with application:"
         echo "  export SECRETS_BACKEND=vault"
@@ -114,12 +114,12 @@ services:
         echo "  export VAULT_TOKEN='dev-root-token'"
         echo ""
     networks:
-      - erc8004_network
+      - agentauri_network
     restart: "no"
 
 networks:
-  erc8004_network:
-    name: erc8004_network
+  agentauri_network:
+    name: agentauri_network
     driver: bridge
 
 # Volume for persistent storage (commented out for dev mode)

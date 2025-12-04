@@ -13,7 +13,7 @@
 #   ./scripts/monitor-ssl.sh [domain] [email]
 #
 # Cron setup (daily at midnight):
-#   0 0 * * * /path/to/scripts/monitor-ssl.sh api.8004.dev admin@8004.dev
+#   0 0 * * * /path/to/scripts/monitor-ssl.sh api.agentauri.ai admin@agentauri.ai
 # =============================================================================
 
 set -e
@@ -21,7 +21,7 @@ set -e
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-DOMAIN="${1:-api.8004.dev}"
+DOMAIN="${1:-api.agentauri.ai}"
 ALERT_EMAIL="${2:-}"
 WARNING_DAYS=30  # Alert if certificate expires in <30 days
 CRITICAL_DAYS=7  # Critical alert if <7 days

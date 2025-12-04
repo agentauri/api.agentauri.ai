@@ -113,7 +113,7 @@ impl Config {
                     .unwrap_or_else(|_| "5432".to_string())
                     .parse()
                     .map_err(|e| Error::config(format!("Invalid DB_PORT: {}", e)))?,
-                name: env::var("DB_NAME").unwrap_or_else(|_| "erc8004_backend".to_string()),
+                name: env::var("DB_NAME").unwrap_or_else(|_| "agentauri_backend".to_string()),
                 user: env::var("DB_USER").unwrap_or_else(|_| "postgres".to_string()),
                 password: env::var("DB_PASSWORD")
                     .map_err(|_| Error::config("DB_PASSWORD must be set"))?,

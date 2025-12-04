@@ -1,4 +1,4 @@
-//! Shared library for api.8004.dev backend services
+//! Shared library for api.agentauri.ai backend services
 //!
 //! This crate provides common functionality used across all backend services:
 //! - Database connection pooling and utilities

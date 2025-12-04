@@ -1,6 +1,6 @@
 # Database Migrations and Schema
 
-This directory contains all database migrations, schema documentation, and seed files for the api.8004.dev PostgreSQL database.
+This directory contains all database migrations, schema documentation, and seed files for the api.agentauri.ai PostgreSQL database.
 
 ## Directory Structure
 
@@ -48,7 +48,7 @@ sudo timescaledb-tune --quiet --yes
 psql -U postgres
 
 # Create database
-CREATE DATABASE erc8004_backend;
+CREATE DATABASE agentauri_backend;
 
 # Exit psql
 \q
@@ -66,7 +66,7 @@ cargo install sqlx-cli --no-default-features --features postgres
 
 ```bash
 # Set DATABASE_URL environment variable
-export DATABASE_URL="postgresql://postgres:password@localhost:5432/erc8004_backend"
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/agentauri_backend"
 
 # Run all pending migrations
 sqlx migrate run --source database/migrations
@@ -108,7 +108,7 @@ All migrations follow SQLx naming convention: `YYYYMMDDHHMMSS_description.sql`
 Load test data for development:
 
 ```bash
-psql -U postgres -d erc8004_backend -f database/seeds/test_data.sql
+psql -U postgres -d agentauri_backend -f database/seeds/test_data.sql
 ```
 
 Test data includes:
@@ -148,10 +148,10 @@ Integration tests require a properly configured test database with environment v
 
 ```bash
 # 1. Create a separate test database (IMPORTANT: Do NOT use production database!)
-createdb erc8004_backend_test
+createdb agentauri_backend_test
 
 # 2. Run migrations on test database
-export DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend_test"
+export DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/agentauri_backend_test"
 sqlx migrate run --source database/migrations
 
 # 3. Copy and configure test environment file
@@ -222,23 +222,23 @@ sqlx migrate revert --source database/migrations
 
 ```bash
 # Full backup (custom format, compressed)
-pg_dump -Fc erc8004_backend > backup_$(date +%Y%m%d).dump
+pg_dump -Fc agentauri_backend > backup_$(date +%Y%m%d).dump
 
 # Schema only
-pg_dump -s erc8004_backend > schema_backup.sql
+pg_dump -s agentauri_backend > schema_backup.sql
 
 # Data only
-pg_dump -a erc8004_backend > data_backup.sql
+pg_dump -a agentauri_backend > data_backup.sql
 ```
 
 ### Restore Database
 
 ```bash
 # From custom format dump
-pg_restore -d erc8004_backend backup_20250123.dump
+pg_restore -d agentauri_backend backup_20250123.dump
 
 # From SQL file
-psql -d erc8004_backend -f backup.sql
+psql -d agentauri_backend -f backup.sql
 ```
 
 ## Monitoring
@@ -272,7 +272,7 @@ ORDER BY idx_scan DESC;
 ### Check Active Connections
 
 ```sql
-SELECT count(*) FROM pg_stat_activity WHERE datname = 'erc8004_backend';
+SELECT count(*) FROM pg_stat_activity WHERE datname = 'agentauri_backend';
 ```
 
 ## Troubleshooting
@@ -291,8 +291,8 @@ psql -U postgres -c "SELECT * FROM pg_available_extensions WHERE name = 'timesca
 ```bash
 # Make sure you're running migrations as a superuser or user with CREATE EXTENSION privilege
 # Or create extensions manually first:
-psql -U postgres -d erc8004_backend -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
-psql -U postgres -d erc8004_backend -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+psql -U postgres -d agentauri_backend -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+psql -U postgres -d agentauri_backend -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 ```
 
 ### Cannot Convert to Hypertable

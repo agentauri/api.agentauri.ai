@@ -412,7 +412,7 @@ prometheus = "0.13"  # CVE vulnerability
 
 ```bash
 # Test security headers are present
-curl -I https://api.8004.dev/api/v1/health
+curl -I https://api.agentauri.ai/api/v1/health
 
 # Expected headers:
 # Strict-Transport-Security: max-age=31536000; includeSubDomains
@@ -424,7 +424,7 @@ curl -I https://api.8004.dev/api/v1/health
 
 ```bash
 # Attempt to spoof IP (should fail)
-curl -H "X-Forwarded-For: 127.0.0.1, 192.168.1.100" https://api.8004.dev/api/v1/triggers
+curl -H "X-Forwarded-For: 127.0.0.1, 192.168.1.100" https://api.agentauri.ai/api/v1/triggers
 
 # Check logs for warning about untrusted IP injection
 ```
@@ -436,7 +436,7 @@ curl -H "X-Forwarded-For: 127.0.0.1, 192.168.1.100" https://api.8004.dev/api/v1/
 docker-compose stop redis
 
 # Make API request
-curl https://api.8004.dev/api/v1/health
+curl https://api.agentauri.ai/api/v1/health
 
 # Expected header:
 # X-RateLimit-Status: degraded

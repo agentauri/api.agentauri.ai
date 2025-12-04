@@ -142,7 +142,7 @@ X-RateLimit-Reset: 1705316400
     "retry_after": 1847,
     "limit": 100,
     "window": 3600,
-    "upgrade_url": "https://8004.dev/pricing"
+    "upgrade_url": "https://agentauri.ai/pricing"
   }
 }
 ```

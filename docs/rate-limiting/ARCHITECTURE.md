@@ -6,7 +6,7 @@ This document provides technical implementation details for the rate limiting sy
 
 ## Overview
 
-The api.8004.dev rate limiting system provides a comprehensive, Redis-based sliding window rate limiter that supports the 3-layer authentication model with query tier cost multipliers.
+The api.agentauri.ai rate limiting system provides a comprehensive, Redis-based sliding window rate limiter that supports the 3-layer authentication model with query tier cost multipliers.
 
 ## Architecture Components
 

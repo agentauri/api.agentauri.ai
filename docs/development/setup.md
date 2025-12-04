@@ -59,8 +59,8 @@
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/api.8004.dev.git
-cd api.8004.dev
+git clone https://github.com/your-org/api.agentauri.ai.git
+cd api.agentauri.ai
 ```
 
 ### 2. Environment Configuration
@@ -69,7 +69,7 @@ Create `.env` file in the project root:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/erc8004_backend
+DATABASE_URL=postgresql://postgres:password@localhost:5432/agentauri_backend
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -117,7 +117,7 @@ Initialize the database:
 
 ```bash
 # Create database (if not using Docker)
-createdb erc8004_backend
+createdb agentauri_backend
 
 # Run migrations
 cd rust-backend
@@ -127,7 +127,7 @@ sqlx migrate run
 Verify migrations:
 
 ```bash
-psql erc8004_backend -c "\dt"
+psql agentauri_backend -c "\dt"
 ```
 
 ### 5. Install Dependencies
@@ -193,7 +193,7 @@ Check that all services are running:
 curl http://localhost:8000/api/v1/health
 
 # Check PostgreSQL
-psql erc8004_backend -c "SELECT COUNT(*) FROM events;"
+psql agentauri_backend -c "SELECT COUNT(*) FROM events;"
 
 # Check Redis
 redis-cli ping
@@ -337,16 +337,16 @@ pnpm dev
 
 ```bash
 # Connect to database
-psql erc8004_backend
+psql agentauri_backend
 
 # Backup database
-pg_dump erc8004_backend > backup.sql
+pg_dump agentauri_backend > backup.sql
 
 # Restore database
-psql erc8004_backend < backup.sql
+psql agentauri_backend < backup.sql
 
 # View table sizes
-psql erc8004_backend -c "
+psql agentauri_backend -c "
 SELECT
     schemaname,
     tablename,

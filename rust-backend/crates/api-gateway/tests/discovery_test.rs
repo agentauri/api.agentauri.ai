@@ -173,13 +173,13 @@ mod unit_tests {
     #[test]
     fn test_contact_structure() {
         let contact = Contact {
-            email: "support@8004.dev".to_string(),
-            github: "https://github.com/erc-8004/api.8004.dev".to_string(),
-            documentation: "https://docs.8004.dev".to_string(),
+            email: "support@agentauri.ai".to_string(),
+            github: "https://github.com/erc-8004/api.agentauri.ai".to_string(),
+            documentation: "https://docs.agentauri.ai".to_string(),
         };
 
         let json = serde_json::to_value(&contact).expect("Failed to serialize");
-        assert_eq!(json["email"], "support@8004.dev");
+        assert_eq!(json["email"], "support@agentauri.ai");
         assert!(json["github"].as_str().unwrap().contains("github.com"));
         assert!(json["documentation"].as_str().unwrap().contains("docs"));
     }
@@ -272,11 +272,11 @@ mod unit_tests {
         use chrono::Utc;
 
         let agent_card = AgentCardResponse {
-            name: "ERC-8004 Backend API".to_string(),
+            name: "AgentAuri API".to_string(),
             version: "1.0.0".to_string(),
             description: "Real-time backend infrastructure".to_string(),
             api_version: "v1".to_string(),
-            base_url: "https://api.8004.dev".to_string(),
+            base_url: "https://api.agentauri.ai".to_string(),
             capabilities: Capabilities {
                 push_layer: PushLayer {
                     enabled: true,
@@ -338,18 +338,18 @@ mod unit_tests {
                 },
             },
             endpoints: Endpoints {
-                api_documentation: "https://api.8004.dev/docs".to_string(),
-                health_check: "https://api.8004.dev/api/v1/health".to_string(),
+                api_documentation: "https://api.agentauri.ai/docs".to_string(),
+                health_check: "https://api.agentauri.ai/api/v1/health".to_string(),
                 authentication: AuthenticationEndpoints {
-                    register: "https://api.8004.dev/api/v1/auth/register".to_string(),
-                    login: "https://api.8004.dev/api/v1/auth/login".to_string(),
+                    register: "https://api.agentauri.ai/api/v1/auth/register".to_string(),
+                    login: "https://api.agentauri.ai/api/v1/auth/login".to_string(),
                 },
-                triggers: "https://api.8004.dev/api/v1/triggers".to_string(),
+                triggers: "https://api.agentauri.ai/api/v1/triggers".to_string(),
             },
             contact: Contact {
-                email: "support@8004.dev".to_string(),
-                github: "https://github.com/erc-8004/api.8004.dev".to_string(),
-                documentation: "https://docs.8004.dev".to_string(),
+                email: "support@agentauri.ai".to_string(),
+                github: "https://github.com/erc-8004/api.agentauri.ai".to_string(),
+                documentation: "https://docs.agentauri.ai".to_string(),
             },
             protocol_version: "erc-8004-v1.0".to_string(),
             generated_at: Utc::now(),
@@ -358,7 +358,7 @@ mod unit_tests {
         let json_str = serde_json::to_string_pretty(&agent_card).expect("Failed to serialize");
 
         // Verify all major sections are present
-        assert!(json_str.contains("ERC-8004 Backend API"));
+        assert!(json_str.contains("AgentAuri API"));
         assert!(json_str.contains("push_layer"));
         assert!(json_str.contains("pull_layer"));
         assert!(json_str.contains("authentication"));

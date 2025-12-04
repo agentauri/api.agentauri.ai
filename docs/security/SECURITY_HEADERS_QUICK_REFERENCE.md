@@ -37,7 +37,7 @@ cargo test --package api-gateway --test security_headers_integration_test
 ./scripts/test-security-headers.sh
 
 # Manual test (production)
-./scripts/test-security-headers.sh https://api.8004.dev
+./scripts/test-security-headers.sh https://api.agentauri.ai
 ```
 
 ## 🔧 Configuration
@@ -87,7 +87,7 @@ SecurityHeaders::default()  // ❌ Wrong for APIs
 
 ```bash
 # Quick check
-curl -I https://api.8004.dev/api/v1/health | grep -i "strict-transport-security\|cross-origin"
+curl -I https://api.agentauri.ai/api/v1/health | grep -i "strict-transport-security\|cross-origin"
 
 # Expected:
 # Strict-Transport-Security: max-age=31536000; includeSubDomains
@@ -105,7 +105,7 @@ curl -I https://api.8004.dev/api/v1/health | grep -i "strict-transport-security\
 ## 🎖️ SecurityHeaders.com Validation
 
 1. Visit: https://securityheaders.com
-2. Enter: `https://api.8004.dev/api/v1/health`
+2. Enter: `https://api.agentauri.ai/api/v1/health`
 3. Expected: **A+**
 
 ## 📞 Support

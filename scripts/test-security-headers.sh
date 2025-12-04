@@ -10,7 +10,7 @@
 #
 # Examples:
 #   ./scripts/test-security-headers.sh                              # Test localhost:8080
-#   ./scripts/test-security-headers.sh https://api.8004.dev         # Test production
+#   ./scripts/test-security-headers.sh https://api.agentauri.ai         # Test production
 
 set -euo pipefail
 

@@ -111,7 +111,7 @@ else
     print_warning ".env file not found, using defaults"
     export DB_USER=${DB_USER:-postgres}
     export DB_PASSWORD=${DB_PASSWORD:-}
-    export DB_NAME=${DB_NAME:-erc8004_backend}
+    export DB_NAME=${DB_NAME:-agentauri_backend}
     export DB_HOST=${DB_HOST:-localhost}
     export DB_PORT=${DB_PORT:-5432}
 fi

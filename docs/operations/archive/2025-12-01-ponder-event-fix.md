@@ -166,7 +166,7 @@ After Ponder has been running for a few minutes:
 
 ```bash
 # Connect to PostgreSQL
-psql erc8004_backend
+psql agentauri_backend
 
 # Check for new event types
 SELECT
@@ -339,7 +339,7 @@ pnpm dev 2>&1 | grep -i error
 
 3. ✅ **Verify database** has new events
    ```bash
-   psql erc8004_backend -c "SELECT DISTINCT event_type FROM \"Event\" ORDER BY event_type;"
+   psql agentauri_backend -c "SELECT DISTINCT event_type FROM \"Event\" ORDER BY event_type;"
    ```
 
 ### Short-term (Today)

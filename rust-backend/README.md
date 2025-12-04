@@ -1,6 +1,6 @@
 # Rust Backend Services
 
-This directory contains the Rust backend services for api.8004.dev, implementing the core event processing, trigger matching, and action execution infrastructure.
+This directory contains the Rust backend services for api.agentauri.ai, implementing the core event processing, trigger matching, and action execution infrastructure.
 
 ## Architecture Overview
 
@@ -84,7 +84,7 @@ Create a `.env` file in the project root (one level up from `rust-backend/`):
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=erc8004_backend
+DB_NAME=agentauri_backend
 DB_USER=postgres
 DB_PASSWORD=your_password_here
 DB_MAX_CONNECTIONS=10

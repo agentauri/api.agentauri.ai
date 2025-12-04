@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Purpose: Comprehensive testing of analytics views, indexes, and functions
 -- Coverage: 20+ tests covering view creation, data correctness, performance, edge cases
--- Run: psql erc8004_backend < database/tests/test-analytics.sql
+-- Run: psql agentauri_backend < database/tests/test-analytics.sql
 -- ============================================================================
 
 \echo '============================================================================'

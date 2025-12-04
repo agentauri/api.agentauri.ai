@@ -5,7 +5,7 @@
 
 ## Overview
 
-The Model Context Protocol (MCP) is a standardized protocol for communication between AI agents and external systems. In the api.8004.dev backend, MCP serves as the critical bridge for pushing on-chain feedback and validation results to off-chain agents, enabling them to learn and adapt based on their reputation.
+The Model Context Protocol (MCP) is a standardized protocol for communication between AI agents and external systems. In the api.agentauri.ai backend, MCP serves as the critical bridge for pushing on-chain feedback and validation results to off-chain agents, enabling them to learn and adapt based on their reputation.
 
 ## Why MCP Integration is Critical
 
@@ -140,7 +140,7 @@ app.post('/mcp/call', async (req, res) => {
     // Create MCP client
     const transport = createTransport(request.endpoint);
     const client = new Client({
-      name: 'erc8004-backend',
+      name: 'agentauri-backend',
       version: '1.0.0',
     }, {
       capabilities: {},

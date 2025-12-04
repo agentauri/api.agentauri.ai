@@ -31,7 +31,7 @@ This test suite verifies ALL aspects of the database:
 
 **Run individually**:
 ```bash
-docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f database/tests/test-schema.sql
+docker exec agentauri-postgres psql -U postgres -d test_agentauri_backend -f database/tests/test-schema.sql
 ```
 
 ### 2. `test-timescaledb.sql`
@@ -47,7 +47,7 @@ docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f databas
 
 **Run individually**:
 ```bash
-docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f database/tests/test-timescaledb.sql
+docker exec agentauri-postgres psql -U postgres -d test_agentauri_backend -f database/tests/test-timescaledb.sql
 ```
 
 ### 3. `test-data-integrity.sql`
@@ -63,7 +63,7 @@ docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f databas
 
 **Run individually**:
 ```bash
-docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f database/tests/test-data-integrity.sql
+docker exec agentauri-postgres psql -U postgres -d test_agentauri_backend -f database/tests/test-data-integrity.sql
 ```
 
 ### 4. `test-notifications.sql`
@@ -77,7 +77,7 @@ docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f databas
 
 **Run individually**:
 ```bash
-docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f database/tests/test-notifications.sql
+docker exec agentauri-postgres psql -U postgres -d test_agentauri_backend -f database/tests/test-notifications.sql
 ```
 
 ### 5. `test-performance.sql`
@@ -93,7 +93,7 @@ docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f databas
 
 **Run individually**:
 ```bash
-docker exec erc8004-postgres psql -U postgres -d test_erc8004_backend -f database/tests/test-performance.sql
+docker exec agentauri-postgres psql -U postgres -d test_agentauri_backend -f database/tests/test-performance.sql
 ```
 
 ## Test Runner Script
@@ -128,17 +128,17 @@ TEST_DB_NAME=my_test_db ./database/test-migrations.sh
 ```
 
 **Environment Variables**:
-- `TEST_DB_NAME`: Test database name (default: `test_erc8004_backend`)
+- `TEST_DB_NAME`: Test database name (default: `test_agentauri_backend`)
 - `DB_USER`: PostgreSQL user (default: `postgres`)
 - `DB_HOST`: PostgreSQL host (default: `localhost`)
 - `DB_PORT`: PostgreSQL port (default: `5432`)
-- `DOCKER_CONTAINER`: Docker container name (default: `erc8004-postgres`)
+- `DOCKER_CONTAINER`: Docker container name (default: `agentauri-postgres`)
 - `KEEP_TEST_DB`: Set to `1` to keep test database after tests (default: `0`)
 
 ## Quick Start
 
 ### Prerequisites
-- Docker with erc8004-postgres container running
+- Docker with agentauri-postgres container running
 - PostgreSQL 15+ with TimescaleDB 2.x
 - Bash shell (macOS/Linux)
 
@@ -153,8 +153,8 @@ TEST_DB_NAME=my_test_db ./database/test-migrations.sh
 ========================================================================
 DATABASE MIGRATION TEST SUITE
 ========================================================================
-[INFO] Test Database: test_erc8004_backend
-[INFO] Docker Container: erc8004-postgres
+[INFO] Test Database: test_agentauri_backend
+[INFO] Docker Container: agentauri-postgres
 
 [✓] Docker container is running
 [✓] PostgreSQL is accessible
@@ -258,7 +258,7 @@ run_test_file "database/tests/test-your-feature.sql"
 ### Docker Container Not Running
 ```bash
 # Check container status
-docker ps -a | grep erc8004-postgres
+docker ps -a | grep agentauri-postgres
 
 # Start container
 docker-compose up -d postgres
@@ -267,10 +267,10 @@ docker-compose up -d postgres
 ### TimescaleDB Extension Not Available
 ```bash
 # Check PostgreSQL logs
-docker logs erc8004-postgres
+docker logs agentauri-postgres
 
 # Verify TimescaleDB is installed
-docker exec erc8004-postgres psql -U postgres -c "SELECT * FROM pg_available_extensions WHERE name = 'timescaledb';"
+docker exec agentauri-postgres psql -U postgres -c "SELECT * FROM pg_available_extensions WHERE name = 'timescaledb';"
 ```
 
 ### Migration Fails
@@ -279,7 +279,7 @@ docker exec erc8004-postgres psql -U postgres -c "SELECT * FROM pg_available_ext
 ./database/test-migrations.sh 2>&1 | grep "Migration failed"
 
 # Run migration manually to see detailed error
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < database/migrations/FAILED_MIGRATION.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend < database/migrations/FAILED_MIGRATION.sql
 ```
 
 ### Test Fails
@@ -288,7 +288,7 @@ docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < datab
 KEEP_TEST_DB=1 ./database/test-migrations.sh
 
 # Connect to test database
-docker exec -it erc8004-postgres psql -U postgres -d test_erc8004_backend
+docker exec -it agentauri-postgres psql -U postgres -d test_agentauri_backend
 
 # Inspect tables, data, and run queries manually
 \dt
@@ -299,7 +299,7 @@ SELECT * FROM test_table;
 ### View Detailed Test Output
 ```bash
 # Run specific test file with verbose output
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend -v ON_ERROR_STOP=1 < database/tests/test-schema.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend -v ON_ERROR_STOP=1 < database/tests/test-schema.sql
 ```
 
 ## Integration with CI/CD

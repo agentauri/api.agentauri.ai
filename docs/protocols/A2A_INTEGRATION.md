@@ -352,8 +352,8 @@ Agents can discover our capabilities through the Agent Card at `/.well-known/age
   "description": "Query agent reputation and validation data from ERC-8004 registries",
   "protocols": ["a2a", "mcp"],
   "endpoints": {
-    "a2a": "https://api.8004.dev/api/v1/a2a/rpc",
-    "mcp": "https://api.8004.dev/mcp"
+    "a2a": "https://api.agentauri.ai/api/v1/a2a/rpc",
+    "mcp": "https://api.agentauri.ai/mcp"
   },
   "capabilities": {
     "tools": [
@@ -385,7 +385,7 @@ Agents can discover our capabilities through the Agent Card at `/.well-known/age
   },
   "authentication": {
     "type": "bearer",
-    "signup_url": "https://8004.dev/signup"
+    "signup_url": "https://agentauri.ai/signup"
   }
 }
 ```
@@ -416,7 +416,7 @@ Agents can discover our capabilities through the Agent Card at `/.well-known/age
     "data": {
       "required": "0.05 USDC",
       "available": "0.02 USDC",
-      "purchase_url": "https://8004.dev/billing"
+      "purchase_url": "https://agentauri.ai/billing"
     }
   },
   "id": "1"
@@ -450,7 +450,7 @@ Agents can discover our capabilities through the Agent Card at `/.well-known/age
 
 ```bash
 # 1. Submit query
-curl -X POST https://api.8004.dev/api/v1/a2a/rpc \
+curl -X POST https://api.agentauri.ai/api/v1/a2a/rpc \
   -H "Authorization: Bearer ak_8004_abc123..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -468,11 +468,11 @@ curl -X POST https://api.8004.dev/api/v1/a2a/rpc \
 # Response: {"jsonrpc":"2.0","result":{"task_id":"task-xyz789","status":"submitted"},"id":"1"}
 
 # 2. Stream progress (optional)
-curl -N https://api.8004.dev/api/v1/a2a/tasks/task-xyz789/stream \
+curl -N https://api.agentauri.ai/api/v1/a2a/tasks/task-xyz789/stream \
   -H "Authorization: Bearer ak_8004_abc123..."
 
 # 3. Get result
-curl https://api.8004.dev/api/v1/a2a/rpc \
+curl https://api.agentauri.ai/api/v1/a2a/rpc \
   -H "Authorization: Bearer ak_8004_abc123..." \
   -H "Content-Type: application/json" \
   -d '{

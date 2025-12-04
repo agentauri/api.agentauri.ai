@@ -1,5 +1,5 @@
 # ============================================================================
-# Docker Compose Configuration for ERC-8004 Backend
+# Docker Compose Configuration for AgentAuri Backend
 # ============================================================================
 # SECURITY: This file uses environment variables for sensitive data
 # Create a .env file with your credentials (see .env.example)
@@ -9,11 +9,11 @@
 services:
   postgres:
     image: timescale/timescaledb:2.23.1-pg15  # Pinned version for security
-    container_name: erc8004-postgres
+    container_name: agentauri-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password must be set in .env file}
-      POSTGRES_DB: ${DB_NAME:-erc8004_backend}
+      POSTGRES_DB: ${DB_NAME:-agentauri_backend}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
       # SECURITY: Bind to localhost only to prevent external access
@@ -44,7 +44,7 @@ services:
 
   redis:
     image: redis:7.4-alpine  # Pinned version for security
-    container_name: erc8004-redis
+    container_name: agentauri-redis
     ports:
       # SECURITY: Bind to localhost only
       - "127.0.0.1:6379:6379"
@@ -72,7 +72,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.51.0  # Pinned version for security
-    container_name: erc8004-prometheus
+    container_name: agentauri-prometheus
     ports:
       # SECURITY: Bind to localhost only
       - "127.0.0.1:9090:9090"
@@ -101,7 +101,7 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.0  # Pinned version for security
-    container_name: erc8004-grafana
+    container_name: agentauri-grafana
     ports:
       # SECURITY: Bind to localhost only
       - "127.0.0.1:3000:3000"
@@ -137,7 +137,7 @@ services:
 
   nginx:
     image: nginx:1.25-alpine  # Pinned version for security
-    container_name: erc8004-nginx
+    container_name: agentauri-nginx
     ports:
       # Expose HTTP and HTTPS to the internet
       - "80:80"
@@ -171,7 +171,7 @@ services:
 
   certbot:
     image: certbot/certbot:latest  # Always use latest for security patches
-    container_name: erc8004-certbot
+    container_name: agentauri-certbot
     volumes:
       # Certificate storage (shared with nginx)
       - ./docker/certbot/conf:/etc/letsencrypt
@@ -202,4 +202,4 @@ volumes:
 
 networks:
   default:
-    name: erc8004-network
+    name: agentauri-network

@@ -205,7 +205,7 @@ async fn refresh_analytics(pool: &PgPool) -> Result<Vec<RefreshResult>> {
 # /etc/cron.d/refresh-analytics
 # Runs every 5 minutes
 
-*/5 * * * * postgres psql -d erc8004_backend -c "SELECT * FROM refresh_action_analytics();" >> /var/log/analytics-refresh.log 2>&1
+*/5 * * * * postgres psql -d agentauri_backend -c "SELECT * FROM refresh_action_analytics();" >> /var/log/analytics-refresh.log 2>&1
 ```
 
 **Pros**:

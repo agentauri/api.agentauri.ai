@@ -319,7 +319,7 @@ Run:
 
 ```bash
 cd rust-backend
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/erc8004_backend \
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/agentauri_backend \
 REDIS_URL=redis://localhost:6379 \
 cargo run -p event-processor
 ```
@@ -334,7 +334,7 @@ INFO Listening for PostgreSQL NOTIFY events on channel 'new_event'
 #### Terminal 2: Insert Test Event
 
 ```bash
-docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend <<EOF
+docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend <<EOF
 INSERT INTO events (
     id, chain_id, block_number, block_hash, transaction_hash, log_index,
     event_type, registry, timestamp, created_at
@@ -368,7 +368,7 @@ To simulate high-volume event processing:
 ```bash
 # Generate 1,000 events
 for i in {1..1000}; do
-  docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend <<EOF
+  docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend <<EOF
   INSERT INTO events (id, chain_id, block_number, block_hash, transaction_hash, log_index,
                       event_type, registry, timestamp, created_at)
   VALUES ('load_test_${i}', 11155111, $((1000000 + i)), '0x' || md5(random()::text),

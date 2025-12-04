@@ -169,7 +169,7 @@ All performance tests passed with the following benchmarks:
 
 ## Test Files
 
-All test files located in `/Users/matteoscurati/work/api.8004.dev/database/tests/`:
+All test files located in `/Users/matteoscurati/work/api.agentauri.ai/database/tests/`:
 
 - ✅ `test-schema.sql` - Schema validation (41 tests)
 - ✅ `test-timescaledb.sql` - TimescaleDB functionality (19 tests)
@@ -186,11 +186,11 @@ All test files located in `/Users/matteoscurati/work/api.8004.dev/database/tests
 ./database/test-migrations.sh
 
 # Run individual test suites
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < database/tests/test-schema.sql
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < database/tests/test-timescaledb.sql
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < database/tests/test-data-integrity.sql
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < database/tests/test-notifications.sql
-docker exec -i erc8004-postgres psql -U postgres -d test_erc8004_backend < database/tests/test-performance-simple.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend < database/tests/test-schema.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend < database/tests/test-timescaledb.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend < database/tests/test-data-integrity.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend < database/tests/test-notifications.sql
+docker exec -i agentauri-postgres psql -U postgres -d test_agentauri_backend < database/tests/test-performance-simple.sql
 ```
 
 ## Compliance with Testing Policy
@@ -224,6 +224,6 @@ The database is ready for production deployment.
 **Test Execution Environment**:
 - PostgreSQL Version: 15.13
 - TimescaleDB Version: 2.23.1
-- Docker Container: erc8004-postgres
-- Test Database: test_erc8004_backend
+- Docker Container: agentauri-postgres
+- Test Database: test_agentauri_backend
 - Test Execution Date: 2025-01-23

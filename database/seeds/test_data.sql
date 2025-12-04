@@ -1,6 +1,6 @@
 -- Test Data Seed File
 -- Purpose: Populate database with sample data for development and testing
--- Usage: psql -d erc8004_backend -f database/seeds/test_data.sql
+-- Usage: psql -d agentauri_backend -f database/seeds/test_data.sql
 -- Note: This file is safe to run multiple times (uses ON CONFLICT DO NOTHING)
 
 -- ============================================================================

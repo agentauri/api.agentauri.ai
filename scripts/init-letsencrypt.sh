@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# Let's Encrypt Initialization Script for api.8004.dev
+# Let's Encrypt Initialization Script for api.agentauri.ai
 # =============================================================================
 # This script initializes HTTPS/TLS with automatic certificate management:
 # 1. Downloads recommended TLS parameters
@@ -16,7 +16,7 @@
 #   --staging    Use Let's Encrypt staging environment (for testing)
 #
 # Prerequisites:
-#   - Domain name (api.8004.dev) pointing to this server
+#   - Domain name (api.agentauri.ai) pointing to this server
 #   - Ports 80 and 443 open in firewall
 #   - Docker and Docker Compose installed
 #   - Valid email address for certificate notifications
@@ -27,8 +27,8 @@ set -e  # Exit on error
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-DOMAIN="${DOMAIN:-api.8004.dev}"
-EMAIL="${LETSENCRYPT_EMAIL:-admin@8004.dev}"  # Change this!
+DOMAIN="${DOMAIN:-api.agentauri.ai}"
+EMAIL="${LETSENCRYPT_EMAIL:-admin@agentauri.ai}"  # Change this!
 STAGING=0  # Set to 1 for testing with staging environment
 
 # Paths

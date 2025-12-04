@@ -304,7 +304,7 @@ impl ReqwestHttpClient {
             .pool_max_idle_per_host(10)
             .pool_idle_timeout(Duration::from_secs(90))
             .connect_timeout(Duration::from_secs(10))
-            .user_agent("erc8004-action-worker/1.0")
+            .user_agent("agentauri-action-worker/1.0")
             .build()
             .map_err(|e| {
                 WorkerError::invalid_config(format!("Failed to create HTTP client: {}", e))

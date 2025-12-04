@@ -1,6 +1,6 @@
 # Authentication System
 
-This document provides a comprehensive overview of the 3-layer authentication system for api.8004.dev.
+This document provides a comprehensive overview of the 3-layer authentication system for api.agentauri.ai.
 
 ## Overview
 

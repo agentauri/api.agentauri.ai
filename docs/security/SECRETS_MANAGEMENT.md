@@ -184,7 +184,7 @@ Run the automated setup script:
 
 This script will:
 - Verify AWS credentials
-- Create all required secrets with `erc8004/` prefix
+- Create all required secrets with `agentauri/` prefix
 - Prompt for secret values (or use defaults)
 - Handle both new secret creation and updates
 
@@ -202,7 +202,7 @@ Attach this policy to your application's IAM role (EC2, ECS, Lambda):
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:DescribeSecret"
             ],
-            "Resource": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:erc8004/*"
+            "Resource": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:agentauri/*"
         },
         {
             "Effect": "Allow",
@@ -302,10 +302,10 @@ export VAULT_ADDR='http://localhost:8200'
 export VAULT_TOKEN='dev-root-token'
 
 # List secrets
-vault kv list secret/erc8004
+vault kv list secret/agentauri
 
 # Get a secret
-vault kv get secret/erc8004/database_url
+vault kv get secret/agentauri/database_url
 ```
 
 **Step 3: Configure Application**
@@ -364,18 +364,18 @@ vault secrets enable -version=2 -path=secret kv
 
 ```bash
 # Example: Create database_url secret
-vault kv put secret/erc8004/database_url \
+vault kv put secret/agentauri/database_url \
   value="postgresql://user:password@host:5432/db"
 
 # Verify
-vault kv get secret/erc8004/database_url
+vault kv get secret/agentauri/database_url
 ```
 
 **Step 5: Create Policy for Application**
 
 ```hcl
-# erc8004-app-policy.hcl
-path "secret/data/erc8004/*" {
+# agentauri-app-policy.hcl
+path "secret/data/agentauri/*" {
   capabilities = ["read"]
 }
 ```
@@ -383,13 +383,13 @@ path "secret/data/erc8004/*" {
 Apply policy:
 
 ```bash
-vault policy write erc8004-app erc8004-app-policy.hcl
+vault policy write agentauri-app agentauri-app-policy.hcl
 ```
 
 **Step 6: Create Token for Application**
 
 ```bash
-vault token create -policy=erc8004-app -ttl=720h
+vault token create -policy=agentauri-app -ttl=720h
 # Save token securely - this is the VAULT_TOKEN for the app
 ```
 
@@ -511,7 +511,7 @@ See `infrastructure/lambda/secret-rotation.py` for example Lambda function.
 
 ```bash
 aws secretsmanager rotate-secret \
-  --secret-id erc8004/database_url \
+  --secret-id agentauri/database_url \
   --rotation-lambda-arn arn:aws:lambda:us-east-1:ACCOUNT:function:rotate-secret \
   --rotation-rules AutomaticallyAfterDays=30
 ```
@@ -520,7 +520,7 @@ aws secretsmanager rotate-secret \
 
 ```bash
 aws secretsmanager rotate-secret \
-  --secret-id erc8004/database_url
+  --secret-id agentauri/database_url
 ```
 
 ### Automated Rotation (Vault)
@@ -532,22 +532,22 @@ Vault supports dynamic secrets for databases:
 vault secrets enable database
 
 # Configure PostgreSQL connection
-vault write database/config/erc8004-db \
+vault write database/config/agentauri-db \
   plugin_name=postgresql-database-plugin \
   allowed_roles="*" \
-  connection_url="postgresql://{{username}}:{{password}}@postgres:5432/erc8004_backend" \
+  connection_url="postgresql://{{username}}:{{password}}@postgres:5432/agentauri_backend" \
   username="vaultadmin" \
   password="vaultpassword"
 
 # Create role with TTL
-vault write database/roles/erc8004-app \
-  db_name=erc8004-db \
+vault write database/roles/agentauri-app \
+  db_name=agentauri-db \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';" \
   default_ttl="1h" \
   max_ttl="24h"
 
 # Application reads dynamic credentials
-vault read database/creds/erc8004-app
+vault read database/creds/agentauri-app
 ```
 
 ---
@@ -567,7 +567,7 @@ vault read database/creds/erc8004-app
             "Action": [
                 "secretsmanager:GetSecretValue"
             ],
-            "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:erc8004/*"
+            "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:agentauri/*"
         },
         {
             "Effect": "Deny",
@@ -582,7 +582,7 @@ vault read database/creds/erc8004-app
 ```
 
 This grants:
-- ✅ Read access to `erc8004/*` secrets
+- ✅ Read access to `agentauri/*` secrets
 - ❌ No write or delete access
 
 ### Vault Policies
@@ -590,12 +590,12 @@ This grants:
 **Application Policy** (read-only):
 
 ```hcl
-# erc8004-app-policy.hcl
-path "secret/data/erc8004/*" {
+# agentauri-app-policy.hcl
+path "secret/data/agentauri/*" {
   capabilities = ["read"]
 }
 
-path "secret/metadata/erc8004/*" {
+path "secret/metadata/agentauri/*" {
   capabilities = ["list"]
 }
 ```
@@ -603,12 +603,12 @@ path "secret/metadata/erc8004/*" {
 **Admin Policy** (full access):
 
 ```hcl
-# erc8004-admin-policy.hcl
-path "secret/data/erc8004/*" {
+# agentauri-admin-policy.hcl
+path "secret/data/agentauri/*" {
   capabilities = ["create", "read", "update", "delete"]
 }
 
-path "secret/metadata/erc8004/*" {
+path "secret/metadata/agentauri/*" {
   capabilities = ["list", "read", "delete"]
 }
 ```
@@ -616,8 +616,8 @@ path "secret/metadata/erc8004/*" {
 Apply policies:
 
 ```bash
-vault policy write erc8004-app erc8004-app-policy.hcl
-vault policy write erc8004-admin erc8004-admin-policy.hcl
+vault policy write agentauri-app agentauri-app-policy.hcl
+vault policy write agentauri-admin agentauri-admin-policy.hcl
 ```
 
 ---
@@ -632,10 +632,10 @@ All Secrets Manager API calls are logged to CloudTrail:
 
 ```bash
 aws cloudtrail create-trail \
-  --name erc8004-secrets-trail \
+  --name agentauri-secrets-trail \
   --s3-bucket-name my-cloudtrail-bucket
 
-aws cloudtrail start-logging --name erc8004-secrets-trail
+aws cloudtrail start-logging --name agentauri-secrets-trail
 ```
 
 **Query Logs** (CloudWatch Insights):
@@ -643,7 +643,7 @@ aws cloudtrail start-logging --name erc8004-secrets-trail
 ```sql
 fields @timestamp, eventName, userIdentity.principalId, requestParameters.secretId
 | filter eventSource = "secretsmanager.amazonaws.com"
-| filter requestParameters.secretId like /erc8004/
+| filter requestParameters.secretId like /agentauri/
 | sort @timestamp desc
 ```
 
@@ -659,7 +659,7 @@ vault audit enable file file_path=/var/log/vault/audit.log
 
 ```bash
 # View recent secret accesses
-jq 'select(.request.path | startswith("secret/data/erc8004"))' \
+jq 'select(.request.path | startswith("secret/data/agentauri"))' \
   /var/log/vault/audit.log | tail -n 20
 ```
 
@@ -724,7 +724,7 @@ Secrets are never lost (AWS handles redundancy). To restore a deleted secret:
 
 ```bash
 # Restore within 7-30 day recovery window
-aws secretsmanager restore-secret --secret-id erc8004/database_url
+aws secretsmanager restore-secret --secret-id agentauri/database_url
 ```
 
 #### Restore from Vault Snapshot
@@ -821,7 +821,7 @@ vault operator unseal
 aws secretsmanager list-secrets --query 'SecretList[].Name'
 
 # Vault: List secrets
-vault kv list secret/erc8004
+vault kv list secret/agentauri
 ```
 
 #### "Access denied" (AWS)
@@ -835,7 +835,7 @@ vault kv list secret/erc8004
 aws sts get-caller-identity
 
 # Test secret access
-aws secretsmanager get-secret-value --secret-id erc8004/database_url
+aws secretsmanager get-secret-value --secret-id agentauri/database_url
 ```
 
 #### "Permission denied" (Vault)
@@ -849,7 +849,7 @@ aws secretsmanager get-secret-value --secret-id erc8004/database_url
 vault token lookup
 
 # Check policy
-vault policy read erc8004-app
+vault policy read agentauri-app
 ```
 
 #### "Cache always empty"

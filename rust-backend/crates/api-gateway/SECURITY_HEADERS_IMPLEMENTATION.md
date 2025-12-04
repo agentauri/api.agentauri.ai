@@ -29,30 +29,30 @@ This document summarizes the implementation of comprehensive security headers mi
 ### Files Created/Modified
 
 **Core Implementation**:
-- ✅ `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware/security_headers.rs` (enhanced)
+- ✅ `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware/security_headers.rs` (enhanced)
   - Added COEP, COOP, CORP headers
   - Updated documentation
   - 12 unit tests
 
 **Integration**:
-- ✅ `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/main.rs` (already integrated at line 91)
+- ✅ `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/main.rs` (already integrated at line 91)
   - `SecurityHeaders::for_api()` applied to all routes
 
 **Testing**:
-- ✅ `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/tests/security_headers_integration_test.rs` (new)
+- ✅ `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/tests/security_headers_integration_test.rs` (new)
   - 13 comprehensive integration tests
   - Tests all API endpoints
   - Validates consistency across routes
 
 **Documentation**:
-- ✅ `/Users/matteoscurati/work/api.8004.dev/docs/security/SECURITY_HEADERS.md` (new)
+- ✅ `/Users/matteoscurati/work/api.agentauri.ai/docs/security/SECURITY_HEADERS.md` (new)
   - Complete header documentation
   - Usage examples
   - Troubleshooting guide
   - Browser compatibility matrix
 
 **Scripts**:
-- ✅ `/Users/matteoscurati/work/api.8004.dev/scripts/test-security-headers.sh` (new)
+- ✅ `/Users/matteoscurati/work/api.agentauri.ai/scripts/test-security-headers.sh` (new)
   - Manual testing script
   - Color-coded output
   - SecurityHeaders.com grade estimation
@@ -173,7 +173,7 @@ SecurityHeaders.com Grade Estimation: A+
 
 ### Production Testing (After Deployment)
 
-**URL**: https://api.8004.dev
+**URL**: https://api.agentauri.ai
 **HSTS**: Enabled (HTTPS connection)
 **Grade**: A+
 
@@ -199,7 +199,7 @@ HSTS_MAX_AGE=31536000
 2. Verify HTTPS certificate is valid
 3. Set `ENABLE_HSTS=true` in production environment
 4. Visit https://securityheaders.com
-5. Enter `https://api.8004.dev/api/v1/health`
+5. Enter `https://api.agentauri.ai/api/v1/health`
 6. Verify grade is **A+**
 
 ## Performance Analysis
@@ -331,10 +331,10 @@ HSTS_MAX_AGE=31536000
 **Production Monitoring**:
 ```bash
 # Check headers are present
-curl -I https://api.8004.dev/api/v1/health | grep -E "X-Content-Type-Options|Cross-Origin"
+curl -I https://api.agentauri.ai/api/v1/health | grep -E "X-Content-Type-Options|Cross-Origin"
 
 # Automated monitoring (add to CI/CD)
-./scripts/test-security-headers.sh https://api.8004.dev
+./scripts/test-security-headers.sh https://api.agentauri.ai
 ```
 
 **Alerting**:
@@ -344,7 +344,7 @@ curl -I https://api.8004.dev/api/v1/health | grep -E "X-Content-Type-Options|Cro
 ## References
 
 ### Documentation
-- [SECURITY_HEADERS.md](/Users/matteoscurati/work/api.8004.dev/docs/security/SECURITY_HEADERS.md) - Complete guide
+- [SECURITY_HEADERS.md](/Users/matteoscurati/work/api.agentauri.ai/docs/security/SECURITY_HEADERS.md) - Complete guide
 - [OWASP Secure Headers](https://owasp.org/www-project-secure-headers/)
 - [Mozilla Web Security Guidelines](https://infosec.mozilla.org/guidelines/web_security)
 

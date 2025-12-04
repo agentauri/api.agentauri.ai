@@ -1,6 +1,6 @@
 # HTTPS/TLS Setup Guide
 
-Complete guide for enabling HTTPS/TLS on api.8004.dev with automatic Let's Encrypt certificate management.
+Complete guide for enabling HTTPS/TLS on api.agentauri.ai with automatic Let's Encrypt certificate management.
 
 ## Table of Contents
 
@@ -42,22 +42,22 @@ Internet → Nginx (HTTPS termination) → API Gateway (HTTP localhost:8080)
 ### 1. Domain Configuration
 
 **Required**:
-- Domain name purchased and configured (e.g., `api.8004.dev`)
+- Domain name purchased and configured (e.g., `api.agentauri.ai`)
 - DNS A record pointing to production server IP
-- Domain propagation complete (verify with `host api.8004.dev`)
+- Domain propagation complete (verify with `host api.agentauri.ai`)
 
 **DNS Configuration Example**:
 ```
 Type: A
-Name: api.8004.dev
+Name: api.agentauri.ai
 Value: <YOUR_SERVER_IP>
 TTL: 3600 (1 hour)
 ```
 
 **Verify DNS**:
 ```bash
-host api.8004.dev
-# Should show: api.8004.dev has address <YOUR_SERVER_IP>
+host api.agentauri.ai
+# Should show: api.agentauri.ai has address <YOUR_SERVER_IP>
 ```
 
 ### 2. Server Requirements
@@ -101,7 +101,7 @@ docker compose version
 
 **Required for Let's Encrypt**:
 - Valid email for certificate expiry notifications
-- Set in `.env` file: `LETSENCRYPT_EMAIL=admin@8004.dev`
+- Set in `.env` file: `LETSENCRYPT_EMAIL=admin@agentauri.ai`
 
 ## Quick Start
 
@@ -110,10 +110,10 @@ docker compose version
 Edit `.env` file:
 ```bash
 # HTTPS Configuration
-DOMAIN=api.8004.dev
+DOMAIN=api.agentauri.ai
 LETSENCRYPT_EMAIL=your-email@example.com  # CHANGE THIS
 ENABLE_HTTPS=true
-BASE_URL=https://api.8004.dev
+BASE_URL=https://api.agentauri.ai
 ```
 
 ### Step 2: Initialize Let's Encrypt
@@ -137,17 +137,17 @@ Run initialization script:
 **Expected output**:
 ```
 ==========================================================================
-SUCCESS! HTTPS/TLS setup complete for api.8004.dev
+SUCCESS! HTTPS/TLS setup complete for api.agentauri.ai
 ==========================================================================
 
 Certificate details:
-  Domain: api.8004.dev
-  Email: admin@8004.dev
+  Domain: api.agentauri.ai
+  Email: admin@agentauri.ai
   Issuer: Let's Encrypt
   Environment: PRODUCTION
 
 Next steps:
-  1. Test HTTPS: curl https://api.8004.dev/health
+  1. Test HTTPS: curl https://api.agentauri.ai/health
   2. Run test script: ./scripts/test-https.sh
 ```
 
@@ -272,7 +272,7 @@ Run comprehensive test suite:
 Test Summary
 ==========================================================================
 
-Domain: api.8004.dev
+Domain: api.agentauri.ai
 
 Passed:   11
 Warnings: 0
@@ -285,49 +285,49 @@ Failed:   0
 
 **Test HTTPS connection**:
 ```bash
-curl -v https://api.8004.dev/health
+curl -v https://api.agentauri.ai/health
 ```
 
 **Test HTTP redirect**:
 ```bash
-curl -I http://api.8004.dev/
+curl -I http://api.agentauri.ai/
 # Should return: 301 Moved Permanently
-# Location: https://api.8004.dev/
+# Location: https://api.agentauri.ai/
 ```
 
 **Test security headers**:
 ```bash
-curl -I https://api.8004.dev/ | grep -i "strict-transport-security"
+curl -I https://api.agentauri.ai/ | grep -i "strict-transport-security"
 ```
 
 **Test TLS version**:
 ```bash
-openssl s_client -connect api.8004.dev:443 -tls1_2 < /dev/null
+openssl s_client -connect api.agentauri.ai:443 -tls1_2 < /dev/null
 # Should show: Protocol : TLSv1.2
 ```
 
 **Test certificate**:
 ```bash
-openssl s_client -connect api.8004.dev:443 -servername api.8004.dev < /dev/null 2>&1 | openssl x509 -noout -text
+openssl s_client -connect api.agentauri.ai:443 -servername api.agentauri.ai < /dev/null 2>&1 | openssl x509 -noout -text
 ```
 
 ### External Validation
 
 **SSL Labs** (comprehensive TLS audit):
 ```
-https://www.ssllabs.com/ssltest/analyze.html?d=api.8004.dev
+https://www.ssllabs.com/ssltest/analyze.html?d=api.agentauri.ai
 ```
 **Target**: A or A+ rating
 
 **SecurityHeaders.com** (header analysis):
 ```
-https://securityheaders.com/?q=https://api.8004.dev
+https://securityheaders.com/?q=https://api.agentauri.ai
 ```
 **Target**: A rating
 
 **Mozilla Observatory** (security assessment):
 ```
-https://observatory.mozilla.org/analyze/api.8004.dev
+https://observatory.mozilla.org/analyze/api.agentauri.ai
 ```
 **Target**: B+ or higher
 
@@ -362,19 +362,19 @@ docker compose --profile production run --rm certbot renew --dry-run
 
 **Check expiry date**:
 ```bash
-openssl s_client -connect api.8004.dev:443 -servername api.8004.dev < /dev/null 2>&1 | openssl x509 -noout -enddate
+openssl s_client -connect api.agentauri.ai:443 -servername api.agentauri.ai < /dev/null 2>&1 | openssl x509 -noout -enddate
 ```
 
 **Alert if <30 days**:
 ```bash
-openssl s_client -connect api.8004.dev:443 -servername api.8004.dev < /dev/null 2>&1 | openssl x509 -noout -checkend 2592000 || echo "WARNING: Certificate expires soon!"
+openssl s_client -connect api.agentauri.ai:443 -servername api.agentauri.ai < /dev/null 2>&1 | openssl x509 -noout -checkend 2592000 || echo "WARNING: Certificate expires soon!"
 ```
 
 ### Certificate Revocation
 
 **If compromised**:
 ```bash
-docker compose --profile production run --rm certbot revoke --cert-path /etc/letsencrypt/live/api.8004.dev/fullchain.pem
+docker compose --profile production run --rm certbot revoke --cert-path /etc/letsencrypt/live/api.agentauri.ai/fullchain.pem
 ./scripts/init-letsencrypt.sh  # Request new certificate
 ```
 
@@ -394,7 +394,7 @@ docker compose --profile production run --rm certbot revoke --cert-path /etc/let
 
 2. **Certificate files missing**:
    ```bash
-   ls -la docker/certbot/conf/live/api.8004.dev/
+   ls -la docker/certbot/conf/live/api.agentauri.ai/
    # Should show: fullchain.pem, privkey.pem
    # Fix: Run ./scripts/init-letsencrypt.sh
    ```
@@ -410,7 +410,7 @@ docker compose --profile production run --rm certbot revoke --cert-path /etc/let
 **Symptom**: `init-letsencrypt.sh` fails with "too many failed authorizations"
 
 **Causes**:
-1. **DNS not configured**: Verify `host api.8004.dev` resolves to server IP
+1. **DNS not configured**: Verify `host api.agentauri.ai` resolves to server IP
 2. **Firewall blocks port 80**: `sudo ufw allow 80/tcp`
 3. **Rate limit hit**: Use staging environment (`--staging` flag)
 4. **Port 80 not accessible**: Test `curl http://<SERVER_IP>/.well-known/test`
@@ -440,7 +440,7 @@ docker compose --profile production down
 **Clear HSTS cache** (Chrome):
 ```
 chrome://net-internals/#hsts
-# Delete domain security policies for api.8004.dev
+# Delete domain security policies for api.agentauri.ai
 ```
 
 ### Issue: Certificate renewal fails
@@ -456,7 +456,7 @@ docker compose --profile production logs certbot
 docker compose --profile production run --rm certbot renew --dry-run
 
 # Check ACME challenge accessibility
-curl http://api.8004.dev/.well-known/acme-challenge/test
+curl http://api.agentauri.ai/.well-known/acme-challenge/test
 # Should return: 404 (not 301 redirect)
 ```
 
@@ -479,7 +479,7 @@ docker compose --profile production exec nginx nginx -T | grep ssl_protocols
 
 **Verify OCSP stapling**:
 ```bash
-openssl s_client -connect api.8004.dev:443 -status < /dev/null 2>&1 | grep "OCSP Response Status"
+openssl s_client -connect api.agentauri.ai:443 -status < /dev/null 2>&1 | grep "OCSP Response Status"
 # Should show: successful
 ```
 
@@ -541,7 +541,7 @@ limit_req_zone $limit_key zone=api_limit:10m rate=100r/s;
 ### Certificate Transparency
 
 **Monitor certificate issuance**:
-- Subscribe to https://crt.sh/?q=api.8004.dev
+- Subscribe to https://crt.sh/?q=api.agentauri.ai
 - Receive alerts for any certificate issued for your domain
 - Detect unauthorized certificate requests
 
@@ -552,10 +552,10 @@ limit_req_zone $limit_key zone=api_limit:10m rate=100r/s;
 **Cron job** (daily check):
 ```bash
 # Add to crontab: crontab -e
-0 0 * * * /usr/bin/docker compose -f /path/to/api.8004.dev/docker-compose.yml --profile production run --rm certbot renew --quiet
+0 0 * * * /usr/bin/docker compose -f /path/to/api.agentauri.ai/docker-compose.yml --profile production run --rm certbot renew --quiet
 
 # Alert if <30 days
-0 0 * * * /usr/bin/openssl s_client -connect api.8004.dev:443 -servername api.8004.dev </dev/null 2>/dev/null | /usr/bin/openssl x509 -noout -checkend 2592000 || echo "WARNING: Certificate expires soon!" | mail -s "SSL Certificate Expiry Alert" admin@8004.dev
+0 0 * * * /usr/bin/openssl s_client -connect api.agentauri.ai:443 -servername api.agentauri.ai </dev/null 2>/dev/null | /usr/bin/openssl x509 -noout -checkend 2592000 || echo "WARNING: Certificate expires soon!" | mail -s "SSL Certificate Expiry Alert" admin@agentauri.ai
 ```
 
 ### Nginx Metrics
@@ -586,7 +586,7 @@ location /stub_status {
 **Monitor SSL Labs rating** (weekly):
 ```bash
 # Use SSL Labs API
-curl -s "https://api.ssllabs.com/api/v3/analyze?host=api.8004.dev" | jq '.endpoints[0].grade'
+curl -s "https://api.ssllabs.com/api/v3/analyze?host=api.agentauri.ai" | jq '.endpoints[0].grade'
 # Alert if grade < A
 ```
 
@@ -604,7 +604,7 @@ curl -s "https://api.ssllabs.com/api/v3/analyze?host=api.8004.dev" | jq '.endpoi
 2. **Update environment** (`.env`):
    ```bash
    ENABLE_HTTPS=false
-   BASE_URL=http://api.8004.dev
+   BASE_URL=http://api.agentauri.ai
    ```
 
 3. **Restart without HTTPS**:
@@ -636,9 +636,9 @@ docker compose --profile production up -d nginx
 ```bash
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout docker/certbot/conf/live/api.8004.dev/privkey.pem \
-  -out docker/certbot/conf/live/api.8004.dev/fullchain.pem \
-  -subj "/CN=api.8004.dev"
+  -keyout docker/certbot/conf/live/api.agentauri.ai/privkey.pem \
+  -out docker/certbot/conf/live/api.agentauri.ai/fullchain.pem \
+  -subj "/CN=api.agentauri.ai"
 
 # Restart nginx
 docker compose --profile production restart nginx

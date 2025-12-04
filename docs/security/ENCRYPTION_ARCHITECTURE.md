@@ -1,4 +1,4 @@
-# Database Encryption Architecture - ERC-8004 Backend
+# Database Encryption Architecture - AgentAuri Backend
 # ============================================================================
 
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -177,20 +177,20 @@
 │  AWS Secrets Manager / HashiCorp Vault / GCP Secret Manager            │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐ │
-│  │ Secret: erc8004/prod/database/encryption-key-v1                  │ │
+│  │ Secret: agentauri/prod/database/encryption-key-v1                  │ │
 │  │ Value: [32-byte random key, base64-encoded]                      │ │
 │  │ Rotation: Annual (re-encrypt data with new key)                  │ │
 │  │ Access: IAM role-based (application only)                        │ │
 │  └──────────────────────────────────────────────────────────────────┘ │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐ │
-│  │ Secret: erc8004/prod/database/master-password                    │ │
+│  │ Secret: agentauri/prod/database/master-password                    │ │
 │  │ Value: [32-byte random password]                                 │ │
 │  │ Rotation: Quarterly (via automated script)                       │ │
 │  └──────────────────────────────────────────────────────────────────┘ │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐ │
-│  │ Secret: erc8004/prod/database/kms-key-arn                        │ │
+│  │ Secret: agentauri/prod/database/kms-key-arn                        │ │
 │  │ Value: arn:aws:kms:us-east-1:123456789012:key/...               │ │
 │  │ Purpose: TDE master key (AWS KMS)                                │ │
 │  └──────────────────────────────────────────────────────────────────┘ │

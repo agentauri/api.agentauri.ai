@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Description: Comprehensive tests for TimescaleDB hypertable functionality
 -- Purpose: Verify events table is correctly configured as hypertable
--- Usage: psql -d test_erc8004_backend -f database/tests/test-timescaledb.sql
+-- Usage: psql -d test_agentauri_backend -f database/tests/test-timescaledb.sql
 -- ============================================================================
 
 \set ON_ERROR_STOP on

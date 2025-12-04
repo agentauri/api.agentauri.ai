@@ -12,17 +12,17 @@ use crate::handlers::billing::PurchaseCreditsRequestWithOrg;
 use crate::handlers::health::HealthResponse;
 use crate::models;
 
-/// OpenAPI documentation for the ERC-8004 Backend API
+/// OpenAPI documentation for the AgentAuri API
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "ERC-8004 Backend API",
+        title = "AgentAuri API",
         version = "1.0.0",
         description = "Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events.\n\n## Authentication\n\nThe API supports a 3-layer authentication system:\n\n- **Layer 0 (Anonymous)**: IP-based rate limiting (10 calls/hour)\n- **Layer 1 (API Key)**: Account-based access with `X-API-Key` header\n- **Layer 2 (JWT)**: Full user access with `Authorization: Bearer <token>`\n\n## Rate Limiting\n\nAll endpoints are rate limited. Check response headers for quota information:\n- `X-RateLimit-Limit`: Maximum requests per hour\n- `X-RateLimit-Remaining`: Remaining requests\n- `X-RateLimit-Reset`: Unix timestamp when limit resets",
         contact(
-            name = "ERC-8004 Team",
-            email = "support@8004.dev",
-            url = "https://github.com/erc-8004/api.8004.dev"
+            name = "AgentAuri Team",
+            email = "support@agentauri.ai",
+            url = "https://github.com/erc-8004/api.agentauri.ai"
         ),
         license(
             name = "MIT",
@@ -31,7 +31,7 @@ use crate::models;
     ),
     servers(
         (url = "http://localhost:8080", description = "Development server"),
-        (url = "https://api.8004.dev", description = "Production server")
+        (url = "https://api.agentauri.ai", description = "Production server")
     ),
     tags(
         (name = "Health", description = "Health check endpoints"),

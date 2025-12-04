@@ -2,7 +2,7 @@
 
 **Status**: Implemented (December 2, 2025)
 
-This document describes the social authentication system for api.8004.dev, enabling users to sign in with Google or GitHub accounts.
+This document describes the social authentication system for api.agentauri.ai, enabling users to sign in with Google or GitHub accounts.
 
 ## Overview
 
@@ -81,14 +81,14 @@ GET /api/v1/auth/{provider}/callback
 
 ```
 302 Found
-Location: https://app.8004.dev/auth/callback?token=eyJ...&user_id=usr_xxx
+Location: https://app.agentauri.ai/auth/callback?token=eyJ...&user_id=usr_xxx
 ```
 
 **Error Response**: 302 redirect with error details
 
 ```
 302 Found
-Location: https://app.8004.dev/auth/callback?error=auth_failed&message=...
+Location: https://app.agentauri.ai/auth/callback?error=auth_failed&message=...
 ```
 
 ## User Account Behavior
@@ -149,7 +149,7 @@ user_identities (
 
 ```bash
 # Frontend URL for redirects
-FRONTEND_URL=https://app.8004.dev
+FRONTEND_URL=https://app.agentauri.ai
 
 # OAuth state signing (REQUIRED in production)
 # Must be at least 32 characters, high entropy
@@ -158,12 +158,12 @@ OAUTH_STATE_SECRET=your-secure-random-secret-at-least-32-chars
 # Google OAuth 2.0
 GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
-GOOGLE_REDIRECT_URI=https://api.8004.dev/api/v1/auth/google/callback
+GOOGLE_REDIRECT_URI=https://api.agentauri.ai/api/v1/auth/google/callback
 
 # GitHub OAuth 2.0
 GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxx
 GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GITHUB_REDIRECT_URI=https://api.8004.dev/api/v1/auth/github/callback
+GITHUB_REDIRECT_URI=https://api.agentauri.ai/api/v1/auth/github/callback
 ```
 
 ### Provider Setup
@@ -176,7 +176,7 @@ GITHUB_REDIRECT_URI=https://api.8004.dev/api/v1/auth/github/callback
 4. Create **OAuth 2.0 Client ID** (Web application)
 5. Add authorized redirect URIs:
    - Development: `http://localhost:8080/api/v1/auth/google/callback`
-   - Production: `https://api.8004.dev/api/v1/auth/google/callback`
+   - Production: `https://api.agentauri.ai/api/v1/auth/google/callback`
 6. Copy Client ID and Client Secret
 
 #### GitHub Developer Settings
@@ -185,7 +185,7 @@ GITHUB_REDIRECT_URI=https://api.8004.dev/api/v1/auth/github/callback
 2. Create **New OAuth App**
 3. Set Authorization callback URL:
    - Development: `http://localhost:8080/api/v1/auth/github/callback`
-   - Production: `https://api.8004.dev/api/v1/auth/github/callback`
+   - Production: `https://api.agentauri.ai/api/v1/auth/github/callback`
 4. Copy Client ID and generate Client Secret
 
 ## Security

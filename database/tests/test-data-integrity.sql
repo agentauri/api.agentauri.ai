@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Description: Tests for constraints, foreign keys, and data integrity rules
 -- Purpose: Verify database enforces data integrity correctly
--- Usage: psql -d test_erc8004_backend -f database/tests/test-data-integrity.sql
+-- Usage: psql -d test_agentauri_backend -f database/tests/test-data-integrity.sql
 -- ============================================================================
 
 \set ON_ERROR_STOP on

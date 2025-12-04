@@ -523,7 +523,7 @@ impl SocialAuthService {
             .get(&self.github_config.as_ref().unwrap().user_info_url)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "ERC-8004-Backend")
+            .header("User-Agent", "AgentAuri-Backend")
             .bearer_auth(access_token)
             .send()
             .await
@@ -567,7 +567,7 @@ impl SocialAuthService {
             .get("https://api.github.com/user/emails")
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .header("User-Agent", "ERC-8004-Backend")
+            .header("User-Agent", "AgentAuri-Backend")
             .bearer_auth(access_token)
             .send()
             .await

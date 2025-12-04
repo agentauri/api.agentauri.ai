@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Description: Comprehensive tests for database schema integrity
 -- Purpose: Verify all tables, columns, constraints, indexes, and triggers
--- Usage: psql -d test_erc8004_backend -f database/tests/test-schema.sql
+-- Usage: psql -d test_agentauri_backend -f database/tests/test-schema.sql
 -- ============================================================================
 
 \set ON_ERROR_STOP on

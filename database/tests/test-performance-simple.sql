@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Description: Tests for query performance and index effectiveness
 -- Purpose: Verify indexes exist and queries perform well
--- Usage: psql -d test_erc8004_backend -f database/tests/test-performance-simple.sql
+-- Usage: psql -d test_agentauri_backend -f database/tests/test-performance-simple.sql
 -- ============================================================================
 
 \set ON_ERROR_STOP on

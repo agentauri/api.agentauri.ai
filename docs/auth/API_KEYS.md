@@ -1,6 +1,6 @@
 # API Key Authentication
 
-This document describes the API key authentication system (Layer 1) for api.8004.dev.
+This document describes the API key authentication system (Layer 1) for api.agentauri.ai.
 
 ## Overview
 

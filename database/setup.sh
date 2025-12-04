@@ -1,6 +1,6 @@
 #!/bin/bash
 # Database Setup Script
-# Automates the creation and migration of the api.8004.dev PostgreSQL database
+# Automates the creation and migration of the api.agentauri.ai PostgreSQL database
 
 set -e  # Exit on error
 
@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Default values
-DB_NAME="${DB_NAME:-erc8004_backend}"
+DB_NAME="${DB_NAME:-agentauri_backend}"
 DB_USER="${DB_USER:-postgres}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --help           Show this help message"
             echo ""
             echo "Environment variables:"
-            echo "  DB_NAME          Database name (default: erc8004_backend)"
+            echo "  DB_NAME          Database name (default: agentauri_backend)"
             echo "  DB_USER          Database user (default: postgres)"
             echo "  DB_HOST          Database host (default: localhost)"
             echo "  DB_PORT          Database port (default: 5432)"
@@ -55,7 +55,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo -e "${GREEN}api.8004.dev Database Setup${NC}"
+echo -e "${GREEN}api.agentauri.ai Database Setup${NC}"
 echo "================================"
 echo ""
 

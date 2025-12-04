@@ -11,15 +11,15 @@
 ### Step 1: Review Security Audit
 ```bash
 # Read the full audit report
-cat /Users/matteoscurati/work/api.8004.dev/docs/security/PONDER_SECURITY_AUDIT.md
+cat /Users/matteoscurati/work/api.agentauri.ai/docs/security/PONDER_SECURITY_AUDIT.md
 
 # Read the executive summary
-cat /Users/matteoscurati/work/api.8004.dev/docs/security/PONDER_SECURITY_SUMMARY.md
+cat /Users/matteoscurati/work/api.agentauri.ai/docs/security/PONDER_SECURITY_SUMMARY.md
 ```
 
 ### Step 2: Run Tests (Baseline)
 ```bash
-cd /Users/matteoscurati/work/api.8004.dev/ponder-indexers
+cd /Users/matteoscurati/work/api.agentauri.ai/ponder-indexers
 
 # Run existing tests
 pnpm test
@@ -195,26 +195,26 @@ pnpm test __tests__/validation.test.ts
 
 #### Step 1: Review Migration
 ```bash
-cat /Users/matteoscurati/work/api.8004.dev/database/migrations/20251201000001_add_event_indexes.sql
+cat /Users/matteoscurati/work/api.agentauri.ai/database/migrations/20251201000001_add_event_indexes.sql
 ```
 
 #### Step 2: Connect to Database
 ```bash
 # Development
-psql postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend
+psql postgresql://postgres:YOUR_PASSWORD@localhost:5432/agentauri_backend
 
 # Or use Docker Compose
-docker compose exec postgres psql -U postgres -d erc8004_backend
+docker compose exec postgres psql -U postgres -d agentauri_backend
 ```
 
 #### Step 3: Run Migration
 ```sql
 -- Option 1: Run migration file directly
-\i /Users/matteoscurati/work/api.8004.dev/database/migrations/20251201000001_add_event_indexes.sql
+\i /Users/matteoscurati/work/api.agentauri.ai/database/migrations/20251201000001_add_event_indexes.sql
 
 -- Option 2: Use SQLx CLI (if configured)
 -- Exit psql first, then run:
--- sqlx migrate run --database-url postgresql://postgres:YOUR_PASSWORD@localhost:5432/erc8004_backend
+-- sqlx migrate run --database-url postgresql://postgres:YOUR_PASSWORD@localhost:5432/agentauri_backend
 ```
 
 #### Step 4: Verify Indexes Created
@@ -468,7 +468,7 @@ pnpm dev
 
 ### Revert Code Changes
 ```bash
-cd /Users/matteoscurati/work/api.8004.dev/ponder-indexers
+cd /Users/matteoscurati/work/api.agentauri.ai/ponder-indexers
 
 # Revert all changes to index.ts
 git checkout HEAD -- src/index.ts

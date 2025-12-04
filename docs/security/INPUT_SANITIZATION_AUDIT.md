@@ -785,7 +785,7 @@ fn validate_redirect_url(url: &str) -> Result<(), ValidationError> {
         }
 
         // Only allow your own domain
-        const ALLOWED_DOMAINS: &[&str] = &["8004.dev", "api.8004.dev"];
+        const ALLOWED_DOMAINS: &[&str] = &["agentauri.ai", "api.agentauri.ai"];
         if !ALLOWED_DOMAINS.iter().any(|d| host.ends_with(d)) {
             return Err(ValidationError::new("url_domain_not_allowed"));
         }
@@ -1098,7 +1098,7 @@ pub wallet_address: String,
 
 #### 1. SSRF Protection for REST Actions (4 hours)
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/models/actions.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/models/actions.rs`
 
 **Changes**:
 - Add `validate_action_config` custom validator
@@ -1140,7 +1140,7 @@ fn test_action_config_blocks_metadata_endpoint() {
 }
 ```
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/action-workers/src/workers/rest_worker.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/action-workers/src/workers/rest_worker.rs`
 
 **Changes** (defense in depth):
 - Re-validate URLs before executing requests
@@ -1152,7 +1152,7 @@ fn test_action_config_blocks_metadata_endpoint() {
 
 #### 2. SSRF Protection for Billing URLs (2 hours)
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/models/billing.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/models/billing.rs`
 
 **Changes**:
 - Add `validate_redirect_url` custom validator for `success_url` and `cancel_url`
@@ -1177,7 +1177,7 @@ fn test_purchase_credits_blocks_localhost() {
 
 #### 3. Ethereum Address Normalization (2 hours)
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/models/wallet.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/models/wallet.rs`
 
 **Changes**:
 - Add address normalization function
@@ -1206,7 +1206,7 @@ fn validate_eth_address_checksum(address: &str) -> Result<(), ValidationError> {
 
 #### 1. JSON Depth/Size Validation (3 hours)
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/models/conditions.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/models/conditions.rs`
 
 **Changes**:
 - Add `validate_config` custom validator
@@ -1235,7 +1235,7 @@ fn test_config_rejects_deep_nesting() {
 
 #### 2. Chain ID Range Validation (1 hour)
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/models/triggers.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/models/triggers.rs`
 
 **Changes**:
 ```rust
@@ -1263,7 +1263,7 @@ fn test_create_trigger_invalid_chain_id() {
 
 #### 3. Email Domain Validation (Optional - 4 hours)
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/models/auth.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/models/auth.rs`
 
 **Changes**:
 - Add disposable email domain blocklist

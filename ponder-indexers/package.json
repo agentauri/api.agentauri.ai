@@ -1,5 +1,5 @@
 {
-  "name": "@api.8004.dev/ponder-indexers",
+  "name": "@api.agentauri.ai/ponder-indexers",
   "version": "0.1.0",
   "private": true,
   "description": "Ponder indexers for ERC-8004 registry events across multiple chains",

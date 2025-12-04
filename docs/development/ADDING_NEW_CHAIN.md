@@ -485,7 +485,7 @@ pnpm dev
 
 ```bash
 # Connect to PostgreSQL
-psql erc8004_backend
+psql agentauri_backend
 
 # Check events table
 SELECT COUNT(*), chain_id, registry
@@ -551,7 +551,7 @@ cast send $REPUTATION_REGISTRY_ADDRESS \
 
 ```bash
 # Check action_results table
-psql erc8004_backend -c "
+psql agentauri_backend -c "
 SELECT id, trigger_id, status, action_type
 FROM action_results
 WHERE created_at > NOW() - INTERVAL '5 minutes'
@@ -671,7 +671,7 @@ docker-compose restart ponder-indexers
 
 ```bash
 # Check health check output
-curl https://staging.api.8004.dev/api/v1/health | jq .
+curl https://staging.api.agentauri.ai/api/v1/health | jq .
 
 # Expected response includes:
 {
@@ -735,10 +735,10 @@ OPTIMISM_SEPOLIA_START_BLOCK=5432100
 
 ```bash
 # 1. Health check
-curl https://api.8004.dev/api/v1/health
+curl https://api.agentauri.ai/api/v1/health
 
 # 2. Check Ponder sync status
-curl https://api.8004.dev/api/v1/ponder/status
+curl https://api.agentauri.ai/api/v1/ponder/status
 
 # 3. Verify events being indexed
 psql $PROD_DATABASE_URL -c "
@@ -891,7 +891,7 @@ cast code $OPTIMISM_SEPOLIA_IDENTITY_ADDRESS \
 
 ```bash
 # Check current block and sync progress
-psql erc8004_backend -c "
+psql agentauri_backend -c "
 SELECT chain_id, block_number,
        EXTRACT(EPOCH FROM (NOW() - updated_at)) as seconds_since_update
 FROM checkpoints
@@ -1604,7 +1604,7 @@ Run these commands after deployment:
 
 ```bash
 # 1. Health check
-curl https://api.8004.dev/api/v1/health | jq '.ponder.optimism_sepolia'
+curl https://api.agentauri.ai/api/v1/health | jq '.ponder.optimism_sepolia'
 
 # 2. Check event count
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM events WHERE chain_id = 11155420;"

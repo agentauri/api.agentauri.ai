@@ -28,10 +28,10 @@
 //!
 //! # Secret Path Convention
 //!
-//! All secrets are stored under `secret/data/erc8004/` path:
-//! - `secret/data/erc8004/database_url`
-//! - `secret/data/erc8004/redis_url`
-//! - `secret/data/erc8004/jwt_secret`
+//! All secrets are stored under `secret/data/agentauri/` path:
+//! - `secret/data/agentauri/database_url`
+//! - `secret/data/agentauri/redis_url`
+//! - `secret/data/agentauri/jwt_secret`
 //! - etc.
 //!
 //! # Usage
@@ -212,7 +212,7 @@ impl SecretsManager {
         // Fetch from Vault
         tracing::debug!("Fetching secret from Vault: {}", secret_name);
 
-        let _path = format!("erc8004/{}", secret_name);
+        let _path = format!("agentauri/{}", secret_name);
 
         #[cfg(feature = "vault-secrets")]
         let secret_data: HashMap<String, String> =
@@ -262,7 +262,7 @@ impl SecretsManager {
     /// Get all application secrets
     ///
     /// This method fetches all required secrets for the application from
-    /// HashiCorp Vault using the `secret/data/erc8004/` path convention.
+    /// HashiCorp Vault using the `secret/data/agentauri/` path convention.
     ///
     /// # Errors
     ///

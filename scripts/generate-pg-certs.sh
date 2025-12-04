@@ -94,7 +94,7 @@ subjectAltName = @alt_names
 DNS.1 = localhost
 DNS.2 = *.localhost
 DNS.3 = postgres
-DNS.4 = erc8004-postgres
+DNS.4 = agentauri-postgres
 IP.1 = 127.0.0.1
 IP.2 = ::1
 EOF
@@ -191,7 +191,7 @@ echo "2. Test TLS connection:"
 echo "   ./scripts/test-pg-tls.sh"
 echo ""
 echo "3. Update DATABASE_URL in .env:"
-echo "   DATABASE_URL=postgresql://postgres:password@localhost:5432/erc8004_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt"
+echo "   DATABASE_URL=postgresql://postgres:password@localhost:5432/agentauri_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt"
 echo ""
 echo -e "${GREEN}Certificate generation complete!${NC}"
 echo ""

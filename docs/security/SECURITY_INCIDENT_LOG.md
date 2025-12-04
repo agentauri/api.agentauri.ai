@@ -1,6 +1,6 @@
 # Security Incident Log
 
-This document tracks security vulnerabilities discovered and remediated in the api.8004.dev project.
+This document tracks security vulnerabilities discovered and remediated in the api.agentauri.ai project.
 
 ## Incident Classification
 
@@ -31,7 +31,7 @@ Database credentials were hardcoded in test files as fallback values when `DATAB
 
 **Exposed Credential**:
 ```
-postgresql://postgres:2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=@localhost:5432/erc8004_backend
+postgresql://postgres:2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=@localhost:5432/agentauri_backend
 ```
 
 **Root Cause**: Developer convenience fallback pattern that prioritized ease of use over security.
@@ -54,7 +54,7 @@ postgresql://postgres:2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=@localhost:543
 **Before (INSECURE)**:
 ```rust
 let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-    "postgresql://postgres:2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=@localhost:5432/erc8004_backend"
+    "postgresql://postgres:2rJ17apV8PPd1Acmg3yEfKNO62PGGsvYdHLWezqyg5U=@localhost:5432/agentauri_backend"
         .to_string()
 });
 ```

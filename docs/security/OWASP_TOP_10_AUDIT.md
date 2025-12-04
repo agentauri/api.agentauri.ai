@@ -1,6 +1,6 @@
 # OWASP Top 10 (2021) Security Audit Report
 
-**Project**: ERC-8004 Backend Infrastructure (api.8004.dev)  
+**Project**: AgentAuri Backend Infrastructure (api.agentauri.ai)  
 **Audit Date**: November 30, 2025  
 **Auditor**: Senior Penetration Testing Team  
 **Scope**: Phase 4 Week 14 Complete (917+ tests passing)  
@@ -755,11 +755,11 @@ Solution: No fixed upgrade available!
 
 ```bash
 # Dependency audit
-cd /Users/matteoscurati/work/api.8004.dev/rust-backend
+cd /Users/matteoscurati/work/api.agentauri.ai/rust-backend
 cargo audit
 # Result: 1 vulnerability (RSA Marvin Attack - medium severity)
 
-cd /Users/matteoscurati/work/api.8004.dev/ponder-indexers
+cd /Users/matteoscurati/work/api.agentauri.ai/ponder-indexers
 pnpm audit --prod
 # Result: No vulnerabilities found
 

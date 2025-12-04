@@ -7,7 +7,7 @@ This document provides detailed implementation notes for developers working on t
 
 ## Overview
 
-Successfully implemented the **Unified Rate Limiter Middleware** for the api.8004.dev project as part of Week 13, Phase 3. This middleware provides comprehensive rate limiting for all API routes based on authentication context and query tiers.
+Successfully implemented the **Unified Rate Limiter Middleware** for the api.agentauri.ai project as part of Week 13, Phase 3. This middleware provides comprehensive rate limiting for all API routes based on authentication context and query tiers.
 
 ## Implementation Status
 
@@ -21,7 +21,7 @@ Successfully implemented the **Unified Rate Limiter Middleware** for the api.800
 
 ### 1. Query Tier Extractor Middleware
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware/query_tier.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware/query_tier.rs`
 
 **Purpose**: Extracts query tier from request path or query parameters and stores it in request extensions for rate limit cost calculation.
 
@@ -44,7 +44,7 @@ Successfully implemented the **Unified Rate Limiter Middleware** for the api.800
 
 ### 2. Unified Rate Limiter Middleware
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware/unified_rate_limiter.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware/unified_rate_limiter.rs`
 
 **Purpose**: Core rate limiting middleware that applies limits based on authentication context and query tier.
 
@@ -67,7 +67,7 @@ Successfully implemented the **Unified Rate Limiter Middleware** for the api.800
 
 ### 3. Module Integration
 
-**File**: `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware.rs`
+**File**: `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware.rs`
 
 **Updates**:
 - Added module declarations for `query_tier` and `unified_rate_limiter`
@@ -294,11 +294,11 @@ cargo test --package api-gateway
 ## Files Changed
 
 ### New Files
-- `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware/query_tier.rs` (309 lines)
-- `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware/unified_rate_limiter.rs` (251 lines)
+- `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware/query_tier.rs` (309 lines)
+- `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware/unified_rate_limiter.rs` (251 lines)
 
 ### Modified Files
-- `/Users/matteoscurati/work/api.8004.dev/rust-backend/crates/api-gateway/src/middleware.rs` (added module declarations and exports)
+- `/Users/matteoscurati/work/api.agentauri.ai/rust-backend/crates/api-gateway/src/middleware.rs` (added module declarations and exports)
 
 ## Success Criteria
 

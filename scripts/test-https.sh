@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# HTTPS/TLS Testing Script for api.8004.dev
+# HTTPS/TLS Testing Script for api.agentauri.ai
 # =============================================================================
 # Comprehensive test suite validating SSL/TLS configuration:
 # - HTTP → HTTPS redirect
@@ -16,7 +16,7 @@
 #   ./scripts/test-https.sh [domain]
 #
 # Arguments:
-#   domain    Domain to test (default: api.8004.dev)
+#   domain    Domain to test (default: api.agentauri.ai)
 # =============================================================================
 
 set -e
@@ -24,7 +24,7 @@ set -e
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-DOMAIN="${1:-api.8004.dev}"
+DOMAIN="${1:-api.agentauri.ai}"
 PORT_HTTPS=443
 
 # Colors

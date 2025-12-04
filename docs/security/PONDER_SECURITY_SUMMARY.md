@@ -99,7 +99,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_trigger_matching
 
 Run migration:
 ```bash
-cd /Users/matteoscurati/work/api.8004.dev
+cd /Users/matteoscurati/work/api.agentauri.ai
 sqlx migrate run
 ```
 

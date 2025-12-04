@@ -72,8 +72,8 @@ print_header "RUNNING ALL PROJECT TESTS"
 print_info "Checking prerequisites..."
 
 # Check Docker
-if ! docker ps | grep -q erc8004-postgres; then
-    print_fail "Docker container erc8004-postgres is not running"
+if ! docker ps | grep -q agentauri-postgres; then
+    print_fail "Docker container agentauri-postgres is not running"
     print_info "Start it with: docker-compose up -d"
     exit 1
 fi
@@ -85,8 +85,8 @@ print_success "Docker container is running"
 
 print_header "DATABASE TESTS"
 
-DB_CONTAINER="erc8004-postgres"
-DB_NAME="erc8004_backend"
+DB_CONTAINER="agentauri-postgres"
+DB_NAME="agentauri_backend"
 DB_USER="postgres"
 
 # Test 1: Schema validation

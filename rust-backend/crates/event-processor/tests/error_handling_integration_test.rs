@@ -71,7 +71,7 @@ impl JobQueue for MockJobQueue {
 /// Setup test database
 async fn setup_test_db() -> PgPool {
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgresql://postgres:password@localhost:5432/erc8004_backend".to_string()
+        "postgresql://postgres:password@localhost:5432/agentauri_backend".to_string()
     });
 
     let pool = PgPool::connect(&database_url)

@@ -101,8 +101,8 @@ score: validatedScore,
 **Status**: Ready to apply when database is available
 ```bash
 # Commands prepared:
-psql erc8004_backend < database/migrations/20251201000002_add_request_uri.sql
-psql erc8004_backend < database/migrations/20251201000001_add_event_indexes.sql
+psql agentauri_backend < database/migrations/20251201000002_add_request_uri.sql
+psql agentauri_backend < database/migrations/20251201000001_add_event_indexes.sql
 ```
 
 ---
@@ -222,12 +222,12 @@ psql erc8004_backend < database/migrations/20251201000001_add_event_indexes.sql
    docker-compose up -d postgres
 
    # Apply migrations
-   psql erc8004_backend < database/migrations/20251201000002_add_request_uri.sql
-   psql erc8004_backend < database/migrations/20251201000001_add_event_indexes.sql
+   psql agentauri_backend < database/migrations/20251201000002_add_request_uri.sql
+   psql agentauri_backend < database/migrations/20251201000001_add_event_indexes.sql
 
    # Verify
-   psql erc8004_backend -c "\d events" | grep request_uri
-   psql erc8004_backend -c "\di" | grep events
+   psql agentauri_backend -c "\d events" | grep request_uri
+   psql agentauri_backend -c "\di" | grep events
    ```
 
 2. **Run Full Test Suite** 🟡

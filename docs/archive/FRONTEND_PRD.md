@@ -1,6 +1,6 @@
 # Frontend Product Requirements Document
 
-## api.8004.dev - ERC-8004 Reputation Dashboard
+## api.agentauri.ai - ERC-8004 Reputation Dashboard
 
 **Version**: 1.0.0
 **Last Updated**: November 29, 2024
@@ -30,7 +30,7 @@
 
 ### 1.1 Project Overview
 
-The api.8004.dev frontend is a comprehensive web application that provides developers and AI agents with a powerful interface to interact with the ERC-8004 reputation system. It enables users to:
+The api.agentauri.ai frontend is a comprehensive web application that provides developers and AI agents with a powerful interface to interact with the ERC-8004 reputation system. It enables users to:
 
 - **Monitor** blockchain events from Identity, Reputation, and Validation registries
 - **Create** programmable triggers that execute automated actions
@@ -479,7 +479,7 @@ export const wagmiConfig = createConfig({
   connectors: [
     injected(),
     walletConnect({ projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID! }),
-    coinbaseWallet({ appName: 'api.8004.dev' }),
+    coinbaseWallet({ appName: 'api.agentauri.ai' }),
   ],
   transports: {
     [mainnet.id]: http(process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL),
@@ -781,7 +781,7 @@ module.exports = {
 ### 3.1 Project Structure
 
 ```
-api.8004.dev-frontend/
+api.agentauri.ai-frontend/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                    # CI/CD pipeline
@@ -2090,7 +2090,7 @@ export default function NewOrganizationPage() {
               <SlugAvailabilityIndicator slug={form.watch('slug')} />
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              Your organization will be accessible at api.8004.dev/@{form.watch('slug')}
+              Your organization will be accessible at api.agentauri.ai/@{form.watch('slug')}
             </p>
           </FormField>
 

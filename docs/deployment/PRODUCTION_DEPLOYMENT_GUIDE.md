@@ -1,6 +1,6 @@
-# Production Deployment Guide - api.8004.dev
+# Production Deployment Guide - api.agentauri.ai
 
-This guide provides step-by-step instructions for deploying the api.8004.dev API Gateway to production.
+This guide provides step-by-step instructions for deploying the api.agentauri.ai API Gateway to production.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ JWT_SECRET="<generate with: openssl rand -base64 32>"
 # Database Configuration
 DB_USER="postgres"
 DB_PASSWORD="<strong-random-password>"
-DB_NAME="erc8004_backend"
+DB_NAME="agentauri_backend"
 DB_HOST="localhost"
 DB_PORT="5432"
 
@@ -91,7 +91,7 @@ sudo systemctl restart redis-server
 
 ### 3. Nginx with Rate Limiting
 
-Create `/etc/nginx/conf.d/api.8004.dev.conf`:
+Create `/etc/nginx/conf.d/api.agentauri.ai.conf`:
 
 ```nginx
 # Rate limiting zones
@@ -166,7 +166,7 @@ sudo systemctl reload nginx
 ### 1. Build Release Binary
 
 ```bash
-cd /path/to/api.8004.dev/rust-backend
+cd /path/to/api.agentauri.ai/rust-backend
 cargo build --release --package api-gateway
 ```
 
@@ -176,9 +176,9 @@ Binary location: `target/release/api-gateway`
 
 ```bash
 # Run all migrations
-for migration in /path/to/api.8004.dev/database/migrations/*.sql; do
+for migration in /path/to/api.agentauri.ai/database/migrations/*.sql; do
     echo "Running: $(basename $migration)"
-    PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres -d erc8004_backend -f "$migration"
+    PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres -d agentauri_backend -f "$migration"
 done
 ```
 
@@ -188,14 +188,14 @@ Create `/etc/systemd/system/api-gateway.service`:
 
 ```ini
 [Unit]
-Description=API Gateway for api.8004.dev
+Description=API Gateway for api.agentauri.ai
 After=network.target postgresql.service redis.service
 
 [Service]
 Type=simple
 User=apigateway
-WorkingDirectory=/opt/api.8004.dev
-ExecStart=/opt/api.8004.dev/api-gateway
+WorkingDirectory=/opt/api.agentauri.ai
+ExecStart=/opt/api.agentauri.ai/api-gateway
 
 # Environment variables
 Environment="JWT_SECRET=<your-jwt-secret>"
@@ -211,7 +211,7 @@ PrivateTmp=true
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/api.8004.dev/logs
+ReadWritePaths=/opt/api.agentauri.ai/logs
 
 # Restart policy
 Restart=always
@@ -279,11 +279,11 @@ sudo journalctl -u api-gateway -f
 
 ```bash
 # Active connections
-PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres -d erc8004_backend \
+PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres -d agentauri_backend \
     -c "SELECT count(*) FROM pg_stat_activity;"
 
 # Table sizes
-PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres -d erc8004_backend \
+PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres -d agentauri_backend \
     -c "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
 ```
 
@@ -355,7 +355,7 @@ sudo journalctl -u api-gateway -n 50
 
 ### Issue: Rate limiting too aggressive
 
-**Solution**: Adjust nginx config rate limits in `/etc/nginx/conf.d/api.8004.dev.conf`
+**Solution**: Adjust nginx config rate limits in `/etc/nginx/conf.d/api.agentauri.ai.conf`
 
 ## Backup and Recovery
 
@@ -366,7 +366,7 @@ sudo journalctl -u api-gateway -n 50
 #!/bin/bash
 BACKUP_DIR="/var/backups/postgresql"
 DATE=$(date +%Y%m%d_%H%M%S)
-PGPASSWORD="$DB_PASSWORD" pg_dump -h localhost -U postgres erc8004_backend | gzip > "$BACKUP_DIR/erc8004_backend_$DATE.sql.gz"
+PGPASSWORD="$DB_PASSWORD" pg_dump -h localhost -U postgres agentauri_backend | gzip > "$BACKUP_DIR/agentauri_backend_$DATE.sql.gz"
 find "$BACKUP_DIR" -type f -mtime +7 -delete  # Keep 7 days
 ```
 
@@ -378,7 +378,7 @@ Add to crontab:
 ### Database Restore
 
 ```bash
-gunzip < backup.sql.gz | PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres erc8004_backend
+gunzip < backup.sql.gz | PGPASSWORD="$DB_PASSWORD" psql -h localhost -U postgres agentauri_backend
 ```
 
 ## Phase 3 Enhancements (Post-MVP)

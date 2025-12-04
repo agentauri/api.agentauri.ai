@@ -1,6 +1,6 @@
 # HTTPS/TLS Quick Reference
 
-Quick commands and configurations for managing HTTPS/TLS on api.8004.dev.
+Quick commands and configurations for managing HTTPS/TLS on api.agentauri.ai.
 
 ## Quick Start
 
@@ -25,7 +25,7 @@ docker compose --profile production up -d
 
 ```bash
 # Check certificate expiry
-openssl s_client -connect api.8004.dev:443 -servername api.8004.dev < /dev/null 2>&1 | openssl x509 -noout -enddate
+openssl s_client -connect api.agentauri.ai:443 -servername api.agentauri.ai < /dev/null 2>&1 | openssl x509 -noout -enddate
 
 # Force certificate renewal
 docker compose --profile production run --rm certbot renew --force-renewal
@@ -35,10 +35,10 @@ docker compose --profile production exec nginx nginx -s reload
 docker compose --profile production run --rm certbot renew --dry-run
 
 # View certificate details
-openssl s_client -connect api.8004.dev:443 -servername api.8004.dev < /dev/null 2>&1 | openssl x509 -noout -text
+openssl s_client -connect api.agentauri.ai:443 -servername api.agentauri.ai < /dev/null 2>&1 | openssl x509 -noout -text
 
 # Revoke compromised certificate
-docker compose --profile production run --rm certbot revoke --cert-path /etc/letsencrypt/live/api.8004.dev/fullchain.pem
+docker compose --profile production run --rm certbot revoke --cert-path /etc/letsencrypt/live/api.agentauri.ai/fullchain.pem
 ```
 
 ### Nginx Operations
@@ -96,22 +96,22 @@ docker compose --profile production logs certbot -f
 ./scripts/test-https.sh
 
 # Monitor SSL/TLS health
-./scripts/monitor-ssl.sh api.8004.dev admin@8004.dev
+./scripts/monitor-ssl.sh api.agentauri.ai admin@agentauri.ai
 
 # Test HTTP → HTTPS redirect
-curl -I http://api.8004.dev/
+curl -I http://api.agentauri.ai/
 
 # Test HTTPS connection
-curl -v https://api.8004.dev/health
+curl -v https://api.agentauri.ai/health
 
 # Test security headers
-curl -I https://api.8004.dev/ | grep -i "strict-transport-security"
+curl -I https://api.agentauri.ai/ | grep -i "strict-transport-security"
 
 # Test TLS version
-openssl s_client -connect api.8004.dev:443 -tls1_2 < /dev/null
+openssl s_client -connect api.agentauri.ai:443 -tls1_2 < /dev/null
 
 # Check SSL Labs rating (browser)
-# https://www.ssllabs.com/ssltest/analyze.html?d=api.8004.dev
+# https://www.ssllabs.com/ssltest/analyze.html?d=api.agentauri.ai
 ```
 
 ## Configuration Files
@@ -120,10 +120,10 @@ openssl s_client -connect api.8004.dev:443 -tls1_2 < /dev/null
 
 ```bash
 # HTTPS Configuration
-DOMAIN=api.8004.dev
-LETSENCRYPT_EMAIL=admin@8004.dev
+DOMAIN=api.agentauri.ai
+LETSENCRYPT_EMAIL=admin@agentauri.ai
 ENABLE_HTTPS=true
-BASE_URL=https://api.8004.dev
+BASE_URL=https://api.agentauri.ai
 ```
 
 ### Nginx Configuration
@@ -157,7 +157,7 @@ docker compose --profile production exec nginx nginx -s reload
 
 ```bash
 # Check DNS
-host api.8004.dev
+host api.agentauri.ai
 
 # Check port 80 accessibility
 curl http://<SERVER_IP>/.well-known/acme-challenge/test
@@ -182,7 +182,7 @@ sudo lsof -i :80
 sudo lsof -i :443
 
 # Check certificate files
-ls -la docker/certbot/conf/live/api.8004.dev/
+ls -la docker/certbot/conf/live/api.agentauri.ai/
 
 # Test configuration
 docker compose --profile production run --rm nginx nginx -t
@@ -196,7 +196,7 @@ docker compose --profile production logs nginx
 ```bash
 # Clear HSTS cache (Chrome)
 # 1. Go to: chrome://net-internals/#hsts
-# 2. Delete domain security policies for api.8004.dev
+# 2. Delete domain security policies for api.agentauri.ai
 # 3. Clear browser cache
 
 # Or use incognito/private mode
@@ -209,7 +209,7 @@ docker compose --profile production logs nginx
 docker compose --profile production run --rm certbot renew --dry-run
 
 # Check ACME challenge
-curl http://api.8004.dev/.well-known/acme-challenge/test
+curl http://api.agentauri.ai/.well-known/acme-challenge/test
 # Should return: 404 (not 301 redirect)
 
 # Force renewal
@@ -243,13 +243,13 @@ Add to crontab (`crontab -e`):
 
 ```bash
 # Certificate renewal (daily)
-0 0 * * * docker compose -f /path/to/api.8004.dev/docker-compose.yml --profile production run --rm certbot renew --quiet
+0 0 * * * docker compose -f /path/to/api.agentauri.ai/docker-compose.yml --profile production run --rm certbot renew --quiet
 
 # Certificate expiry alert (<30 days)
-0 0 * * * /path/to/api.8004.dev/scripts/monitor-ssl.sh api.8004.dev admin@8004.dev
+0 0 * * * /path/to/api.agentauri.ai/scripts/monitor-ssl.sh api.agentauri.ai admin@agentauri.ai
 
 # SSL Labs rating check (weekly, Monday at 2 AM)
-0 2 * * 1 curl -s "https://api.ssllabs.com/api/v3/analyze?host=api.8004.dev" | jq -r '.endpoints[0].grade' | grep -q 'A' || echo "SSL Labs rating below A" | mail -s "SSL Rating Alert" admin@8004.dev
+0 2 * * 1 curl -s "https://api.ssllabs.com/api/v3/analyze?host=api.agentauri.ai" | jq -r '.endpoints[0].grade' | grep -q 'A' || echo "SSL Labs rating below A" | mail -s "SSL Rating Alert" admin@agentauri.ai
 ```
 
 ### Log Monitoring

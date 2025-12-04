@@ -27,12 +27,12 @@ Production-grade PostgreSQL deployment with TLS encryption, high availability, a
 #!/bin/bash
 # Create production PostgreSQL instance with encryption at rest
 
-DB_INSTANCE_ID="erc8004-prod"
+DB_INSTANCE_ID="agentauri-prod"
 DB_INSTANCE_CLASS="db.t3.medium"  # Adjust based on workload
 DB_STORAGE_GB=100                  # Initial storage
 KMS_KEY_ARN="arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
 VPC_SECURITY_GROUP="sg-xxxxxxxxx"
-DB_SUBNET_GROUP="erc8004-db-subnet-group"
+DB_SUBNET_GROUP="agentauri-db-subnet-group"
 MASTER_PASSWORD="$(openssl rand -base64 32)"  # Generate strong password
 
 aws rds create-db-instance \
@@ -79,16 +79,16 @@ echo "⚠️  SAVE PASSWORD TO AWS SECRETS MANAGER IMMEDIATELY!"
 ```bash
 # Store master password
 aws secretsmanager create-secret \
-  --name erc8004/prod/database/master-password \
+  --name agentauri/prod/database/master-password \
   --description "ERC-8004 Production PostgreSQL master password" \
   --secret-string "$MASTER_PASSWORD" \
   --tags Key=Project,Value=ERC-8004 Key=Environment,Value=Production
 
 # Store connection string
 aws secretsmanager create-secret \
-  --name erc8004/prod/database/connection-string \
+  --name agentauri/prod/database/connection-string \
   --description "ERC-8004 Production PostgreSQL connection string" \
-  --secret-string "postgresql://postgres:$MASTER_PASSWORD@$ENDPOINT:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/rds-ca-2019-root.pem" \
+  --secret-string "postgresql://postgres:$MASTER_PASSWORD@$ENDPOINT:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/rds-ca-2019-root.pem" \
   --tags Key=Project,Value=ERC-8004 Key=Environment,Value=Production
 ```
 
@@ -108,7 +108,7 @@ wget https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem \
 
 ```bash
 # In production .env or environment variables
-DATABASE_URL="postgresql://postgres:PASSWORD@erc8004-prod.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/rds-ca-bundle.pem"
+DATABASE_URL="postgresql://postgres:PASSWORD@agentauri-prod.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/rds-ca-bundle.pem"
 
 # Or retrieve from Secrets Manager at runtime
 # See: https://docs.aws.amazon.com/secretsmanager/latest/userguide/retrieving-secrets.html
@@ -136,7 +136,7 @@ aws iam attach-role-policy \
 
 # Enable enhanced monitoring on instance
 aws rds modify-db-instance \
-  --db-instance-identifier erc8004-prod \
+  --db-instance-identifier agentauri-prod \
   --monitoring-interval 60 \
   --monitoring-role-arn arn:aws:iam::123456789012:role/rds-monitoring-role
 ```
@@ -146,8 +146,8 @@ aws rds modify-db-instance \
 ```bash
 # Create read replica in different AZ
 aws rds create-db-instance-read-replica \
-  --db-instance-identifier erc8004-prod-replica-1 \
-  --source-db-instance-identifier erc8004-prod \
+  --db-instance-identifier agentauri-prod-replica-1 \
+  --source-db-instance-identifier agentauri-prod \
   --db-instance-class db.t3.medium \
   --availability-zone us-east-1b \
   --storage-encrypted \
@@ -176,7 +176,7 @@ For production workload (db.m5.xlarge): ~$600-800/month
 
 ```bash
 az group create \
-  --name erc8004-prod \
+  --name agentauri-prod \
   --location eastus
 ```
 
@@ -188,8 +188,8 @@ ADMIN_PASSWORD="$(openssl rand -base64 32)"
 
 # Create server with encryption (always enabled)
 az postgres flexible-server create \
-  --resource-group erc8004-prod \
-  --name erc8004-postgres \
+  --resource-group agentauri-prod \
+  --name agentauri-postgres \
   --location eastus \
   --admin-user postgres \
   --admin-password "$ADMIN_PASSWORD" \
@@ -206,8 +206,8 @@ az postgres flexible-server create \
 
 # Get connection info
 az postgres flexible-server show \
-  --resource-group erc8004-prod \
-  --name erc8004-postgres \
+  --resource-group agentauri-prod \
+  --name agentauri-postgres \
   --query "{FQDN:fullyQualifiedDomainName, State:state}" \
   -o table
 
@@ -220,21 +220,21 @@ echo "⚠️  SAVE PASSWORD TO AZURE KEY VAULT IMMEDIATELY!"
 ```bash
 # Create Key Vault
 az keyvault create \
-  --name erc8004-prod-kv \
-  --resource-group erc8004-prod \
+  --name agentauri-prod-kv \
+  --resource-group agentauri-prod \
   --location eastus
 
 # Store password
 az keyvault secret set \
-  --vault-name erc8004-prod-kv \
+  --vault-name agentauri-prod-kv \
   --name database-password \
   --value "$ADMIN_PASSWORD"
 
 # Store connection string
 az keyvault secret set \
-  --vault-name erc8004-prod-kv \
+  --vault-name agentauri-prod-kv \
   --name database-connection-string \
-  --value "postgresql://postgres:$ADMIN_PASSWORD@erc8004-postgres.postgres.database.azure.com:5432/erc8004_backend?sslmode=verify-full"
+  --value "postgresql://postgres:$ADMIN_PASSWORD@agentauri-postgres.postgres.database.azure.com:5432/agentauri_backend?sslmode=verify-full"
 ```
 
 ### 4. Download Azure CA Certificate
@@ -253,8 +253,8 @@ APP_PUBLIC_IP=$(curl -s ifconfig.me)
 
 # Allow application IP
 az postgres flexible-server firewall-rule create \
-  --resource-group erc8004-prod \
-  --name erc8004-postgres \
+  --resource-group agentauri-prod \
+  --name agentauri-postgres \
   --rule-name allow-app-server \
   --start-ip-address "$APP_PUBLIC_IP" \
   --end-ip-address "$APP_PUBLIC_IP"
@@ -265,16 +265,16 @@ az postgres flexible-server firewall-rule create \
 ```bash
 # Create encryption key in Key Vault
 az keyvault key create \
-  --vault-name erc8004-prod-kv \
+  --vault-name agentauri-prod-kv \
   --name database-encryption-key \
   --kty RSA \
   --size 2048
 
 # Enable customer-managed key encryption
 az postgres flexible-server update \
-  --resource-group erc8004-prod \
-  --name erc8004-postgres \
-  --key-id "https://erc8004-prod-kv.vault.azure.net/keys/database-encryption-key"
+  --resource-group agentauri-prod \
+  --name agentauri-postgres \
+  --key-id "https://agentauri-prod-kv.vault.azure.net/keys/database-encryption-key"
 ```
 
 ### Cost Estimate (Azure)
@@ -297,7 +297,7 @@ az postgres flexible-server update \
 ADMIN_PASSWORD="$(openssl rand -base64 32)"
 
 # Create instance with encryption (always enabled)
-gcloud sql instances create erc8004-postgres \
+gcloud sql instances create agentauri-postgres \
   --database-version=POSTGRES_15 \
   --tier=db-custom-2-7680 \
   --region=us-central1 \
@@ -315,8 +315,8 @@ gcloud sql instances create erc8004-postgres \
   --root-password="$ADMIN_PASSWORD"
 
 # Create database
-gcloud sql databases create erc8004_backend \
-  --instance=erc8004-postgres
+gcloud sql databases create agentauri_backend \
+  --instance=agentauri-postgres
 
 echo "Database created successfully!"
 echo "Admin password: $ADMIN_PASSWORD"
@@ -334,7 +334,7 @@ echo -n "$ADMIN_PASSWORD" | gcloud secrets create database-password \
 # Store connection string
 gcloud secrets create database-connection-string \
   --data-file=- <<EOF
-postgresql://postgres:$ADMIN_PASSWORD@/erc8004_backend?host=/cloudsql/PROJECT_ID:us-central1:erc8004-postgres&sslmode=disable
+postgresql://postgres:$ADMIN_PASSWORD@/agentauri_backend?host=/cloudsql/PROJECT_ID:us-central1:agentauri-postgres&sslmode=disable
 EOF
 ```
 
@@ -346,27 +346,27 @@ wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_pro
 chmod +x cloud_sql_proxy
 
 # Run proxy (creates Unix socket)
-./cloud_sql_proxy -instances=PROJECT_ID:us-central1:erc8004-postgres=tcp:5432 &
+./cloud_sql_proxy -instances=PROJECT_ID:us-central1:agentauri-postgres=tcp:5432 &
 
 # Connection string (via proxy - TLS handled automatically)
-DATABASE_URL="postgresql://postgres:$ADMIN_PASSWORD@localhost:5432/erc8004_backend"
+DATABASE_URL="postgresql://postgres:$ADMIN_PASSWORD@localhost:5432/agentauri_backend"
 ```
 
 ### 4. Enable Customer-Managed Encryption Key (Optional)
 
 ```bash
 # Create encryption key
-gcloud kms keyrings create erc8004-keyring \
+gcloud kms keyrings create agentauri-keyring \
   --location=us-central1
 
 gcloud kms keys create database-encryption-key \
   --location=us-central1 \
-  --keyring=erc8004-keyring \
+  --keyring=agentauri-keyring \
   --purpose=encryption
 
 # Update instance to use customer-managed key
-gcloud sql instances patch erc8004-postgres \
-  --disk-encryption-key=projects/PROJECT_ID/locations/us-central1/keyRings/erc8004-keyring/cryptoKeys/database-encryption-key
+gcloud sql instances patch agentauri-postgres \
+  --disk-encryption-key=projects/PROJECT_ID/locations/us-central1/keyRings/agentauri-keyring/cryptoKeys/database-encryption-key
 ```
 
 ### Cost Estimate (GCP)
@@ -503,17 +503,17 @@ repo1-retention-full=7
 repo1-cipher-type=aes-256-cbc
 repo1-cipher-pass=$(openssl rand -base64 32)
 
-[erc8004]
+[agentauri]
 pg1-path=/mnt/pgdata
 pg1-port=5432
 EOF
 
 # Create initial backup
-sudo -u postgres pgbackrest --stanza=erc8004 stanza-create
-sudo -u postgres pgbackrest --stanza=erc8004 --type=full backup
+sudo -u postgres pgbackrest --stanza=agentauri stanza-create
+sudo -u postgres pgbackrest --stanza=agentauri --type=full backup
 
 # Schedule daily backups
-echo "0 2 * * * postgres pgbackrest --stanza=erc8004 --type=incr backup" | sudo tee -a /etc/crontab
+echo "0 2 * * * postgres pgbackrest --stanza=agentauri --type=incr backup" | sudo tee -a /etc/crontab
 ```
 
 ### Cost Estimate (Self-Managed on AWS EC2)
@@ -540,9 +540,9 @@ use sqlx::PgPool;
 
 // Production connection with full TLS verification
 let options = PgConnectOptions::new()
-    .host("erc8004-prod.xxxxxxxxx.us-east-1.rds.amazonaws.com")
+    .host("agentauri-prod.xxxxxxxxx.us-east-1.rds.amazonaws.com")
     .port(5432)
-    .database("erc8004_backend")
+    .database("agentauri_backend")
     .username("postgres")
     .password(&secrets.database_password)  // From secrets manager
     .ssl_mode(PgSslMode::VerifyFull)       // Verify certificate and hostname
@@ -555,16 +555,16 @@ let pool = PgPool::connect_with(options).await?;
 
 ```bash
 # AWS RDS
-DATABASE_URL="postgresql://postgres:PASSWORD@erc8004-prod.xxxxx.us-east-1.rds.amazonaws.com:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/rds-ca-bundle.pem"
+DATABASE_URL="postgresql://postgres:PASSWORD@agentauri-prod.xxxxx.us-east-1.rds.amazonaws.com:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/rds-ca-bundle.pem"
 
 # Azure
-DATABASE_URL="postgresql://postgres:PASSWORD@erc8004-postgres.postgres.database.azure.com:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/azure-postgresql-ca.pem"
+DATABASE_URL="postgresql://postgres:PASSWORD@agentauri-postgres.postgres.database.azure.com:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/etc/ssl/certs/azure-postgresql-ca.pem"
 
 # GCP (via Cloud SQL Proxy)
-DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/erc8004_backend"
+DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/agentauri_backend"
 
 # Self-Managed
-DATABASE_URL="postgresql://postgres:PASSWORD@db.yourdomain.com:5432/erc8004_backend?sslmode=verify-full"
+DATABASE_URL="postgresql://postgres:PASSWORD@db.yourdomain.com:5432/agentauri_backend?sslmode=verify-full"
 ```
 
 ---
@@ -576,7 +576,7 @@ DATABASE_URL="postgresql://postgres:PASSWORD@db.yourdomain.com:5432/erc8004_back
 ```bash
 # CPU utilization
 aws cloudwatch put-metric-alarm \
-  --alarm-name erc8004-db-high-cpu \
+  --alarm-name agentauri-db-high-cpu \
   --alarm-description "Database CPU >80%" \
   --metric-name CPUUtilization \
   --namespace AWS/RDS \
@@ -584,13 +584,13 @@ aws cloudwatch put-metric-alarm \
   --period 300 \
   --threshold 80 \
   --comparison-operator GreaterThanThreshold \
-  --dimensions Name=DBInstanceIdentifier,Value=erc8004-prod \
+  --dimensions Name=DBInstanceIdentifier,Value=agentauri-prod \
   --evaluation-periods 2 \
-  --alarm-actions arn:aws:sns:us-east-1:123456789012:erc8004-alerts
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:agentauri-alerts
 
 # Storage space
 aws cloudwatch put-metric-alarm \
-  --alarm-name erc8004-db-low-storage \
+  --alarm-name agentauri-db-low-storage \
   --alarm-description "Database storage <10GB free" \
   --metric-name FreeStorageSpace \
   --namespace AWS/RDS \
@@ -598,13 +598,13 @@ aws cloudwatch put-metric-alarm \
   --period 300 \
   --threshold 10737418240 \  # 10GB in bytes
   --comparison-operator LessThanThreshold \
-  --dimensions Name=DBInstanceIdentifier,Value=erc8004-prod \
+  --dimensions Name=DBInstanceIdentifier,Value=agentauri-prod \
   --evaluation-periods 1 \
-  --alarm-actions arn:aws:sns:us-east-1:123456789012:erc8004-alerts
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:agentauri-alerts
 
 # Connection count
 aws cloudwatch put-metric-alarm \
-  --alarm-name erc8004-db-high-connections \
+  --alarm-name agentauri-db-high-connections \
   --alarm-description "Database connections >80" \
   --metric-name DatabaseConnections \
   --namespace AWS/RDS \
@@ -612,9 +612,9 @@ aws cloudwatch put-metric-alarm \
   --period 300 \
   --threshold 80 \
   --comparison-operator GreaterThanThreshold \
-  --dimensions Name=DBInstanceIdentifier,Value=erc8004-prod \
+  --dimensions Name=DBInstanceIdentifier,Value=agentauri-prod \
   --evaluation-periods 2 \
-  --alarm-actions arn:aws:sns:us-east-1:123456789012:erc8004-alerts
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:agentauri-alerts
 ```
 
 ### Prometheus Metrics (Self-Managed)
@@ -673,7 +673,7 @@ Production database MUST have:
 
 1. Choose your platform (AWS/Azure/GCP/Self-Managed)
 2. Follow setup guide above
-3. Test TLS connection: `./scripts/test-pg-tls.sh HOSTNAME 5432 erc8004_backend postgres`
+3. Test TLS connection: `./scripts/test-pg-tls.sh HOSTNAME 5432 agentauri_backend postgres`
 4. Apply database migrations: `sqlx migrate run`
 5. Enable column encryption for PII (see [DATABASE_ENCRYPTION.md](./DATABASE_ENCRYPTION.md))
 6. Setup monitoring and alerts

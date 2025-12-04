@@ -189,7 +189,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY action_metrics_hourly;
 
 Run comprehensive test suite:
 ```bash
-psql erc8004_backend < database/tests/test-analytics.sql
+psql agentauri_backend < database/tests/test-analytics.sql
 ```
 
 Expected: **26/26 tests passed**
@@ -197,8 +197,8 @@ Expected: **26/26 tests passed**
 ## Support
 
 - Slack: #analytics-backend
-- Email: backend-team@8004.dev
-- Docs: https://docs.8004.dev/analytics
+- Email: backend-team@agentauri.ai
+- Docs: https://docs.agentauri.ai/analytics
 
 ---
 

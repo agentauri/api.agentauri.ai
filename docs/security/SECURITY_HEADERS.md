@@ -231,7 +231,7 @@ curl -I http://localhost:8080/api/v1/health
 
 1. Deploy to a publicly accessible domain with HTTPS
 2. Visit https://securityheaders.com
-3. Enter your domain (e.g., https://api.8004.dev)
+3. Enter your domain (e.g., https://api.agentauri.ai)
 4. Expected grade: **A+** (with HSTS enabled)
 
 ### Automated Testing

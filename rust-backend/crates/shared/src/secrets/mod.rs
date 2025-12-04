@@ -9,7 +9,7 @@
 //!
 //! - In-memory caching with configurable TTL (default: 1 hour)
 //! - Automatic cache invalidation
-//! - Structured secret organization (prefix: `erc8004/`)
+//! - Structured secret organization (prefix: `agentauri/`)
 //! - Rotation support (backend-specific)
 //!
 //! # Usage

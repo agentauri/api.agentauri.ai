@@ -6,7 +6,7 @@
 
 ## Overview
 
-Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Let's Encrypt certificate management, production-ready Nginx reverse proxy, and comprehensive security hardening.
+Implemented complete HTTPS/TLS infrastructure for api.agentauri.ai with automatic Let's Encrypt certificate management, production-ready Nginx reverse proxy, and comprehensive security hardening.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 
 ### 1. Nginx Configuration
 
-**Main Configuration** (`/Users/matteoscurati/work/api.8004.dev/docker/nginx/nginx.conf`):
+**Main Configuration** (`/Users/matteoscurati/work/api.agentauri.ai/docker/nginx/nginx.conf`):
 - Worker processes: auto (CPU-optimized)
 - Worker connections: 1024 per worker
 - Gzip compression: Level 6, multiple content types
@@ -56,7 +56,7 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 - Structured logging support
 - Resource optimization
 
-**Site Configuration** (`/Users/matteoscurati/work/api.8004.dev/docker/nginx/conf.d/api.conf`):
+**Site Configuration** (`/Users/matteoscurati/work/api.agentauri.ai/docker/nginx/conf.d/api.conf`):
 
 **HTTP Server (Port 80)**:
 - Let's Encrypt ACME challenge support (`/.well-known/acme-challenge/`)
@@ -96,7 +96,7 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 
 ### 2. Docker Compose Integration
 
-**Updated** (`/Users/matteoscurati/work/api.8004.dev/docker-compose.yml`):
+**Updated** (`/Users/matteoscurati/work/api.agentauri.ai/docker-compose.yml`):
 
 **Nginx Service**:
 - Image: `nginx:1.25-alpine` (pinned, security-focused)
@@ -128,7 +128,7 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 
 ### 3. Automation Scripts
 
-**Certificate Initialization** (`/Users/matteoscurati/work/api.8004.dev/scripts/init-letsencrypt.sh`):
+**Certificate Initialization** (`/Users/matteoscurati/work/api.agentauri.ai/scripts/init-letsencrypt.sh`):
 - Downloads TLS parameters (Diffie-Hellman, SSL options)
 - Creates dummy certificate for initial nginx startup
 - Starts nginx with dummy certificate
@@ -146,7 +146,7 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 - Certificate replacement (removes dummy)
 - Production vs. staging environment support
 
-**HTTPS Testing** (`/Users/matteoscurati/work/api.8004.dev/scripts/test-https.sh`):
+**HTTPS Testing** (`/Users/matteoscurati/work/api.agentauri.ai/scripts/test-https.sh`):
 
 **11 Comprehensive Tests**:
 1. DNS resolution
@@ -169,7 +169,7 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 - Summary with pass/fail/warning counts
 - Non-zero exit code on failures
 
-**SSL/TLS Monitoring** (`/Users/matteoscurati/work/api.8004.dev/scripts/monitor-ssl.sh`):
+**SSL/TLS Monitoring** (`/Users/matteoscurati/work/api.agentauri.ai/scripts/monitor-ssl.sh`):
 
 **9 Health Checks**:
 1. Certificate expiry (<30 days warning, <7 days critical)
@@ -191,12 +191,12 @@ Implemented complete HTTPS/TLS infrastructure for api.8004.dev with automatic Le
 
 ### 4. Environment Configuration
 
-**Updated** (`/Users/matteoscurati/work/api.8004.dev/.env.example`):
+**Updated** (`/Users/matteoscurati/work/api.agentauri.ai/.env.example`):
 
 **New Variables**:
 ```bash
-DOMAIN=api.8004.dev
-LETSENCRYPT_EMAIL=admin@8004.dev
+DOMAIN=api.agentauri.ai
+LETSENCRYPT_EMAIL=admin@agentauri.ai
 ENABLE_HTTPS=false  # Set true for production
 ```
 
@@ -207,7 +207,7 @@ ENABLE_HTTPS=false  # Set true for production
 
 ### 5. Documentation
 
-**Complete Setup Guide** (`/Users/matteoscurati/work/api.8004.dev/docs/deployment/HTTPS_SETUP.md`):
+**Complete Setup Guide** (`/Users/matteoscurati/work/api.agentauri.ai/docs/deployment/HTTPS_SETUP.md`):
 - 350+ lines of comprehensive documentation
 - Prerequisites (domain, DNS, firewall)
 - Step-by-step setup instructions
@@ -220,7 +220,7 @@ ENABLE_HTTPS=false  # Set true for production
 - Rollback procedures
 - External resource links
 
-**Quick Reference** (`/Users/matteoscurati/work/api.8004.dev/docs/deployment/HTTPS_QUICK_REFERENCE.md`):
+**Quick Reference** (`/Users/matteoscurati/work/api.agentauri.ai/docs/deployment/HTTPS_QUICK_REFERENCE.md`):
 - Common commands (certificate, nginx, services)
 - Configuration file locations
 - Troubleshooting quick fixes
@@ -338,10 +338,10 @@ DHE-RSA-AES256-GCM-SHA384
 1. **Domain Configuration**:
    ```bash
    # Add DNS A record
-   api.8004.dev → <SERVER_IP>
+   api.agentauri.ai → <SERVER_IP>
 
    # Verify
-   host api.8004.dev
+   host api.agentauri.ai
    ```
 
 2. **Firewall**:
@@ -378,18 +378,18 @@ DHE-RSA-AES256-GCM-SHA384
    **Expected**: All 11 tests pass
 
 4. **Verify External**:
-   - SSL Labs: https://www.ssllabs.com/ssltest/analyze.html?d=api.8004.dev
-   - SecurityHeaders: https://securityheaders.com/?q=https://api.8004.dev
+   - SSL Labs: https://www.ssllabs.com/ssltest/analyze.html?d=api.agentauri.ai
+   - SecurityHeaders: https://securityheaders.com/?q=https://api.agentauri.ai
 
 ### Monitoring Setup
 
 **Cron Jobs** (add to crontab):
 ```bash
 # Daily certificate renewal check
-0 0 * * * docker compose -f /path/to/api.8004.dev/docker-compose.yml --profile production run --rm certbot renew --quiet
+0 0 * * * docker compose -f /path/to/api.agentauri.ai/docker-compose.yml --profile production run --rm certbot renew --quiet
 
 # Daily SSL health monitoring
-0 0 * * * /path/to/api.8004.dev/scripts/monitor-ssl.sh api.8004.dev admin@8004.dev
+0 0 * * * /path/to/api.agentauri.ai/scripts/monitor-ssl.sh api.agentauri.ai admin@agentauri.ai
 ```
 
 ## Production Checklist

@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 DB_HOST="localhost"
 DB_PORT="5432"
 DB_USER="postgres"
-DB_NAME="erc8004_backend"
+DB_NAME="agentauri_backend"
 
 # Database password MUST be set via PGPASSWORD environment variable
 # Do NOT hardcode passwords in this script for security reasons

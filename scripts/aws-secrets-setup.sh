@@ -32,7 +32,7 @@ NC='\033[0m' # No Color
 AWS_REGION="${AWS_REGION:-us-east-1}"
 AWS_PROFILE="${AWS_PROFILE:-default}"
 DRY_RUN=false
-SECRET_PREFIX="erc8004"
+SECRET_PREFIX="agentauri"
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do

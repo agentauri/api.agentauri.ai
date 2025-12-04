@@ -31,7 +31,7 @@ This guide provides implementation recommendations for exposing analytics materi
 **Request Example**:
 ```bash
 curl -H "Authorization: Bearer $JWT_TOKEN" \
-  "https://api.8004.dev/api/v1/analytics/actions/success-rate?days=7"
+  "https://api.agentauri.ai/api/v1/analytics/actions/success-rate?days=7"
 ```
 
 **Response Schema** (200 OK):

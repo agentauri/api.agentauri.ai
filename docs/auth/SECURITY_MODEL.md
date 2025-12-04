@@ -1,6 +1,6 @@
 # Security Model
 
-This document describes the security model and best practices for the api.8004.dev authentication system.
+This document describes the security model and best practices for the api.agentauri.ai authentication system.
 
 ## Threat Model
 

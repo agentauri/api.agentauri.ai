@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-**Project**: api.8004.dev - ERC-8004 Backend Infrastructure
+**Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
 **Last Updated**: January 30, 2025
 **Audience**: Developers, DevOps, SREs
 
@@ -59,7 +59,7 @@ docker compose logs -f event-processor | grep "Listening"
 **Check**:
 ```sql
 -- Connect to database
-docker compose exec postgres psql -U postgres -d erc8004_backend
+docker compose exec postgres psql -U postgres -d agentauri_backend
 
 -- Verify trigger exists
 SELECT tgname, tgenabled FROM pg_trigger WHERE tgname = 'notify_new_event_trigger';
@@ -220,7 +220,7 @@ cat .env | grep DATABASE_URL
 # Should include: ?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
 
 # Fix if missing:
-# DATABASE_URL=postgresql://postgres:PASSWORD@localhost:5432/erc8004_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
+# DATABASE_URL=postgresql://postgres:PASSWORD@localhost:5432/agentauri_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
 ```
 
 #### Solution 3: Certificate expired
@@ -335,7 +335,7 @@ docker compose up -d
 # Must be: sk_live_* or sk_test_*
 
 # Check if key exists in database
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "SELECT key_prefix, is_active, expires_at FROM api_keys WHERE key_prefix = 'sk_live_ABC';"
 ```
 
@@ -377,7 +377,7 @@ X-RateLimit-Remaining: 0
 ```bash
 # Check current rate limit tier
 curl -H "Authorization: Bearer YOUR_JWT" \
-  https://api.8004.dev/api/v1/auth/me
+  https://api.agentauri.ai/api/v1/auth/me
 
 # Response includes: "plan": "free"
 ```
@@ -388,7 +388,7 @@ curl -H "Authorization: Bearer YOUR_JWT" \
 ```bash
 # Check reset time in response headers
 curl -I -H "Authorization: Bearer YOUR_JWT" \
-  https://api.8004.dev/api/v1/triggers
+  https://api.agentauri.ai/api/v1/triggers
 
 # Look for: X-RateLimit-Reset: 1640000000
 ```
@@ -397,7 +397,7 @@ curl -I -H "Authorization: Bearer YOUR_JWT" \
 ```bash
 # Upgrade to Pro plan (500 req/hr)
 curl -X POST -H "Authorization: Bearer YOUR_JWT" \
-  https://api.8004.dev/api/v1/billing/upgrade \
+  https://api.agentauri.ai/api/v1/billing/upgrade \
   -d '{"plan": "pro"}'
 ```
 
@@ -462,7 +462,7 @@ Error: "skipping trigger (fail-fast)"
 **Diagnosis**:
 ```bash
 # Check circuit breaker states
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "SELECT trigger_id, state, failure_count, last_failure_at FROM circuit_breaker_state WHERE state = 'open';"
 ```
 
@@ -591,10 +591,10 @@ docker compose exec redis redis-cli --latency
 
 **Check**:
 ```bash
-./scripts/test-security-headers.sh https://api.8004.dev
+./scripts/test-security-headers.sh https://api.agentauri.ai
 
 # Or test specific header
-curl -I https://api.8004.dev/api/v1/health | grep Strict-Transport-Security
+curl -I https://api.agentauri.ai/api/v1/health | grep Strict-Transport-Security
 ```
 
 **Solutions**:
@@ -606,7 +606,7 @@ curl -I https://api.8004.dev/api/v1/health | grep Strict-Transport-Security
 
 # Verify
 docker compose restart api-gateway
-curl -I https://api.8004.dev/api/v1/health | grep Strict-Transport-Security
+curl -I https://api.agentauri.ai/api/v1/health | grep Strict-Transport-Security
 ```
 
 #### Solution 2: Middleware not applied
@@ -647,7 +647,7 @@ docker compose ps > containers.txt
 docker stats --no-stream > resources.txt
 
 # Database stats
-docker compose exec postgres psql -U postgres -d erc8004_backend -c \
+docker compose exec postgres psql -U postgres -d agentauri_backend -c \
   "SELECT * FROM pg_stat_activity;" > db-connections.txt
 ```
 

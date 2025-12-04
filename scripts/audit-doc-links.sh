@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="/Users/matteoscurati/work/api.8004.dev"
+PROJECT_ROOT="/Users/matteoscurati/work/api.agentauri.ai"
 cd "$PROJECT_ROOT"
 
 echo "🔍 Documentation Link Audit"

@@ -1,8 +1,8 @@
-# api.8004.dev - ERC-8004 Backend Infrastructure
+# api.agentauri.ai - AgentAuri Backend Infrastructure
 
-[![CI](https://github.com/matteoscurati/api.8004.dev/actions/workflows/ci.yml/badge.svg)](https://github.com/matteoscurati/api.8004.dev/actions/workflows/ci.yml)
-[![Security Scan](https://github.com/matteoscurati/api.8004.dev/actions/workflows/security.yml/badge.svg)](https://github.com/matteoscurati/api.8004.dev/actions/workflows/security.yml)
-[![Code Quality](https://github.com/matteoscurati/api.8004.dev/actions/workflows/lint.yml/badge.svg)](https://github.com/matteoscurati/api.8004.dev/actions/workflows/lint.yml)
+[![CI](https://github.com/matteoscurati/api.agentauri.ai/actions/workflows/ci.yml/badge.svg)](https://github.com/matteoscurati/api.agentauri.ai/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/matteoscurati/api.agentauri.ai/actions/workflows/security.yml/badge.svg)](https://github.com/matteoscurati/api.agentauri.ai/actions/workflows/security.yml)
+[![Code Quality](https://github.com/matteoscurati/api.agentauri.ai/actions/workflows/lint.yml/badge.svg)](https://github.com/matteoscurati/api.agentauri.ai/actions/workflows/lint.yml)
 
 Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events. Enables programmable triggers that execute automated actions based on blockchain events from Identity, Reputation, and Validation registries.
 
@@ -42,8 +42,8 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/matteoscurati/api.8004.dev.git
-   cd api.8004.dev
+   git clone https://github.com/matteoscurati/api.agentauri.ai.git
+   cd api.agentauri.ai
    ```
 
 2. **Configure environment variables**:
@@ -143,11 +143,11 @@ The project enforces **100% test coverage** before commits. All tests must pass 
 ./scripts/run-tests.sh
 
 # Database tests only (108 tests covering schema, TimescaleDB, integrity, notifications, performance)
-docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-schema.sql
-docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-timescaledb.sql
-docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-data-integrity.sql
-docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-notifications.sql
-docker exec -i erc8004-postgres psql -U postgres -d erc8004_backend < database/tests/test-performance-simple.sql
+docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend < database/tests/test-schema.sql
+docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend < database/tests/test-timescaledb.sql
+docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend < database/tests/test-data-integrity.sql
+docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend < database/tests/test-notifications.sql
+docker exec -i agentauri-postgres psql -U postgres -d agentauri_backend < database/tests/test-performance-simple.sql
 
 # Rust tests (when implemented)
 cd rust-backend
@@ -366,8 +366,8 @@ See `.env.example` for configuration guidelines.
 ## Support
 
 - **Documentation**: [CLAUDE.md](./CLAUDE.md)
-- **Issues**: [GitHub Issues](https://github.com/matteoscurati/api.8004.dev/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/matteoscurati/api.8004.dev/discussions)
+- **Issues**: [GitHub Issues](https://github.com/matteoscurati/api.agentauri.ai/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/matteoscurati/api.agentauri.ai/discussions)
 
 ## Related Projects
 

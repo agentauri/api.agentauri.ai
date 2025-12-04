@@ -98,7 +98,7 @@ vault --version  # Should be 1.15 or later
 - `secretsmanager:GetSecretValue`
 
 **Vault**: Ensure token has:
-- `create`, `read`, `update` on `secret/data/erc8004/*`
+- `create`, `read`, `update` on `secret/data/agentauri/*`
 
 ---
 
@@ -108,11 +108,11 @@ vault --version  # Should be 1.15 or later
 
 ```bash
 # Configure AWS CLI (if not already done)
-aws configure --profile erc8004-prod
+aws configure --profile agentauri-prod
 
 # Set region
 export AWS_REGION=us-east-1
-export AWS_PROFILE=erc8004-prod
+export AWS_PROFILE=agentauri-prod
 
 # Verify access
 aws sts get-caller-identity
@@ -124,7 +124,7 @@ aws sts get-caller-identity
 
 ```bash
 # Run interactive setup
-./scripts/aws-secrets-setup.sh --region us-east-1 --profile erc8004-prod
+./scripts/aws-secrets-setup.sh --region us-east-1 --profile agentauri-prod
 
 # Follow prompts to enter each secret value
 # Values from .env will be used as defaults
@@ -135,7 +135,7 @@ aws sts get-caller-identity
 ```bash
 # Example: Create database_url secret
 aws secretsmanager create-secret \
-  --name erc8004/database_url \
+  --name agentauri/database_url \
   --description "PostgreSQL connection string" \
   --secret-string "postgresql://user:password@host:5432/db" \
   --region us-east-1
@@ -146,16 +146,16 @@ aws secretsmanager create-secret \
 ### Step 3: Verify Secrets Created
 
 ```bash
-# List all erc8004 secrets
+# List all agentauri secrets
 aws secretsmanager list-secrets \
-  --filters Key=name,Values=erc8004/ \
+  --filters Key=name,Values=agentauri/ \
   --region us-east-1 \
   --query 'SecretList[].Name' \
   --output table
 
 # Test retrieving a secret
 aws secretsmanager get-secret-value \
-  --secret-id erc8004/database_url \
+  --secret-id agentauri/database_url \
   --region us-east-1 \
   --query 'SecretString' \
   --output text
@@ -163,7 +163,7 @@ aws secretsmanager get-secret-value \
 
 ### Step 4: Create IAM Policy for Application
 
-Create `erc8004-secrets-policy.json`:
+Create `agentauri-secrets-policy.json`:
 
 ```json
 {
@@ -175,7 +175,7 @@ Create `erc8004-secrets-policy.json`:
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:DescribeSecret"
             ],
-            "Resource": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:erc8004/*"
+            "Resource": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:agentauri/*"
         },
         {
             "Effect": "Allow",
@@ -190,7 +190,7 @@ Replace `ACCOUNT_ID` with your AWS account ID:
 
 ```bash
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-sed -i "s/ACCOUNT_ID/$ACCOUNT_ID/g" erc8004-secrets-policy.json
+sed -i "s/ACCOUNT_ID/$ACCOUNT_ID/g" agentauri-secrets-policy.json
 ```
 
 Apply policy:
@@ -198,13 +198,13 @@ Apply policy:
 ```bash
 # Create policy
 aws iam create-policy \
-  --policy-name erc8004-secrets-policy \
-  --policy-document file://erc8004-secrets-policy.json
+  --policy-name agentauri-secrets-policy \
+  --policy-document file://agentauri-secrets-policy.json
 
 # Attach to EC2 instance role (example)
 aws iam attach-role-policy \
-  --role-name erc8004-ec2-role \
-  --policy-arn arn:aws:iam::ACCOUNT_ID:policy/erc8004-secrets-policy
+  --role-name agentauri-ec2-role \
+  --policy-arn arn:aws:iam::ACCOUNT_ID:policy/agentauri-secrets-policy
 ```
 
 ### Step 5: Update Application Configuration
@@ -224,7 +224,7 @@ export AWS_REGION=us-east-1
 # Add to .env or shell profile
 export SECRETS_BACKEND=aws
 export AWS_REGION=us-east-1
-export AWS_PROFILE=erc8004-prod
+export AWS_PROFILE=agentauri-prod
 ```
 
 ### Step 6: Update Cargo.toml
@@ -291,13 +291,13 @@ vault secrets list
 
 ```bash
 # Create each secret individually
-vault kv put secret/erc8004/database_url \
+vault kv put secret/agentauri/database_url \
   value="postgresql://user:password@host:5432/db"
 
-vault kv put secret/erc8004/redis_url \
+vault kv put secret/agentauri/redis_url \
   value="redis://redis:6379"
 
-vault kv put secret/erc8004/jwt_secret \
+vault kv put secret/agentauri/jwt_secret \
   value="your_jwt_secret_32_characters_long"
 
 # Repeat for all secrets...
@@ -316,9 +316,9 @@ while IFS='=' read -r key value; do
   secret_name=$(echo "$key" | tr '[:upper:]' '[:lower:]')
 
   # Create secret in Vault
-  vault kv put "secret/erc8004/$secret_name" value="$value"
+  vault kv put "secret/agentauri/$secret_name" value="$value"
 
-  echo "✓ Created: secret/erc8004/$secret_name"
+  echo "✓ Created: secret/agentauri/$secret_name"
 done < .env
 ```
 
@@ -326,26 +326,26 @@ done < .env
 
 ```bash
 # List all secrets
-vault kv list secret/erc8004
+vault kv list secret/agentauri
 
 # Get a specific secret
-vault kv get secret/erc8004/database_url
+vault kv get secret/agentauri/database_url
 
 # Get secret value only
-vault kv get -field=value secret/erc8004/database_url
+vault kv get -field=value secret/agentauri/database_url
 ```
 
 ### Step 5: Create Vault Policy
 
-Create `erc8004-app-policy.hcl`:
+Create `agentauri-app-policy.hcl`:
 
 ```hcl
 # Read-only access to application secrets
-path "secret/data/erc8004/*" {
+path "secret/data/agentauri/*" {
   capabilities = ["read"]
 }
 
-path "secret/metadata/erc8004/*" {
+path "secret/metadata/agentauri/*" {
   capabilities = ["list"]
 }
 ```
@@ -353,18 +353,18 @@ path "secret/metadata/erc8004/*" {
 Apply policy:
 
 ```bash
-vault policy write erc8004-app erc8004-app-policy.hcl
+vault policy write agentauri-app agentauri-app-policy.hcl
 ```
 
 ### Step 6: Create Application Token
 
 ```bash
-# Create token with erc8004-app policy
+# Create token with agentauri-app policy
 # TTL: 720 hours (30 days) - adjust as needed
 vault token create \
-  -policy=erc8004-app \
+  -policy=agentauri-app \
   -ttl=720h \
-  -display-name="erc8004-api-gateway"
+  -display-name="agentauri-api-gateway"
 
 # Save the token securely!
 # Example output:
@@ -630,7 +630,7 @@ Since secrets were temporarily in .env, rotate all Tier 1 secrets:
 ```bash
 # Alert on excessive secret accesses (potential leak)
 aws cloudwatch put-metric-alarm \
-  --alarm-name erc8004-secrets-high-access \
+  --alarm-name agentauri-secrets-high-access \
   --alarm-description "Alert on >1000 secret accesses/hour" \
   --metric-name GetSecretValue \
   --namespace AWS/SecretsManager \
@@ -703,21 +703,21 @@ curl -s $VAULT_ADDR/v1/sys/health
 aws sts get-caller-identity
 
 # Test secret access manually
-aws secretsmanager get-secret-value --secret-id erc8004/database_url
+aws secretsmanager get-secret-value --secret-id agentauri/database_url
 
 # Check IAM policy is correct (see Step 4 above)
 ```
 
 ### "Secret not found after migration"
 
-**Symptom**: Application crashes with `Secret erc8004/database_url not found`
+**Symptom**: Application crashes with `Secret agentauri/database_url not found`
 
 **Solution**:
 ```bash
 # Verify secret name (case-sensitive!)
 aws secretsmanager list-secrets --query 'SecretList[].Name'
 
-# Check prefix is correct (must be erc8004/ not erc8004_)
+# Check prefix is correct (must be agentauri/ not agentauri_)
 ```
 
 ---

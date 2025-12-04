@@ -437,7 +437,7 @@ DELETE /api/v1/oauth/tokens               Revoke all tokens for user
 
 ```typescript
 // Step 1: Register OAuth client
-const client = await fetch('https://api.8004.dev/api/v1/oauth/clients', {
+const client = await fetch('https://api.agentauri.ai/api/v1/oauth/clients', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${userJwt}`,
@@ -455,7 +455,7 @@ const { client_id, client_secret } = await client.json();
 // Store client_secret securely!
 
 // Step 2: Generate authorization URL
-const authUrl = new URL('https://api.8004.dev/api/v1/oauth/authorize');
+const authUrl = new URL('https://api.agentauri.ai/api/v1/oauth/authorize');
 authUrl.searchParams.set('response_type', 'code');
 authUrl.searchParams.set('client_id', client_id);
 authUrl.searchParams.set('redirect_uri', 'https://dashboard.example.com/oauth/callback');
@@ -474,7 +474,7 @@ app.get('/oauth/callback', async (req, res) => {
   }
 
   // Exchange code for token
-  const tokenResponse = await fetch('https://api.8004.dev/api/v1/oauth/token', {
+  const tokenResponse = await fetch('https://api.agentauri.ai/api/v1/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -496,7 +496,7 @@ app.get('/oauth/callback', async (req, res) => {
 });
 
 // Step 4: Use access token
-const triggers = await fetch('https://api.8004.dev/api/v1/triggers', {
+const triggers = await fetch('https://api.agentauri.ai/api/v1/triggers', {
   headers: { 'Authorization': `Bearer ${access_token}` }
 });
 ```
@@ -526,7 +526,7 @@ sessionStorage.setItem('pkce_code_verifier', codeVerifier);
 
 // Step 3: Generate authorization URL with PKCE
 const codeChallenge = await generateCodeChallenge(codeVerifier);
-const authUrl = new URL('https://api.8004.dev/api/v1/oauth/authorize');
+const authUrl = new URL('https://api.agentauri.ai/api/v1/oauth/authorize');
 authUrl.searchParams.set('response_type', 'code');
 authUrl.searchParams.set('client_id', PUBLIC_CLIENT_ID);
 authUrl.searchParams.set('redirect_uri', window.location.origin + '/callback');
@@ -542,7 +542,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const code = urlParams.get('code');
 const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
 
-const tokenResponse = await fetch('https://api.8004.dev/api/v1/oauth/token', {
+const tokenResponse = await fetch('https://api.agentauri.ai/api/v1/oauth/token', {
   method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams({
@@ -564,7 +564,7 @@ import requests
 
 # Step 1: Obtain access token using client credentials
 token_response = requests.post(
-    'https://api.8004.dev/api/v1/oauth/token',
+    'https://api.agentauri.ai/api/v1/oauth/token',
     data={
         'grant_type': 'client_credentials',
         'client_id': 'client_xxx',
@@ -577,7 +577,7 @@ access_token = token_response.json()['access_token']
 
 # Step 2: Use access token for API calls
 triggers = requests.get(
-    'https://api.8004.dev/api/v1/triggers',
+    'https://api.agentauri.ai/api/v1/triggers',
     headers={'Authorization': f'Bearer {access_token}'}
 )
 

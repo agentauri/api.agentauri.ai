@@ -1,4 +1,4 @@
-# api.8004.dev - ERC-8004 Backend Infrastructure
+# api.agentauri.ai - AgentAuri Backend Infrastructure
 
 ## Quick Reference
 
@@ -21,7 +21,7 @@ cd ponder-indexers && pnpm test       # TypeScript tests
 
 # Database operations
 sqlx migrate add <name>               # Create new migration
-psql erc8004_backend                  # Connect to database
+psql agentauri_backend                  # Connect to database
 psql < database/seeds/test_data.sql   # Load test data
 ```
 
@@ -540,7 +540,7 @@ Complete flow for a reputation feedback event:
 ### Project Structure
 
 ```
-api.8004.dev/
+api.agentauri.ai/
 ├── CLAUDE.md                    # This file
 ├── README.md                    # User-facing documentation
 ├── docs/                        # Detailed documentation
@@ -1042,7 +1042,7 @@ cargo install cargo-audit
 ### Database Setup
 
 1. Install PostgreSQL 15+ with TimescaleDB extension
-2. Create database: `createdb erc8004_backend`
+2. Create database: `createdb agentauri_backend`
 3. Enable TimescaleDB: `CREATE EXTENSION IF NOT EXISTS timescaledb;`
 4. Run migrations: `sqlx migrate run`
 5. (Optional) Seed test data: `psql < database/seeds/test_triggers.sql`
@@ -1105,7 +1105,7 @@ export async function sendFeedbackToAgent(
   });
 
   const client = new Client({
-    name: "erc8004-backend",
+    name: "agentauri-backend",
     version: "1.0.0",
   }, { capabilities: {} });
 

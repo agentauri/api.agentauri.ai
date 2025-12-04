@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The api.8004.dev backend infrastructure provides real-time monitoring and automated response capabilities for the ERC-8004 on-chain agent economy. It bridges blockchain events with off-chain systems through a programmable trigger engine.
+The api.agentauri.ai backend infrastructure provides real-time monitoring and automated response capabilities for the ERC-8004 on-chain agent economy. It bridges blockchain events with off-chain systems through a programmable trigger engine.
 
 ## Core Concepts
 

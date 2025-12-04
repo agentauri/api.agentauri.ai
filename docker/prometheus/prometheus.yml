@@ -1,12 +1,12 @@
 # ============================================================================
-# Prometheus Configuration for ERC-8004 Backend
+# Prometheus Configuration for AgentAuri Backend
 # ============================================================================
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    cluster: 'erc8004-dev'
+    cluster: 'agentauri-dev'
     environment: 'development'
 
 # Alertmanager configuration (optional, for production)

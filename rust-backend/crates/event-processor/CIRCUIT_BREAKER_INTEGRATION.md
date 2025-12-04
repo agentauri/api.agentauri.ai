@@ -274,7 +274,7 @@ Run the full test suite:
 
 ```bash
 cd rust-backend
-export DATABASE_URL="postgresql://user:pass@localhost:5432/erc8004_backend"
+export DATABASE_URL="postgresql://user:pass@localhost:5432/agentauri_backend"
 cargo test --package event-processor circuit_breaker
 ```
 

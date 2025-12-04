@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes how the api.8004.dev backend integrates with the ERC-8004 standard for on-chain agent economy. It covers the three core registries, event structures, and integration patterns.
+This document describes how the api.agentauri.ai backend integrates with the ERC-8004 standard for on-chain agent economy. It covers the three core registries, event structures, and integration patterns.
 
 ## ERC-8004 Standard
 

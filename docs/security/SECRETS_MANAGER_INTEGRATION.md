@@ -37,15 +37,15 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
    ```bash
    # Using AWS CLI
    aws secretsmanager create-secret \
-     --name erc8004-backend/production/db-encryption-key \
+     --name agentauri-backend/production/db-encryption-key \
      --secret-string "YOUR_ENCRYPTION_KEY_HERE"
 
    aws secretsmanager create-secret \
-     --name erc8004-backend/production/jwt-secret \
+     --name agentauri-backend/production/jwt-secret \
      --secret-string "YOUR_JWT_SECRET_HERE"
 
    aws secretsmanager create-secret \
-     --name erc8004-backend/production/database-password \
+     --name agentauri-backend/production/database-password \
      --secret-string "YOUR_DB_PASSWORD_HERE"
    ```
 
@@ -60,7 +60,7 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
            "secretsmanager:GetSecretValue",
            "secretsmanager:DescribeSecret"
          ],
-         "Resource": "arn:aws:secretsmanager:*:*:secret:erc8004-backend/*"
+         "Resource": "arn:aws:secretsmanager:*:*:secret:agentauri-backend/*"
        }
      ]
    }
@@ -77,11 +77,11 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
 
        let mut secrets = HashMap::new();
        secrets.insert("db_encryption_key",
-           secrets_manager.get_secret("erc8004-backend/production/db-encryption-key").await?);
+           secrets_manager.get_secret("agentauri-backend/production/db-encryption-key").await?);
        secrets.insert("jwt_secret",
-           secrets_manager.get_secret("erc8004-backend/production/jwt-secret").await?);
+           secrets_manager.get_secret("agentauri-backend/production/jwt-secret").await?);
        secrets.insert("db_password",
-           secrets_manager.get_secret("erc8004-backend/production/database-password").await?);
+           secrets_manager.get_secret("agentauri-backend/production/database-password").await?);
 
        Ok(secrets)
    }
@@ -93,7 +93,7 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
    # Set ENABLE_SECRETS_MANAGER=true to load secrets from AWS
    ENABLE_SECRETS_MANAGER=false
    AWS_REGION=us-east-1
-   AWS_SECRETS_PREFIX=erc8004-backend/production
+   AWS_SECRETS_PREFIX=agentauri-backend/production
 
    # Development: Use local secrets (DO NOT USE IN PRODUCTION)
    DB_ENCRYPTION_KEY=REPLACE_WITH_KEY_FROM_SECRETS_MANAGER
@@ -128,9 +128,9 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
    export VAULT_TOKEN='your-root-token'
 
    # Store secrets
-   vault kv put secret/erc8004-backend/production/db-encryption-key value="YOUR_KEY"
-   vault kv put secret/erc8004-backend/production/jwt-secret value="YOUR_SECRET"
-   vault kv put secret/erc8004-backend/production/database-password value="YOUR_PASSWORD"
+   vault kv put secret/agentauri-backend/production/db-encryption-key value="YOUR_KEY"
+   vault kv put secret/agentauri-backend/production/jwt-secret value="YOUR_SECRET"
+   vault kv put secret/agentauri-backend/production/database-password value="YOUR_PASSWORD"
    ```
 
 3. **Configure AppRole Authentication**:
@@ -139,21 +139,21 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
    vault auth enable approle
 
    # Create policy
-   vault policy write erc8004-backend - <<EOF
-   path "secret/data/erc8004-backend/production/*" {
+   vault policy write agentauri-backend - <<EOF
+   path "secret/data/agentauri-backend/production/*" {
      capabilities = ["read"]
    }
    EOF
 
    # Create AppRole
-   vault write auth/approle/role/erc8004-backend \
-     policies="erc8004-backend" \
+   vault write auth/approle/role/agentauri-backend \
+     policies="agentauri-backend" \
      token_ttl=1h \
      token_max_ttl=4h
 
    # Get RoleID and SecretID
-   vault read auth/approle/role/erc8004-backend/role-id
-   vault write -f auth/approle/role/erc8004-backend/secret-id
+   vault read auth/approle/role/agentauri-backend/role-id
+   vault write -f auth/approle/role/agentauri-backend/secret-id
    ```
 
 4. **Update Code to Use Vault**:
@@ -171,7 +171,7 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
            &vault_addr,
            &role_id,
            &secret_id,
-           "secret/erc8004-backend/production"
+           "secret/agentauri-backend/production"
        ).await?;
 
        let mut secrets = HashMap::new();
@@ -193,7 +193,7 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
    VAULT_ADDR=https://vault.example.com:8200
    VAULT_ROLE_ID=your-role-id
    VAULT_SECRET_ID=your-secret-id  # Store this in CI/CD secrets
-   VAULT_MOUNT_PATH=secret/erc8004-backend/production
+   VAULT_MOUNT_PATH=secret/agentauri-backend/production
    ```
 
 ### Implementation Checklist

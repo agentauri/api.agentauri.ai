@@ -1,4 +1,4 @@
-//! Event Processor for api.8004.dev
+//! Event Processor for api.agentauri.ai
 //!
 //! Listens to PostgreSQL NOTIFY events and evaluates triggers against incoming events.
 //! Uses dual-path architecture for zero event loss:

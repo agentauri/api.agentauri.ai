@@ -1,4 +1,4 @@
--- api.8004.dev PostgreSQL Database Schema
+-- api.agentauri.ai PostgreSQL Database Schema
 -- Full schema reference (concatenation of all migrations)
 -- Generated: 2025-01-23
 -- PostgreSQL Version: 15+

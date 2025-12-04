@@ -69,7 +69,7 @@ Create `.gitleaks.toml` in project root for custom rules:
 
 ```toml
 # Custom gitleaks configuration
-title = "ERC-8004 Backend Secret Detection"
+title = "AgentAuri Backend Secret Detection"
 
 # Custom rules for database URLs
 [[rules]]

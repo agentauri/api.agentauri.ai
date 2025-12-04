@@ -86,7 +86,7 @@ Update `.env`:
 
 ```bash
 # Require TLS connection
-DATABASE_URL=postgresql://postgres:password@localhost:5432/erc8004_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
+DATABASE_URL=postgresql://postgres:password@localhost:5432/agentauri_backend?sslmode=require&sslrootcert=./docker/postgres/certs/root.crt
 ```
 
 **SSL Modes**:
@@ -115,7 +115,7 @@ Cloud providers offer managed PostgreSQL with built-in TLS:
 wget https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
 # Connection string
-DATABASE_URL="postgresql://postgres:password@mydb.xxxxx.us-east-1.rds.amazonaws.com:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/path/to/global-bundle.pem"
+DATABASE_URL="postgresql://postgres:password@mydb.xxxxx.us-east-1.rds.amazonaws.com:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/path/to/global-bundle.pem"
 ```
 
 **Azure Database for PostgreSQL**:
@@ -124,7 +124,7 @@ DATABASE_URL="postgresql://postgres:password@mydb.xxxxx.us-east-1.rds.amazonaws.
 wget https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem
 
 # Connection string
-DATABASE_URL="postgresql://postgres@myserver:password@myserver.postgres.database.azure.com:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/path/to/BaltimoreCyberTrustRoot.crt.pem"
+DATABASE_URL="postgresql://postgres@myserver:password@myserver.postgres.database.azure.com:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/path/to/BaltimoreCyberTrustRoot.crt.pem"
 ```
 
 **Google Cloud SQL**:
@@ -133,7 +133,7 @@ DATABASE_URL="postgresql://postgres@myserver:password@myserver.postgres.database
 ./cloud_sql_proxy -instances=PROJECT:REGION:INSTANCE=tcp:5432
 
 # Or download server CA certificate from Cloud Console
-DATABASE_URL="postgresql://postgres:password@mydb.xxxxx.cloudsql.com:5432/erc8004_backend?sslmode=verify-full&sslrootcert=/path/to/server-ca.pem"
+DATABASE_URL="postgresql://postgres:password@mydb.xxxxx.cloudsql.com:5432/agentauri_backend?sslmode=verify-full&sslrootcert=/path/to/server-ca.pem"
 ```
 
 #### Option 2: Self-Managed PostgreSQL
@@ -555,7 +555,7 @@ TDE encrypts data at rest (on disk) automatically, with no application changes r
 
 ```bash
 aws rds create-db-instance \
-  --db-instance-identifier erc8004-prod \
+  --db-instance-identifier agentauri-prod \
   --db-instance-class db.t3.medium \
   --engine postgres \
   --engine-version 15.4 \
@@ -583,8 +583,8 @@ aws rds create-db-instance \
 
 ```bash
 az postgres server create \
-  --resource-group erc8004-prod \
-  --name erc8004-postgres \
+  --resource-group agentauri-prod \
+  --name agentauri-postgres \
   --location eastus \
   --admin-user postgres \
   --admin-password "$POSTGRES_PASSWORD" \
@@ -606,7 +606,7 @@ az postgres server create \
 **Enable encryption** (default for new instances):
 
 ```bash
-gcloud sql instances create erc8004-postgres \
+gcloud sql instances create agentauri-postgres \
   --database-version=POSTGRES_15 \
   --tier=db-custom-2-7680 \
   --region=us-central1 \
@@ -897,7 +897,7 @@ Tested on: Same hardware as above
 pgbackrest backup --type=full --repo=1 --cipher-type=aes-256-cbc --cipher-pass="$BACKUP_PASSWORD"
 
 # Encrypted pg_dump
-pg_dump erc8004_backend | gpg --symmetric --cipher-algo AES256 > backup.sql.gpg
+pg_dump agentauri_backend | gpg --symmetric --cipher-algo AES256 > backup.sql.gpg
 ```
 
 ### Point-in-Time Recovery (PITR)

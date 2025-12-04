@@ -181,7 +181,7 @@ All 7 comprehensive tests passing:
 cd rust-backend
 
 # Set DATABASE_URL
-export DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/erc8004_backend"
+export DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5432/agentauri_backend"
 
 # Run batch loading tests
 cargo test --package event-processor --test batch_loading_test -- --test-threads=1

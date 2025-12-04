@@ -1,6 +1,6 @@
 # Testing Strategy
 
-**Project**: api.8004.dev - ERC-8004 Backend Infrastructure
+**Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
 **Last Updated**: January 30, 2025
 **Audience**: Developers, QA Engineers, CI/CD Maintainers
 
@@ -484,7 +484,7 @@ Located in `scripts/`:
 ### Directory Structure
 
 ```
-api.8004.dev/
+api.agentauri.ai/
 ├── rust-backend/
 │   ├── crates/
 │   │   ├── api-gateway/
@@ -762,12 +762,12 @@ jobs:
           cd rust-backend
           sqlx migrate run
         env:
-          DATABASE_URL: postgres://postgres:testpass@localhost/erc8004_backend
+          DATABASE_URL: postgres://postgres:testpass@localhost/agentauri_backend
 
       - name: Run Rust tests
         run: cargo test --workspace
         env:
-          DATABASE_URL: postgres://postgres:testpass@localhost/erc8004_backend
+          DATABASE_URL: postgres://postgres:testpass@localhost/agentauri_backend
           REDIS_URL: redis://localhost:6379
 
       - name: Run TypeScript tests

@@ -34,8 +34,8 @@ print_info() {
 }
 
 DB_USER="${DB_USER:-postgres}"
-DB_NAME="${DB_NAME:-erc8004_backend}"
-DB_CONTAINER="erc8004-postgres"
+DB_NAME="${DB_NAME:-agentauri_backend}"
+DB_CONTAINER="agentauri-postgres"
 
 print_header "EVENT PROCESSOR INTEGRATION TEST"
 
@@ -109,14 +109,14 @@ fi
 
 # Test 3: Verify Event Processor code can connect
 print_info "Test 3: Checking Event Processor build..."
-cd /Users/matteoscurati/work/api.8004.dev/rust-backend
+cd /Users/matteoscurati/work/api.agentauri.ai/rust-backend
 if cargo build -p event-processor --quiet 2>&1; then
     print_success "Event Processor builds successfully"
 else
     print_fail "Event Processor failed to build"
     exit 1
 fi
-cd /Users/matteoscurati/work/api.8004.dev
+cd /Users/matteoscurati/work/api.agentauri.ai
 
 print_header "MANUAL TEST INSTRUCTIONS"
 echo ""

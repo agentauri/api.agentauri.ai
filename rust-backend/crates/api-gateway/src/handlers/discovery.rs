@@ -92,16 +92,17 @@ fn build_response(json_body: String) -> HttpResponse {
 /// Generate Agent Card with system metadata
 fn generate_agent_card() -> AgentCardResponse {
     // Use environment variables for dynamic values
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "https://api.8004.dev".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "https://api.agentauri.ai".to_string());
     let contact_email =
-        std::env::var("CONTACT_EMAIL").unwrap_or_else(|_| "support@8004.dev".to_string());
+        std::env::var("CONTACT_EMAIL").unwrap_or_else(|_| "support@agentauri.ai".to_string());
     let contact_github = std::env::var("CONTACT_GITHUB")
-        .unwrap_or_else(|_| "https://github.com/erc-8004/api.8004.dev".to_string());
-    let documentation_url =
-        std::env::var("DOCUMENTATION_URL").unwrap_or_else(|_| "https://docs.8004.dev".to_string());
+        .unwrap_or_else(|_| "https://github.com/erc-8004/api.agentauri.ai".to_string());
+    let documentation_url = std::env::var("DOCUMENTATION_URL")
+        .unwrap_or_else(|_| "https://docs.agentauri.ai".to_string());
 
     AgentCardResponse {
-        name: "ERC-8004 Backend API".to_string(),
+        name: "AgentAuri API".to_string(),
         version: "1.0.0".to_string(),
         description: "Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chain agent economy events".to_string(),
         api_version: "v1".to_string(),
@@ -247,20 +248,21 @@ pub async fn get_security_txt() -> Result<HttpResponse> {
     debug!("Security.txt endpoint called");
 
     // Use environment variables for dynamic values
-    let contact_email =
-        std::env::var("SECURITY_CONTACT_EMAIL").unwrap_or_else(|_| "security@8004.dev".to_string());
+    let contact_email = std::env::var("SECURITY_CONTACT_EMAIL")
+        .unwrap_or_else(|_| "security@agentauri.ai".to_string());
     let contact_url = std::env::var("SECURITY_CONTACT_URL").unwrap_or_else(|_| {
-        "https://github.com/erc-8004/api.8004.dev/security/advisories".to_string()
+        "https://github.com/erc-8004/api.agentauri.ai/security/advisories".to_string()
     });
-    let policy_url = std::env::var("SECURITY_POLICY_URL")
-        .unwrap_or_else(|_| "https://github.com/erc-8004/api.8004.dev/security/policy".to_string());
+    let policy_url = std::env::var("SECURITY_POLICY_URL").unwrap_or_else(|_| {
+        "https://github.com/erc-8004/api.agentauri.ai/security/policy".to_string()
+    });
     let acknowledgments_url = std::env::var("SECURITY_ACKNOWLEDGMENTS_URL").unwrap_or_else(|_| {
-        "https://github.com/erc-8004/api.8004.dev/security/advisories".to_string()
+        "https://github.com/erc-8004/api.agentauri.ai/security/advisories".to_string()
     });
     let hiring_url = std::env::var("SECURITY_HIRING_URL").ok();
     let canonical_url = std::env::var("BASE_URL")
         .map(|base| format!("{}/.well-known/security.txt", base))
-        .unwrap_or_else(|_| "https://api.8004.dev/.well-known/security.txt".to_string());
+        .unwrap_or_else(|_| "https://api.agentauri.ai/.well-known/security.txt".to_string());
 
     // Expiration date: 1 year from now (RFC 9116 requirement)
     let expires = Utc::now()
@@ -273,7 +275,7 @@ pub async fn get_security_txt() -> Result<HttpResponse> {
     let mut content = String::new();
 
     // Header comment
-    content.push_str("# Security contact information for api.8004.dev\n");
+    content.push_str("# Security contact information for api.agentauri.ai\n");
     content.push_str("# This file follows RFC 9116 (https://www.rfc-editor.org/rfc/rfc9116)\n\n");
 
     // Required: Contact (can have multiple)
@@ -317,7 +319,7 @@ mod tests {
         let agent_card = generate_agent_card();
 
         // Basic fields
-        assert_eq!(agent_card.name, "ERC-8004 Backend API");
+        assert_eq!(agent_card.name, "AgentAuri API");
         assert_eq!(agent_card.version, "1.0.0");
         assert_eq!(agent_card.api_version, "v1");
         assert_eq!(agent_card.protocol_version, "erc-8004-v1.0");
@@ -480,7 +482,7 @@ mod tests {
         let json = serde_json::to_string(&agent_card).expect("Serialization failed");
 
         // Verify all major sections are present
-        assert!(json.contains("ERC-8004 Backend API"));
+        assert!(json.contains("AgentAuri API"));
         assert!(json.contains("push_layer"));
         assert!(json.contains("pull_layer"));
         assert!(json.contains("authentication"));

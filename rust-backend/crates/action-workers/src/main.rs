@@ -1,4 +1,4 @@
-//! Action Workers for api.8004.dev
+//! Action Workers for api.agentauri.ai
 //!
 //! Consumes jobs from Redis queue and executes actions (Telegram, REST, MCP).
 //! Implements a worker pool with configurable parallelism and graceful shutdown.

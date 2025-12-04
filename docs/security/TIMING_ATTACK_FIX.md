@@ -244,7 +244,7 @@ Ok(None) => {
 
 ## Contact
 
-For security concerns, contact: security@8004.dev
+For security concerns, contact: security@agentauri.ai
 
 ---
 

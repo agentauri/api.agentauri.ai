@@ -1,4 +1,4 @@
-//! API Gateway for api.8004.dev
+//! API Gateway for api.agentauri.ai
 //!
 //! REST API server providing trigger management and system queries.
 

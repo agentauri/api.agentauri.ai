@@ -49,7 +49,7 @@ VAULT_ADDR="${VAULT_ADDR:-http://localhost:8200}"
 VAULT_TOKEN="${VAULT_TOKEN:-}"
 AUTO_GENERATE=false
 DRY_RUN=false
-SECRET_PREFIX="erc8004"
+SECRET_PREFIX="agentauri"
 SECRET_NAME=""
 
 # Parse command-line arguments
