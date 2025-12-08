@@ -52,7 +52,7 @@ const MAX_POLLING_ITERATIONS: u64 = 1_000_000;
 #[derive(Debug, Clone, FromRow)]
 struct UnprocessedEvent {
     id: String,
-    chain_id: i64,
+    chain_id: i32, // matches INTEGER in PostgreSQL view
     block_number: i64,
     #[allow(dead_code)] // Used in SQL query and debug logs
     registry: String,
