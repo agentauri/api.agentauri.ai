@@ -5,6 +5,7 @@
 //! is received multiple times (e.g., through both NOTIFY and polling fallback).
 
 use anyhow::{Context, Result};
+use serde_json::json;
 use shared::models::{Event, Trigger, TriggerAction, TriggerCondition};
 use shared::{ActionJob, ActionType, DbPool};
 use std::collections::HashMap;
@@ -22,6 +23,67 @@ fn get_hostname() -> String {
         .ok()
         .and_then(|h| h.into_string().ok())
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Convert an Event struct to a flattened JSON object for template variable substitution
+///
+/// This function extracts all relevant fields from an Event and returns them as a
+/// flat JSON object. Template variables like `{{agent_id}}` will be replaced with
+/// the corresponding values from this object.
+///
+/// # Fields included
+///
+/// - `event_id` - Unique event identifier
+/// - `chain_id` - Blockchain chain ID (e.g., 11155111 for Sepolia)
+/// - `block_number` - Block number where the event occurred
+/// - `registry` - Registry type (identity, reputation, validation)
+/// - `event_type` - Type of event (e.g., NewFeedback, AgentRegistered)
+/// - `agent_id` - Agent ID (if present)
+/// - `timestamp` - Unix timestamp of the event
+/// - `owner` - Owner address (identity registry)
+/// - `token_uri` - Token URI (identity registry)
+/// - `client_address` - Client address (reputation registry)
+/// - `score` - Feedback score (reputation registry)
+/// - `tag1`, `tag2` - Tags (reputation registry)
+/// - `validator_address` - Validator address (validation registry)
+/// - `response` - Validation response code (validation registry)
+fn event_to_template_data(event: &Event) -> serde_json::Value {
+    json!({
+        // Core event fields (always present)
+        "event_id": event.id,
+        "chain_id": event.chain_id,
+        "block_number": event.block_number,
+        "registry": event.registry,
+        "event_type": event.event_type,
+        "timestamp": event.timestamp,
+        "transaction_hash": event.transaction_hash,
+
+        // Agent ID (common across registries)
+        "agent_id": event.agent_id,
+
+        // Identity Registry fields
+        "owner": event.owner,
+        "token_uri": event.token_uri,
+        "metadata_key": event.metadata_key,
+        "metadata_value": event.metadata_value,
+
+        // Reputation Registry fields
+        "client_address": event.client_address,
+        "feedback_index": event.feedback_index,
+        "score": event.score,
+        "tag1": event.tag1,
+        "tag2": event.tag2,
+        "file_uri": event.file_uri,
+        "file_hash": event.file_hash,
+
+        // Validation Registry fields
+        "validator_address": event.validator_address,
+        "request_hash": event.request_hash,
+        "response": event.response,
+        "response_uri": event.response_uri,
+        "response_hash": event.response_hash,
+        "tag": event.tag,
+    })
 }
 
 /// Process a single event notification with idempotency guarantee
@@ -198,6 +260,19 @@ pub async fn process_event<Q: JobQueue>(
             }
         }
 
+        // Skip events that occurred before trigger was created
+        // This prevents a flood of notifications from historical events when a new trigger is created
+        if event.timestamp < trigger.created_at.timestamp() {
+            tracing::debug!(
+                trigger_id = %trigger.id,
+                trigger_name = %trigger.name,
+                event_timestamp = event.timestamp,
+                trigger_created_at = %trigger.created_at,
+                "Skipping trigger - event occurred before trigger creation"
+            );
+            continue;
+        }
+
         // Get conditions for this trigger from the batch-loaded map
         let conditions = conditions_map
             .get(&trigger.id)
@@ -271,12 +346,16 @@ pub async fn process_event<Q: JobQueue>(
                         }
                     };
 
+                    // Build event_data JSON for template variable substitution
+                    let event_data = event_to_template_data(&event);
+
                     let job = ActionJob::new(
                         &trigger.id,
                         &event.id,
                         action_type,
                         action.priority,
                         action.config.clone(),
+                        event_data,
                     );
 
                     // FIX 2.2: Continue on enqueue error instead of aborting
@@ -438,8 +517,12 @@ async fn mark_event_processed(
 }
 
 /// Fetch an event from the database
+///
+/// Reads from `ponder_events` view which maps Ponder's camelCase columns
+/// to snake_case for compatibility with the existing Event model.
+/// This view reads from the shared `ponder."Event"` table.
 async fn fetch_event(event_id: &str, db_pool: &DbPool) -> Result<Event> {
-    sqlx::query_as::<_, Event>(
+    match sqlx::query_as::<_, Event>(
         r#"
         SELECT
             id, chain_id, block_number, block_hash, transaction_hash, log_index,
@@ -447,14 +530,28 @@ async fn fetch_event(event_id: &str, db_pool: &DbPool) -> Result<Event> {
             metadata_value, client_address, feedback_index, score, tag1, tag2,
             file_uri, file_hash, validator_address, request_hash, response,
             response_uri, response_hash, tag, created_at
-        FROM events
+        FROM ponder_events
         WHERE id = $1
         "#,
     )
     .bind(event_id)
     .fetch_one(db_pool)
     .await
-    .context("Failed to fetch event from database")
+    {
+        Ok(event) => Ok(event),
+        Err(e) => {
+            tracing::error!(
+                event_id = %event_id,
+                error = ?e,
+                error_id = "FETCH_EVENT_SQLX_ERROR",
+                "SQLx error fetching event (full debug)"
+            );
+            Err(anyhow::anyhow!(
+                "Failed to fetch event from database: {:?}",
+                e
+            ))
+        }
+    }
 }
 
 /// Fetch enabled triggers matching chain_id and registry

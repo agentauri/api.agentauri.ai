@@ -154,6 +154,7 @@ mod tests {
             ActionType::Telegram,
             1,
             json!({"chat_id": "123"}),
+            json!({"agent_id": 42}), // event_data
         );
 
         let result = mock_queue.enqueue(&job).await;

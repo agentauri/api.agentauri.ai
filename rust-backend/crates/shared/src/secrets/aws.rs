@@ -137,6 +137,8 @@ pub struct SecretsManager {
     cache: Arc<RwLock<HashMap<String, CachedSecret>>>,
     #[allow(dead_code)]
     cache_ttl: Duration,
+    /// Secret name prefix (e.g., "agentauri/staging" or "agentauri/production")
+    prefix: String,
 }
 
 impl SecretsManager {
@@ -155,6 +157,11 @@ impl SecretsManager {
     ///
     /// * `ttl` - Cache time-to-live duration
     ///
+    /// # Environment Variables
+    ///
+    /// * `SECRETS_PREFIX` - Secret name prefix (default: "agentauri/staging")
+    ///   Examples: "agentauri/staging", "agentauri/production"
+    ///
     /// # Errors
     ///
     /// Returns an error if AWS SDK initialization fails.
@@ -170,10 +177,15 @@ impl SecretsManager {
         #[cfg(not(feature = "aws-secrets"))]
         let client = Client;
 
+        // Get prefix from environment or use default
+        let prefix =
+            std::env::var("SECRETS_PREFIX").unwrap_or_else(|_| "agentauri/staging".to_string());
+
         Ok(Self {
             client,
             cache: Arc::new(RwLock::new(HashMap::new())),
             cache_ttl: ttl,
+            prefix,
         })
     }
 
@@ -257,29 +269,70 @@ impl SecretsManager {
     /// Returns an error if any required secret is missing or inaccessible.
     pub async fn get_app_secrets(&self) -> Result<AppSecrets, SecretsError> {
         // Fetch all secrets in parallel for performance
+        // Build secret names with prefix
+        let rds_password_name = format!("{}/rds-password", self.prefix);
+        let jwt_secret_name = format!("{}/jwt-secret", self.prefix);
+        let stripe_keys_name = format!("{}/stripe-keys", self.prefix);
+        let alchemy_api_key_name = format!("{}/alchemy-api-key", self.prefix);
+        let api_key_salt_name = format!("{}/api-key-salt", self.prefix);
+        let telegram_bot_token_name = format!("{}/telegram-bot-token", self.prefix);
+
         let (
-            database_url,
-            redis_url,
+            rds_password_json,
             jwt_secret,
-            stripe_secret_key,
-            stripe_webhook_secret,
-            ethereum_sepolia_rpc_url,
-            base_sepolia_rpc_url,
-            linea_sepolia_rpc_url,
-            api_encryption_key,
+            stripe_keys_json,
+            alchemy_api_key,
+            api_key_salt,
             telegram_bot_token,
         ) = tokio::try_join!(
-            self.get_secret("agentauri/database_url"),
-            self.get_secret("agentauri/redis_url"),
-            self.get_secret("agentauri/jwt_secret"),
-            self.get_secret("agentauri/stripe_secret_key"),
-            self.get_secret("agentauri/stripe_webhook_secret"),
-            self.get_secret("agentauri/ethereum_sepolia_rpc_url"),
-            self.get_secret("agentauri/base_sepolia_rpc_url"),
-            self.get_secret_optional("agentauri/linea_sepolia_rpc_url"),
-            self.get_secret("agentauri/api_encryption_key"),
-            self.get_secret_optional("agentauri/telegram_bot_token"),
+            self.get_secret(&rds_password_name),
+            self.get_secret(&jwt_secret_name),
+            self.get_secret_optional(&stripe_keys_name),
+            self.get_secret(&alchemy_api_key_name),
+            self.get_secret(&api_key_salt_name),
+            self.get_secret_optional(&telegram_bot_token_name),
         )?;
+
+        // Parse RDS password JSON to extract database URL
+        let rds_info: serde_json::Value = serde_json::from_str(&rds_password_json)
+            .map_err(|e| SecretsError::InvalidValue(format!("RDS password JSON: {}", e)))?;
+        let database_url = rds_info["url"]
+            .as_str()
+            .ok_or_else(|| SecretsError::InvalidValue("Missing 'url' in RDS password".to_string()))?
+            .to_string();
+
+        // Get Redis URL from environment or construct from secret
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
+
+        // Parse Stripe keys JSON if present
+        let (stripe_secret_key, stripe_webhook_secret) = if let Some(stripe_json) = stripe_keys_json
+        {
+            let stripe_info: serde_json::Value =
+                serde_json::from_str(&stripe_json).unwrap_or_default();
+            (
+                stripe_info["secret_key"].as_str().unwrap_or("").to_string(),
+                stripe_info["webhook_secret"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
+            )
+        } else {
+            (String::new(), String::new())
+        };
+
+        // Build RPC URLs from Alchemy API key
+        let ethereum_sepolia_rpc_url =
+            format!("https://eth-sepolia.g.alchemy.com/v2/{}", alchemy_api_key);
+        let base_sepolia_rpc_url =
+            format!("https://base-sepolia.g.alchemy.com/v2/{}", alchemy_api_key);
+        let linea_sepolia_rpc_url = Some(format!(
+            "https://linea-sepolia.g.alchemy.com/v2/{}",
+            alchemy_api_key
+        ));
+
+        // API encryption key from api-key-salt
+        let api_encryption_key = api_key_salt;
 
         let secrets = AppSecrets {
             database_url,

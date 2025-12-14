@@ -1,0 +1,256 @@
+# =============================================================================
+# Nginx Development Configuration for api.agentauri.ai
+# =============================================================================
+# Development-only configuration with self-signed certificates
+# For local testing with HTTPS without Let's Encrypt
+# Last Updated: December 6, 2025
+# =============================================================================
+
+# =============================================================================
+# HTTP SERVER - Development (allows HTTP access)
+# =============================================================================
+server {
+    listen 80;
+    listen [::]:80;
+    server_name localhost api.agentauri.local;
+
+    # =========================================================================
+    # LOGGING
+    # =========================================================================
+    access_log /var/log/nginx/api.dev.access.log main;
+    error_log /var/log/nginx/api.dev.error.log warn;
+
+    # =========================================================================
+    # API GATEWAY ENDPOINTS
+    # =========================================================================
+    location /api/ {
+        # Relaxed rate limiting for development (1000 requests/second per IP)
+        limit_req zone=api_limit burst=200 nodelay;
+
+        # Proxy to API Gateway (Rust/Actix-web)
+        proxy_pass http://api_gateway;
+
+        # Proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # HTTP version
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+
+    # =========================================================================
+    # AUTHENTICATION ENDPOINTS (RELAXED FOR DEVELOPMENT)
+    # =========================================================================
+    location ~ ^/api/v1/auth/(login|register|wallet/verify) {
+        # Relaxed rate limiting for development (50 requests/min per IP)
+        limit_req zone=login_limit burst=10 nodelay;
+
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+
+    # =========================================================================
+    # DISCOVERY ENDPOINT (PUBLIC, NO AUTH)
+    # =========================================================================
+    location /.well-known/agent.json {
+        proxy_pass http://api_gateway;
+
+        # Proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # CORS headers for public access
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Accept" always;
+        add_header Cache-Control "public, max-age=3600" always;
+    }
+
+    # =========================================================================
+    # API DOCUMENTATION (Swagger UI)
+    # =========================================================================
+    location /api-docs/ {
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # =========================================================================
+    # METRICS ENDPOINT (DEVELOPMENT ONLY)
+    # =========================================================================
+    location /metrics {
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # =========================================================================
+    # HEALTH CHECK ENDPOINT (NO LOGGING)
+    # =========================================================================
+    location /health {
+        proxy_pass http://api_gateway/api/v1/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # Disable logging for health checks
+        access_log off;
+
+        # Short timeouts
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 5s;
+    }
+
+    # =========================================================================
+    # PONDER INDEXER ENDPOINTS (DEVELOPMENT MONITORING)
+    # =========================================================================
+    location /ponder/ {
+        proxy_pass http://ponder_indexers/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+}
+
+# =============================================================================
+# HTTPS SERVER - Development with Self-Signed Certificate
+# =============================================================================
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;  # Enable HTTP/2
+    server_name localhost api.agentauri.local;
+
+    # =========================================================================
+    # SSL/TLS CERTIFICATE CONFIGURATION (SELF-SIGNED)
+    # =========================================================================
+    ssl_certificate /etc/nginx/ssl/self-signed.crt;
+    ssl_certificate_key /etc/nginx/ssl/self-signed.key;
+
+    # =========================================================================
+    # SSL/TLS PROTOCOL & CIPHER CONFIGURATION
+    # =========================================================================
+    # Same as production for testing purposes
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers off;
+
+    # =========================================================================
+    # SSL SESSION CONFIGURATION
+    # =========================================================================
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    # =========================================================================
+    # SECURITY HEADERS (DEVELOPMENT - NO HSTS)
+    # =========================================================================
+    # DO NOT use HSTS in development (it will break HTTP access)
+    # add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # =========================================================================
+    # LOGGING
+    # =========================================================================
+    access_log /var/log/nginx/api.dev.ssl.access.log main;
+    error_log /var/log/nginx/api.dev.ssl.error.log warn;
+
+    # =========================================================================
+    # PROXY CONFIGURATION (SAME AS HTTP)
+    # =========================================================================
+    location /api/ {
+        limit_req zone=api_limit burst=200 nodelay;
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+
+    location ~ ^/api/v1/auth/(login|register|wallet/verify) {
+        limit_req zone=login_limit burst=10 nodelay;
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+
+    location /.well-known/agent.json {
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Accept" always;
+        add_header Cache-Control "public, max-age=3600" always;
+    }
+
+    location /api-docs/ {
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /metrics {
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /health {
+        proxy_pass http://api_gateway/api/v1/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        access_log off;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 5s;
+    }
+
+    location /ponder/ {
+        proxy_pass http://ponder_indexers/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+}

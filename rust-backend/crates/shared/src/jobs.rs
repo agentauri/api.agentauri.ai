@@ -65,6 +65,9 @@ pub struct ActionJob {
     pub priority: i32,
     /// Action-specific configuration
     pub config: serde_json::Value,
+    /// Event data for template variable substitution
+    /// Contains flattened event fields: agent_id, score, chain_id, event_type, etc.
+    pub event_data: serde_json::Value,
     /// When this job was created
     pub created_at: DateTime<Utc>,
 }
@@ -79,12 +82,14 @@ impl ActionJob {
     /// * `action_type` - Type of action
     /// * `priority` - Job priority (higher = more urgent)
     /// * `config` - Action-specific configuration
+    /// * `event_data` - Event data for template variable substitution
     pub fn new(
         trigger_id: &str,
         event_id: &str,
         action_type: ActionType,
         priority: i32,
         config: serde_json::Value,
+        event_data: serde_json::Value,
     ) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -93,6 +98,7 @@ impl ActionJob {
             action_type,
             priority,
             config,
+            event_data,
             created_at: Utc::now(),
         }
     }
@@ -109,6 +115,11 @@ mod tests {
             "chat_id": "123456789",
             "message_template": "Test message"
         });
+        let event_data = json!({
+            "agent_id": 42,
+            "score": 85,
+            "chain_id": 11155111
+        });
 
         let job = ActionJob::new(
             "trigger-123",
@@ -116,6 +127,7 @@ mod tests {
             ActionType::Telegram,
             1,
             config.clone(),
+            event_data.clone(),
         );
 
         assert!(!job.id.is_empty());
@@ -124,12 +136,14 @@ mod tests {
         assert_eq!(job.action_type, ActionType::Telegram);
         assert_eq!(job.priority, 1);
         assert_eq!(job.config, config);
+        assert_eq!(job.event_data, event_data);
     }
 
     #[test]
     fn test_action_job_serialization() {
         let config = json!({"url": "https://example.com"});
-        let job = ActionJob::new("t1", "e1", ActionType::Rest, 2, config);
+        let event_data = json!({"agent_id": 42});
+        let job = ActionJob::new("t1", "e1", ActionType::Rest, 2, config, event_data);
 
         let serialized = serde_json::to_string(&job).unwrap();
         let deserialized: ActionJob = serde_json::from_str(&serialized).unwrap();
@@ -139,14 +153,23 @@ mod tests {
         assert_eq!(job.event_id, deserialized.event_id);
         assert_eq!(job.action_type, deserialized.action_type);
         assert_eq!(job.priority, deserialized.priority);
+        assert_eq!(job.event_data, deserialized.event_data);
         assert_eq!(job.created_at, deserialized.created_at);
     }
 
     #[test]
     fn test_action_job_ids_are_unique() {
         let config = json!({"key": "value"});
-        let job1 = ActionJob::new("t1", "e1", ActionType::Telegram, 1, config.clone());
-        let job2 = ActionJob::new("t1", "e1", ActionType::Telegram, 1, config);
+        let event_data = json!({"agent_id": 42});
+        let job1 = ActionJob::new(
+            "t1",
+            "e1",
+            ActionType::Telegram,
+            1,
+            config.clone(),
+            event_data.clone(),
+        );
+        let job2 = ActionJob::new("t1", "e1", ActionType::Telegram, 1, config, event_data);
 
         // UUIDs should be unique even for identical parameters
         assert_ne!(job1.id, job2.id);

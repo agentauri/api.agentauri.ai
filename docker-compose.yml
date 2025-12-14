@@ -77,7 +77,8 @@ services:
       # SECURITY: Bind to localhost only
       - "127.0.0.1:9090:9090"
     volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -127,6 +128,102 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0  # Pinned version for security
+    container_name: agentauri-alertmanager
+    ports:
+      # SECURITY: Bind to localhost only
+      - "127.0.0.1:9093:9093"
+    environment:
+      # Slack webhook URL - REQUIRED for Slack integration
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./docker/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.listen-address='
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ==========================================================================
+  # PONDER BLOCKCHAIN INDEXER
+  # ==========================================================================
+  # Indexes blockchain events from ERC-8004 registries (Identity, Reputation,
+  # Validation) and stores them in PostgreSQL. Uses circuit breaker pattern
+  # for RPC provider resilience.
+  # ==========================================================================
+
+  ponder:
+    build:
+      context: ./ponder-indexers
+      dockerfile: Dockerfile
+    container_name: agentauri-ponder
+    environment:
+      - DATABASE_URL=postgres://${DB_USER:-postgres}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-agentauri_backend}
+      # RPC Provider URLs (at least one chain required)
+      - ETHEREUM_SEPOLIA_RPC_ALCHEMY=${ETHEREUM_SEPOLIA_RPC_ALCHEMY:-}
+      - ETHEREUM_SEPOLIA_RPC_INFURA=${ETHEREUM_SEPOLIA_RPC_INFURA:-}
+      - ETHEREUM_SEPOLIA_RPC_QUIKNODE=${ETHEREUM_SEPOLIA_RPC_QUIKNODE:-}
+      - BASE_SEPOLIA_RPC_ALCHEMY=${BASE_SEPOLIA_RPC_ALCHEMY:-}
+      - BASE_SEPOLIA_RPC_INFURA=${BASE_SEPOLIA_RPC_INFURA:-}
+      # Contract Addresses
+      - ETHEREUM_SEPOLIA_IDENTITY_ADDRESS=${ETHEREUM_SEPOLIA_IDENTITY_ADDRESS:-}
+      - ETHEREUM_SEPOLIA_REPUTATION_ADDRESS=${ETHEREUM_SEPOLIA_REPUTATION_ADDRESS:-}
+      - ETHEREUM_SEPOLIA_VALIDATION_ADDRESS=${ETHEREUM_SEPOLIA_VALIDATION_ADDRESS:-}
+      # Circuit Breaker Config
+      - CIRCUIT_BREAKER_FAILURE_THRESHOLD=${CIRCUIT_BREAKER_FAILURE_THRESHOLD:-5}
+      - CIRCUIT_BREAKER_RESET_TIMEOUT_MS=${CIRCUIT_BREAKER_RESET_TIMEOUT_MS:-60000}
+      # Runtime Health Monitoring
+      - RUNTIME_HEALTH_CHECK_INTERVAL_MS=${RUNTIME_HEALTH_CHECK_INTERVAL_MS:-30000}
+      - RUNTIME_HEALTH_DEBUG_LOGGING=${RUNTIME_HEALTH_DEBUG_LOGGING:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # CRITICAL: Restart policy for RPC resilience (safety net for crashes)
+    # This ensures Ponder automatically restarts if all providers fail
+    restart: always
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 10
+        delay: 5s
+        window: 120s
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:42069/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits
+    profiles:
+      - indexer  # Use: docker compose --profile indexer up
 
   # ==========================================================================
   # HTTPS/TLS LAYER - Nginx Reverse Proxy + Let's Encrypt
@@ -199,6 +296,7 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
 
 networks:
   default:

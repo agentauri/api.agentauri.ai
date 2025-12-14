@@ -1,0 +1,9 @@
+# Ignore SSL certificate files (security)
+*.crt
+*.key
+*.pem
+*.csr
+
+# Keep the generation script
+!generate-self-signed.sh
+!README.md

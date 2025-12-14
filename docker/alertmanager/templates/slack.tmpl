@@ -1,0 +1,49 @@
+{{ define "slack.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+{{- end }}
+
+{{ define "slack.text" -}}
+{{ range .Alerts }}
+*Alert:* {{ .Labels.alertname }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
+*Description:* {{ .Annotations.description }}
+*Service:* {{ .Labels.service }}
+*Details:*
+{{ range .Labels.SortedPairs }}  - *{{ .Name }}:* `{{ .Value }}`
+{{ end }}
+{{ if .Annotations.summary }}*Summary:* {{ .Annotations.summary }}{{ end }}
+{{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+{{ end }}
+{{- end }}
+
+{{ define "slack.critical.text" -}}
+{{ range .Alerts }}
+*CRITICAL ALERT - IMMEDIATE ACTION REQUIRED*
+
+*Alert:* {{ .Labels.alertname }}
+*Service:* {{ .Labels.service }}
+*Description:* {{ .Annotations.description }}
+
+*Details:*
+{{ range .Labels.SortedPairs }}  - *{{ .Name }}:* `{{ .Value }}`
+{{ end }}
+
+*Actions:*
+{{ if .Annotations.runbook_url }}1. Follow runbook: {{ .Annotations.runbook_url }}{{ end }}
+2. Check Grafana dashboard for details
+3. Acknowledge in PagerDuty if configured
+{{ end }}
+{{- end }}
+
+{{ define "slack.silence_url" -}}
+{{ .ExternalURL }}/#/silences/new?filter=%7B
+{{- range .CommonLabels.SortedPairs -}}
+{{- if ne .Name "alertname" -}}
+{{- .Name }}%3D"{{ .Value }}"%2C%20
+{{- end -}}
+{{- end -}}
+alertname%3D"{{ .CommonLabels.alertname }}"%7D
+{{- end }}
+
+{{ define "slack.link.dashboard" -}}
+http://localhost:3000/d/{{ .Labels.service | reReplaceAll "-" "_" }}-dashboard
+{{- end }}

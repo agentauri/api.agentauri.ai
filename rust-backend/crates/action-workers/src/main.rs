@@ -197,9 +197,8 @@ async fn run_worker<C, T, L1, D1, R, H, L2, D2>(
             result = consumer.consume(CONSUME_TIMEOUT_SECS) => {
                 match result {
                     Ok(Some(job)) => {
-                        // TODO: In Phase 4, fetch actual event data from database
-                        // For now, use the job config as event data
-                        let event_data = job.config.clone();
+                        // Use event_data from the job (populated by event-processor)
+                        let event_data = job.event_data.clone();
 
                         match job.action_type {
                             ActionType::Telegram => {

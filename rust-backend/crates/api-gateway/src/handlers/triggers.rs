@@ -126,21 +126,20 @@ pub async fn list_triggers(
         ));
     }
 
-    // Get total count
-    let total = match handle_db_error(
-        TriggerRepository::count_by_organization(&pool, &organization_id).await,
-        "count triggers",
-    ) {
+    // Execute count and list in parallel for better performance
+    let (total_result, triggers_result) = tokio::join!(
+        TriggerRepository::count_by_organization(&pool, &organization_id),
+        TriggerRepository::list_by_organization(&pool, &organization_id, query.limit, query.offset)
+    );
+
+    // Handle count result
+    let total = match handle_db_error(total_result, "count triggers") {
         Ok(count) => count,
         Err(resp) => return resp,
     };
 
-    // Get triggers
-    let triggers = match handle_db_error(
-        TriggerRepository::list_by_organization(&pool, &organization_id, query.limit, query.offset)
-            .await,
-        "list triggers",
-    ) {
+    // Handle list result
+    let triggers = match handle_db_error(triggers_result, "list triggers") {
         Ok(triggers) => triggers,
         Err(resp) => return resp,
     };
@@ -215,20 +214,20 @@ pub async fn get_trigger(
         Err(resp) => return resp,
     };
 
-    // Get conditions
-    let conditions = match handle_db_error(
-        ConditionRepository::list_by_trigger(&pool, &trigger_id).await,
-        "fetch conditions",
-    ) {
+    // Fetch conditions and actions in parallel for better performance
+    let (conditions_result, actions_result) = tokio::join!(
+        ConditionRepository::list_by_trigger(&pool, &trigger_id),
+        ActionRepository::list_by_trigger(&pool, &trigger_id)
+    );
+
+    // Handle conditions result
+    let conditions = match handle_db_error(conditions_result, "fetch conditions") {
         Ok(conditions) => conditions,
         Err(resp) => return resp,
     };
 
-    // Get actions
-    let actions = match handle_db_error(
-        ActionRepository::list_by_trigger(&pool, &trigger_id).await,
-        "fetch actions",
-    ) {
+    // Handle actions result
+    let actions = match handle_db_error(actions_result, "fetch actions") {
         Ok(actions) => actions,
         Err(resp) => return resp,
     };

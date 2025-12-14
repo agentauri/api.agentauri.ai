@@ -39,6 +39,9 @@ validator = { workspace = true }
 # Redis
 redis = { workspace = true }
 
+# Async traits
+async-trait = { workspace = true }
+
 # Concurrent data structures for fallback rate limiting
 dashmap = { workspace = true }
 

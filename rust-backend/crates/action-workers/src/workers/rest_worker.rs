@@ -190,7 +190,14 @@ mod tests {
     use std::collections::HashMap;
 
     fn create_test_job(config: serde_json::Value) -> ActionJob {
-        ActionJob::new("trigger-1", "event-1", ActionType::Rest, 1, config)
+        ActionJob::new(
+            "trigger-1",
+            "event-1",
+            ActionType::Rest,
+            1,
+            config,
+            serde_json::json!({}), // event_data (tests pass their own)
+        )
     }
 
     fn create_worker(

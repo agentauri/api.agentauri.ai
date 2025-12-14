@@ -198,7 +198,7 @@ export async function healthCheckProviders(
  * @returns Map of healthy provider names to URLs
  */
 export function filterHealthyProviders(
-  providers: Record<string, string>,
+  _providers: Record<string, string>,
   healthCheckResults: HealthCheckResult[]
 ): Record<string, string> {
   const healthyProviders: Record<string, string> = {};

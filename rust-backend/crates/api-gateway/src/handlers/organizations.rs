@@ -188,21 +188,20 @@ pub async fn list_organizations(
         ));
     }
 
-    // Get total count
-    let total = match handle_db_error(
-        OrganizationRepository::count_by_user(&pool, &user_id).await,
-        "count organizations",
-    ) {
+    // Execute count and list in parallel for better performance
+    let (total_result, orgs_result) = tokio::join!(
+        OrganizationRepository::count_by_user(&pool, &user_id),
+        OrganizationRepository::list_by_user_with_roles(&pool, &user_id, query.limit, query.offset)
+    );
+
+    // Handle count result
+    let total = match handle_db_error(total_result, "count organizations") {
         Ok(count) => count,
         Err(resp) => return resp,
     };
 
-    // Get organizations WITH roles in a single optimized query (no N+1)
-    let orgs_with_roles = match handle_db_error(
-        OrganizationRepository::list_by_user_with_roles(&pool, &user_id, query.limit, query.offset)
-            .await,
-        "list organizations",
-    ) {
+    // Handle list result (optimized query with roles - no N+1)
+    let orgs_with_roles = match handle_db_error(orgs_result, "list organizations") {
         Ok(orgs) => orgs,
         Err(resp) => return resp,
     };
@@ -254,11 +253,14 @@ pub async fn get_organization(
         Err(resp) => return resp,
     };
 
-    // Check membership
-    let role = match handle_db_error(
-        MemberRepository::get_role(&pool, &org_id, &user_id).await,
-        "check membership",
-    ) {
+    // Execute membership check and organization fetch in parallel for better performance
+    let (role_result, org_result) = tokio::join!(
+        MemberRepository::get_role(&pool, &org_id, &user_id),
+        OrganizationRepository::find_by_id(&pool, &org_id)
+    );
+
+    // Handle role result
+    let role = match handle_db_error(role_result, "check membership") {
         Ok(Some(r)) => r,
         Ok(None) => {
             return HttpResponse::NotFound()
@@ -267,11 +269,8 @@ pub async fn get_organization(
         Err(resp) => return resp,
     };
 
-    // Get organization
-    let org = match handle_db_error(
-        OrganizationRepository::find_by_id(&pool, &org_id).await,
-        "fetch organization",
-    ) {
+    // Handle organization result
+    let org = match handle_db_error(org_result, "fetch organization") {
         Ok(Some(org)) => org,
         Ok(None) => {
             return HttpResponse::NotFound()
@@ -604,11 +603,15 @@ pub async fn list_members(
         ));
     }
 
-    // Check membership and get role (needed for email masking decision)
-    let requester_role = match handle_db_error(
-        MemberRepository::get_role(&pool, &org_id, &user_id).await,
-        "check membership",
-    ) {
+    // Execute membership check, count, and list in parallel for better performance
+    let (role_result, total_result, members_result) = tokio::join!(
+        MemberRepository::get_role(&pool, &org_id, &user_id),
+        MemberRepository::count(&pool, &org_id),
+        MemberRepository::list_with_users(&pool, &org_id, query.limit, query.offset)
+    );
+
+    // Handle role result (needed for email masking decision)
+    let requester_role = match handle_db_error(role_result, "check membership") {
         Ok(Some(role)) => role,
         Ok(None) => {
             return HttpResponse::NotFound()
@@ -617,20 +620,14 @@ pub async fn list_members(
         Err(resp) => return resp,
     };
 
-    // Get total count
-    let total = match handle_db_error(
-        MemberRepository::count(&pool, &org_id).await,
-        "count members",
-    ) {
+    // Handle count result
+    let total = match handle_db_error(total_result, "count members") {
         Ok(count) => count,
         Err(resp) => return resp,
     };
 
-    // Get members WITH user info in a single optimized query (no N+1)
-    let members_with_users = match handle_db_error(
-        MemberRepository::list_with_users(&pool, &org_id, query.limit, query.offset).await,
-        "list members",
-    ) {
+    // Handle list result (optimized query with user info - no N+1)
+    let members_with_users = match handle_db_error(members_result, "list members") {
         Ok(m) => m,
         Err(resp) => return resp,
     };

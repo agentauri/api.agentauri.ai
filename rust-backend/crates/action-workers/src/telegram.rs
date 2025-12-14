@@ -185,13 +185,15 @@ impl TelegramClient for TeloxideTelegramClient {
             .send_message(ChatId(chat_id_num), text)
             .parse_mode(parse_mode)
             .await
-            .map_err(|_e| {
-                // Don't log the full error message as it might contain sensitive info
+            .map_err(|e| {
+                // Log error details for debugging (in dev mode only)
                 tracing::error!(
                     chat_id = sanitize_for_logging(chat_id),
-                    "Failed to send Telegram message (error details omitted for security)"
+                    error = %e,
+                    error_debug = ?e,
+                    "Failed to send Telegram message"
                 );
-                WorkerError::telegram("Failed to send message to Telegram API")
+                WorkerError::telegram(format!("Failed to send message to Telegram API: {}", e))
             })?;
 
         tracing::debug!(

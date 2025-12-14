@@ -74,11 +74,28 @@ pub struct RedisConfig {
 
     /// Redis password (optional)
     pub password: Option<String>,
+
+    /// Direct Redis URL (takes precedence over host/port/password)
+    /// Supports both `redis://` and `rediss://` (TLS) schemes
+    pub url: Option<String>,
 }
 
 impl RedisConfig {
     /// Build a Redis connection URL
+    ///
+    /// If `url` is set (from REDIS_URL env var), uses that directly.
+    /// Otherwise, builds URL from host/port/password components.
+    ///
+    /// This supports:
+    /// - `redis://` - standard Redis connection
+    /// - `rediss://` - Redis with TLS (required for AWS ElastiCache with transit encryption)
     pub fn connection_url(&self) -> String {
+        // If direct URL is provided (e.g., from AWS Secrets Manager), use it
+        if let Some(url) = &self.url {
+            return url.clone();
+        }
+
+        // Otherwise build from components (backward compatibility)
         if let Some(password) = &self.password {
             format!("redis://:{}@{}:{}", password, self.host, self.port)
         } else {
@@ -118,7 +135,7 @@ impl Config {
                 password: env::var("DB_PASSWORD")
                     .map_err(|_| Error::config("DB_PASSWORD must be set"))?,
                 max_connections: env::var("DB_MAX_CONNECTIONS")
-                    .unwrap_or_else(|_| "10".to_string())
+                    .unwrap_or_else(|_| "100".to_string())
                     .parse()
                     .map_err(|e| Error::config(format!("Invalid DB_MAX_CONNECTIONS: {}", e)))?,
                 ssl_mode: env::var("DB_SSL_MODE").unwrap_or_else(|_| {
@@ -136,6 +153,8 @@ impl Config {
                     .parse()
                     .map_err(|e| Error::config(format!("Invalid REDIS_PORT: {}", e)))?,
                 password: env::var("REDIS_PASSWORD").ok(),
+                // REDIS_URL takes precedence - supports TLS (rediss://) for AWS ElastiCache
+                url: env::var("REDIS_URL").ok(),
             },
             server: ServerConfig {
                 host: env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
@@ -286,6 +305,7 @@ mod tests {
             host: "localhost".to_string(),
             port: 6379,
             password: Some("secret".to_string()),
+            url: None,
         };
 
         assert_eq!(config.connection_url(), "redis://:secret@localhost:6379");
@@ -297,8 +317,41 @@ mod tests {
             host: "localhost".to_string(),
             port: 6379,
             password: None,
+            url: None,
         };
 
         assert_eq!(config.connection_url(), "redis://localhost:6379");
+    }
+
+    #[test]
+    fn test_redis_connection_url_with_direct_url() {
+        let config = RedisConfig {
+            host: "localhost".to_string(),
+            port: 6379,
+            password: Some("ignored".to_string()),
+            url: Some("rediss://:authtoken@redis.example.com:6379".to_string()),
+        };
+
+        // Direct URL takes precedence over host/port/password
+        assert_eq!(
+            config.connection_url(),
+            "rediss://:authtoken@redis.example.com:6379"
+        );
+    }
+
+    #[test]
+    fn test_redis_connection_url_tls() {
+        let config = RedisConfig {
+            host: "unused".to_string(),
+            port: 6379,
+            password: None,
+            url: Some("rediss://:mytoken@master.cache.amazonaws.com:6379".to_string()),
+        };
+
+        // Supports rediss:// scheme for TLS (AWS ElastiCache)
+        assert_eq!(
+            config.connection_url(),
+            "rediss://:mytoken@master.cache.amazonaws.com:6379"
+        );
     }
 }

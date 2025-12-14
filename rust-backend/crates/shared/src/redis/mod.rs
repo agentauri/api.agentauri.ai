@@ -4,10 +4,16 @@
 //! - Connection pooling
 //! - Rate limiting operations
 //! - Job queue management
-//! - Caching
+//! - Entity caching (users, organizations, triggers)
 
+pub mod cache;
 pub mod rate_limiter;
 
+pub use cache::{
+    get_or_fetch, membership_key, org_key_by_id, org_keys_pattern, trigger_key_by_id,
+    user_key_by_email, user_key_by_id, user_key_by_username, user_keys_pattern, CacheAware,
+    EntityCache,
+};
 pub use rate_limiter::{RateLimitResult, RateLimitScope, RateLimiter};
 
 use crate::error::{Error, Result};

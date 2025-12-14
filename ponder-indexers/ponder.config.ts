@@ -18,6 +18,39 @@ import {
   logHealthCheckSummary,
 } from "./src/logger";
 import { healthCheckProviders } from "./src/health-check";
+import {
+  CircuitBreakerManager,
+  type CircuitBreakerConfig,
+} from "./src/circuit-breaker";
+import {
+  createRuntimeHealthMonitor,
+  type RuntimeHealthMonitor,
+} from "./src/runtime-health-monitor";
+
+// ============================================================================
+// GLOBAL ERROR HANDLERS - Prevent crashes from unhandled rejections
+// ============================================================================
+// These handlers catch errors that would otherwise crash the entire process.
+// See: https://github.com/ponder-sh/ponder/issues/861
+
+process.on('unhandledRejection', (reason, _promise) => {
+  configLogger.error({
+    type: 'unhandledRejection',
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  }, 'Unhandled promise rejection caught - preventing crash');
+  // Do NOT rethrow - this prevents the crash
+});
+
+process.on('uncaughtException', (error) => {
+  configLogger.error({
+    type: 'uncaughtException',
+    message: error.message,
+    stack: error.stack,
+  }, 'Uncaught exception caught - logging before potential crash');
+  // Note: For uncaught exceptions, Node.js will still exit after this handler
+  // unless you explicitly prevent it. But at least we log the error.
+});
 
 // ============================================================================
 // ENVIRONMENT VALIDATION
@@ -51,6 +84,25 @@ const RANKING_CONFIG = {
   sampleCount: env.RPC_RANK_SAMPLE_COUNT,
   timeout: env.RPC_RANK_TIMEOUT,
 };
+
+// ============================================================================
+// CIRCUIT BREAKER & RUNTIME HEALTH MONITORING
+// ============================================================================
+// These provide runtime resilience against RPC provider failures.
+// Circuit breakers prevent repeated calls to failing providers.
+// Runtime health monitoring continuously checks provider health.
+
+const CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
+  failureThreshold: env.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+  resetTimeoutMs: env.CIRCUIT_BREAKER_RESET_TIMEOUT_MS,
+  halfOpenSuccessThreshold: env.CIRCUIT_BREAKER_HALF_OPEN_SUCCESS_THRESHOLD,
+};
+
+// Global circuit breaker manager (shared across all chains)
+const circuitBreakerManager = new CircuitBreakerManager(CIRCUIT_BREAKER_CONFIG);
+
+// Runtime health monitor (started after config initialization)
+let runtimeHealthMonitor: RuntimeHealthMonitor | null = null;
 
 /**
  * Get RPC URLs for a chain from validated environment
@@ -279,7 +331,14 @@ const networks: Record<string, NetworkConfig> = {
  */
 function getContractAddress(key: keyof EnvConfig): `0x${string}` {
   const value = env[key] as string | undefined;
-  return (value || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+  const address = (value || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+  // Debug: log contract address resolution
+  configLogger.info({
+    envKey: key,
+    hasValue: !!value,
+    address: address.slice(0, 10) + "...",
+  }, `Contract address resolved for ${key}`);
+  return address;
 }
 
 const contracts: Record<string, Record<string, `0x${string}`>> = {
@@ -393,6 +452,33 @@ async function buildNetworksWithHealthChecks() {
     totalNetworks: enabledNetworkKeys.length,
   }, "Ponder configuration complete");
 
+  // Start runtime health monitor for all healthy providers
+  const allProviderUrls: Record<string, string> = {};
+  for (const { envPrefix, healthyProviders } of healthCheckResults) {
+    for (const [providerName, url] of Object.entries(healthyProviders)) {
+      // Use unique key combining chain prefix and provider name
+      allProviderUrls[`${envPrefix}_${providerName}`] = url;
+    }
+  }
+
+  if (Object.keys(allProviderUrls).length > 0) {
+    runtimeHealthMonitor = createRuntimeHealthMonitor(
+      allProviderUrls,
+      {
+        checkIntervalMs: env.RUNTIME_HEALTH_CHECK_INTERVAL_MS,
+        timeoutMs: env.RUNTIME_HEALTH_CHECK_TIMEOUT_MS,
+        failureThreshold: env.RUNTIME_HEALTH_FAILURE_THRESHOLD,
+        debugLogging: env.RUNTIME_HEALTH_DEBUG_LOGGING,
+      },
+      circuitBreakerManager
+    );
+
+    configLogger.info({
+      providers: Object.keys(allProviderUrls),
+      checkIntervalMs: env.RUNTIME_HEALTH_CHECK_INTERVAL_MS,
+    }, "Runtime health monitor started");
+  }
+
   return { configuredNetworks, enabledNetworkKeys };
 }
 
@@ -414,6 +500,14 @@ for (const networkKey of enabledNetworkKeys) {
   const startBlock = startBlocks[networkKey] ?? 0;
   const pascalNetworkKey =
     networkKey.charAt(0).toUpperCase() + networkKey.slice(1);
+
+  // Debug: log what we're processing
+  configLogger.info({
+    networkKey,
+    hasContractAddrs: !!contractAddrs,
+    identityAddr: contractAddrs?.identity?.slice(0, 10),
+    startBlock,
+  }, `Processing contracts for ${networkKey}`);
 
   // Skip if no contract addresses for this network
   if (!contractAddrs) continue;
@@ -444,14 +538,67 @@ for (const networkKey of enabledNetworkKeys) {
 }
 
 // ============================================================================
+// GRACEFUL SHUTDOWN
+// ============================================================================
+// Stop the runtime health monitor on process exit
+
+process.on('SIGINT', () => {
+  configLogger.info({}, 'Received SIGINT, stopping health monitor');
+  if (runtimeHealthMonitor) {
+    runtimeHealthMonitor.stop();
+  }
+});
+
+process.on('SIGTERM', () => {
+  configLogger.info({}, 'Received SIGTERM, stopping health monitor');
+  if (runtimeHealthMonitor) {
+    runtimeHealthMonitor.stop();
+  }
+});
+
+// ============================================================================
+// DATABASE SCHEMA CONFIGURATION
+// ============================================================================
+// Ponder uses a dedicated 'ponder' schema to isolate blockchain events from
+// application data. This allows sharing a single Ponder instance across
+// staging and production environments (blockchain events are public and immutable).
+
+/**
+ * Build database connection string with schema configuration
+ *
+ * Adds PostgreSQL options to set search_path to the 'ponder' schema.
+ * This ensures all Ponder tables (Event, Checkpoint) are created in the
+ * ponder schema rather than the public schema.
+ */
+function buildDatabaseUrlWithSchema(baseUrl: string, schema: string = "ponder"): string {
+  const url = new URL(baseUrl);
+
+  // Get existing options or create new ones
+  const existingOptions = url.searchParams.get("options") || "";
+
+  // Build the search_path option
+  // Format: -c search_path=ponder,public (ponder first, then public for extensions)
+  const searchPathOption = `-c search_path=${schema},public`;
+
+  // Combine with existing options if present
+  const newOptions = existingOptions
+    ? `${existingOptions} ${searchPathOption}`
+    : searchPathOption;
+
+  url.searchParams.set("options", newOptions);
+
+  return url.toString();
+}
+
+// ============================================================================
 // PONDER CONFIGURATION
 // ============================================================================
 
 export default createConfig({
-  // Database configuration - uses PostgreSQL from validated env
+  // Database configuration - uses PostgreSQL from validated env with ponder schema
   database: {
     kind: "postgres",
-    connectionString: env.DATABASE_URL,
+    connectionString: buildDatabaseUrlWithSchema(env.DATABASE_URL),
   },
 
   // Network configurations (dynamically built)

@@ -23,6 +23,7 @@ pub use db::DbPool;
 pub use error::{Error, Result};
 pub use jobs::{ActionJob, ActionType, ACTION_JOBS_DLQ, ACTION_JOBS_QUEUE};
 pub use redis::{RateLimitResult, RateLimitScope, RateLimiter};
+pub use secrets::{load_secrets, AppSecrets, SecretsBackend, SecretsError};
 
 /// Initialize tracing subscriber for structured logging
 pub fn init_tracing() {

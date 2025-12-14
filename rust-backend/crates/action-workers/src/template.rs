@@ -8,6 +8,7 @@
 //! - Variable values are sanitized before logging to prevent log injection
 //! - Message length is validated to prevent resource exhaustion
 
+use chrono::{TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -207,7 +208,19 @@ pub fn render_template(
 fn get_variable_value(variables: &serde_json::Value, name: &str) -> String {
     match variables.get(name) {
         Some(serde_json::Value::String(s)) => s.clone(),
-        Some(serde_json::Value::Number(n)) => n.to_string(),
+        Some(serde_json::Value::Number(n)) => {
+            // Format timestamp as human-readable date (on-chain event timestamp)
+            if name == "timestamp" {
+                if let Some(ts) = n.as_i64() {
+                    return Utc
+                        .timestamp_opt(ts, 0)
+                        .single()
+                        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                        .unwrap_or_else(|| n.to_string());
+                }
+            }
+            n.to_string()
+        }
         Some(serde_json::Value::Bool(b)) => b.to_string(),
         Some(serde_json::Value::Null) => "null".to_string(),
         Some(serde_json::Value::Array(arr)) => {
@@ -428,6 +441,26 @@ mod tests {
 
         let result = render_template(template, &vars).unwrap();
         assert_eq!(result, "**Agent 42**\n\n_Score: 85_");
+    }
+
+    #[test]
+    fn test_timestamp_formatted_as_date() {
+        // Unix timestamp: 1702425600 = 2023-12-13 00:00:00 UTC
+        let template = "Event at {{timestamp}}";
+        let vars = json!({"timestamp": 1702425600});
+
+        let result = render_template(template, &vars).unwrap();
+        assert_eq!(result, "Event at 2023-12-13 00:00:00 UTC");
+    }
+
+    #[test]
+    fn test_timestamp_invalid_fallback() {
+        // Test with a string timestamp (should keep as-is)
+        let template = "Event at {{timestamp}}";
+        let vars = json!({"timestamp": "manual-timestamp"});
+
+        let result = render_template(template, &vars).unwrap();
+        assert_eq!(result, "Event at manual-timestamp");
     }
 
     #[test]

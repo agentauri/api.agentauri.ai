@@ -1,0 +1,426 @@
+# AgentAuri AlertManager Rules
+# These rules define alerts for production monitoring
+# Reference: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+
+groups:
+  # API Gateway Alerts
+  - name: api-gateway
+    interval: 30s
+    rules:
+      # High error rate (>5% for 5 minutes)
+      - alert: HighAPIErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: "High API error rate detected"
+          description: "API Gateway error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/high-error-rate"
+
+      # High latency (p95 > 1s for 5 minutes)
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: "High API latency detected"
+          description: "API Gateway p95 latency is {{ $value | humanizeDuration }} (threshold: 1s)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/high-latency"
+
+      # Very high latency (p99 > 5s for 5 minutes)
+      - alert: CriticalAPILatency
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: "Critical API latency detected"
+          description: "API Gateway p99 latency is {{ $value | humanizeDuration }} (threshold: 5s)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/critical-latency"
+
+      # Service down
+      - alert: APIGatewayDown
+        expr: up{job="api-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: "API Gateway is down"
+          description: "API Gateway instance has been unreachable for more than 1 minute"
+          runbook_url: "https://docs.agentauri.ai/runbooks/service-down"
+
+  # Event Processor Alerts
+  - name: event-processor
+    interval: 30s
+    rules:
+      # High queue depth (>10k for 5 minutes)
+      - alert: HighQueueDepth
+        expr: action_queue_depth > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: event-processor
+        annotations:
+          summary: "High action queue depth"
+          description: "Action queue depth is {{ $value }} (threshold: 10,000)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/high-queue-depth"
+
+      # Critical queue depth (>50k for 5 minutes)
+      - alert: CriticalQueueDepth
+        expr: action_queue_depth > 50000
+        for: 5m
+        labels:
+          severity: critical
+          service: event-processor
+        annotations:
+          summary: "Critical action queue depth"
+          description: "Action queue depth is {{ $value }} (threshold: 50,000)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/critical-queue-depth"
+
+      # Event processor down
+      - alert: EventProcessorDown
+        expr: up{job="event-processor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: event-processor
+        annotations:
+          summary: "Event Processor is down"
+          description: "Event Processor instance has been unreachable for more than 1 minute"
+          runbook_url: "https://docs.agentauri.ai/runbooks/service-down"
+
+      # Low event processing rate (could indicate issues)
+      - alert: LowEventProcessingRate
+        expr: |
+          sum(rate(events_processed_total[5m])) < 0.1
+          and sum(rate(events_processed_total[30m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: event-processor
+        annotations:
+          summary: "Unusually low event processing rate"
+          description: "Event processing rate has dropped significantly"
+          runbook_url: "https://docs.agentauri.ai/runbooks/low-processing-rate"
+
+  # Action Workers Alerts
+  - name: action-workers
+    interval: 30s
+    rules:
+      # High action failure rate (>10% for 5 minutes)
+      - alert: HighActionFailureRate
+        expr: |
+          sum(rate(actions_executed_total{status="failure"}[5m]))
+          / sum(rate(actions_executed_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: action-workers
+        annotations:
+          summary: "High action failure rate"
+          description: "Action failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/action-failures"
+
+      # Action workers down
+      - alert: ActionWorkersDown
+        expr: up{job="action-workers"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: action-workers
+        annotations:
+          summary: "Action Workers are down"
+          description: "Action Workers instance has been unreachable for more than 1 minute"
+          runbook_url: "https://docs.agentauri.ai/runbooks/service-down"
+
+  # Database Alerts
+  - name: database
+    interval: 30s
+    rules:
+      # Database connection pool exhausted
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          db_pool_connections_active / db_pool_connections_max > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Database connection pool is at {{ $value | humanizePercentage }} capacity"
+          runbook_url: "https://docs.agentauri.ai/runbooks/db-pool-exhausted"
+
+      # High database query latency
+      - alert: HighDatabaseLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(db_query_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database query latency"
+          description: "Database p95 query latency is {{ $value | humanizeDuration }} (threshold: 500ms)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/db-high-latency"
+
+      # PostgreSQL down
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been unreachable for more than 1 minute"
+          runbook_url: "https://docs.agentauri.ai/runbooks/postgres-down"
+
+  # Redis Alerts
+  - name: redis
+    interval: 30s
+    rules:
+      # High Redis latency
+      - alert: HighRedisLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(redis_command_duration_seconds_bucket[5m])) by (le)) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High Redis latency"
+          description: "Redis p95 command latency is {{ $value | humanizeDuration }} (threshold: 100ms)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/redis-high-latency"
+
+      # Redis down
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been unreachable for more than 1 minute"
+          runbook_url: "https://docs.agentauri.ai/runbooks/redis-down"
+
+  # System Resources Alerts
+  - name: system
+    interval: 30s
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 80%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/high-cpu"
+
+      # Critical CPU usage
+      - alert: CriticalCPUUsage
+        expr: |
+          100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical CPU usage"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 95%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/critical-cpu"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanize }}% (threshold: 80%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/high-memory"
+
+      # Critical memory usage
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage is {{ $value | humanize }}% (threshold: 95%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/critical-memory"
+
+      # Disk space low
+      - alert: LowDiskSpace
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Available disk space is {{ $value | humanize }}% (threshold: 20%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/low-disk"
+
+      # Critical disk space
+      - alert: CriticalDiskSpace
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical disk space"
+          description: "Available disk space is {{ $value | humanize }}% (threshold: 10%)"
+          runbook_url: "https://docs.agentauri.ai/runbooks/critical-disk"
+
+  # Rate Limiting Alerts
+  - name: rate-limiting
+    interval: 30s
+    rules:
+      # High rate limit rejection rate
+      - alert: HighRateLimitRejections
+        expr: |
+          sum(rate(rate_limit_rejections_total[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: "High rate limit rejection rate"
+          description: "{{ $value | humanizePercentage }} of requests are being rate limited"
+          runbook_url: "https://docs.agentauri.ai/runbooks/rate-limiting"
+
+  # Authentication Alerts
+  - name: authentication
+    interval: 30s
+    rules:
+      # High authentication failure rate
+      - alert: HighAuthFailureRate
+        expr: |
+          sum(rate(auth_failures_total[5m]))
+          / sum(rate(http_requests_total{path=~"/api/v1/auth.*"}[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.agentauri.ai/runbooks/auth-failures"
+
+      # Potential brute force attack
+      - alert: PotentialBruteForce
+        expr: |
+          sum(rate(auth_failures_total[1m])) by (ip) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "Potential brute force attack detected"
+          description: "IP {{ $labels.ip }} has {{ $value }} auth failures per minute"
+          runbook_url: "https://docs.agentauri.ai/runbooks/brute-force"
+
+  # Ponder Indexer Alerts
+  - name: ponder-indexer
+    interval: 30s
+    rules:
+      # Ponder indexer down
+      - alert: PonderIndexerDown
+        expr: up{job="ponder-indexer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ponder-indexer
+        annotations:
+          summary: "Ponder Indexer is down"
+          description: "Ponder blockchain indexer has been unreachable for more than 1 minute. Blockchain events are not being indexed."
+          runbook_url: "https://docs.agentauri.ai/runbooks/ponder-down"
+
+      # Ponder sync stalled (no new blocks synced)
+      - alert: PonderSyncStalled
+        expr: |
+          time() - ponder_last_sync_timestamp > 600
+        for: 5m
+        labels:
+          severity: critical
+          service: ponder-indexer
+        annotations:
+          summary: "Ponder sync is stalled"
+          description: "Ponder has not synced any new blocks for {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.agentauri.ai/runbooks/ponder-sync-stalled"
+
+      # High RPC error rate
+      - alert: PonderHighRPCErrorRate
+        expr: |
+          sum(rate(ponder_rpc_errors_total[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: ponder-indexer
+        annotations:
+          summary: "High Ponder RPC error rate"
+          description: "Ponder is experiencing {{ $value | humanize }} RPC errors per second"
+          runbook_url: "https://docs.agentauri.ai/runbooks/ponder-rpc-errors"
+
+      # Circuit breaker open (provider failing)
+      - alert: PonderCircuitBreakerOpen
+        expr: ponder_circuit_breaker_state == 2
+        for: 1m
+        labels:
+          severity: warning
+          service: ponder-indexer
+        annotations:
+          summary: "Ponder circuit breaker is open"
+          description: "Circuit breaker for {{ $labels.chain }} - {{ $labels.provider }} is OPEN. Provider is being bypassed."
+          runbook_url: "https://docs.agentauri.ai/runbooks/ponder-circuit-breaker"
+
+      # Low sync rate (could indicate RPC issues)
+      - alert: PonderLowSyncRate
+        expr: |
+          sum(rate(ponder_sync_blocks_total[5m])) < 0.1
+          and sum(ponder_sync_blocks_total) > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: ponder-indexer
+        annotations:
+          summary: "Low Ponder sync rate"
+          description: "Ponder block sync rate has dropped to {{ $value | humanize }} blocks/sec"
+          runbook_url: "https://docs.agentauri.ai/runbooks/ponder-low-sync"
+
+      # High sync lag (falling behind chain head)
+      - alert: PonderHighSyncLag
+        expr: ponder_sync_lag_blocks > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: ponder-indexer
+        annotations:
+          summary: "Ponder has high sync lag"
+          description: "Ponder is {{ $value }} blocks behind the chain head on {{ $labels.chain }}"
+          runbook_url: "https://docs.agentauri.ai/runbooks/ponder-sync-lag"

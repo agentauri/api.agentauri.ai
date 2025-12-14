@@ -1,0 +1,63 @@
+# =============================================================================
+# Docker Build Context Exclusions
+# =============================================================================
+# These files are excluded from the Docker build context to:
+# - Speed up builds by reducing context size
+# - Prevent sensitive files from being included in images
+# - Avoid cache invalidation from irrelevant changes
+# =============================================================================
+
+# Build artifacts (use multi-stage build instead)
+target/
+**/target/
+
+# Git directory
+.git/
+.gitignore
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Documentation (not needed in runtime image)
+*.md
+!README.md
+docs/
+
+# Test files
+tests/
+**/tests/
+**/*_test.rs
+
+# Local development files
+.env
+.env.*
+!.env.example
+
+# Rust specific
+**/*.rs.bk
+Cargo.lock.bak
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+
+# Docker files (prevent recursive inclusion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# macOS
+.DS_Store
+._*
+
+# SQLx prepared queries are INCLUDED (needed for offline compilation)
+# DO NOT add .sqlx/ here

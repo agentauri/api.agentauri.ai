@@ -1,0 +1,153 @@
+# ============================================================================
+# AlertManager Configuration for AgentAuri Backend
+# ============================================================================
+# Routes alerts to Slack channels based on severity and component.
+# See: https://prometheus.io/docs/alerting/latest/configuration/
+# ============================================================================
+
+global:
+  # How long to wait before sending a notification again if the alert is still firing
+  resolve_timeout: 5m
+
+  # Slack webhook URL - REQUIRED: Set in .env file
+  # Get webhook URL from: https://api.slack.com/messaging/webhooks
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+# Notification templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Alert routing tree
+route:
+  # Default receiver for all alerts
+  receiver: 'slack-default'
+
+  # Group alerts by these labels to reduce noise
+  group_by: ['alertname', 'severity', 'service']
+
+  # Wait 30 seconds to buffer alerts before sending
+  group_wait: 30s
+
+  # Wait 5 minutes before sending more alerts in same group
+  group_interval: 5m
+
+  # Wait 4 hours before re-sending same alert
+  repeat_interval: 4h
+
+  # Child routes for specific alert types
+  routes:
+    # Critical alerts go to dedicated channel with shorter intervals
+    - receiver: 'slack-critical'
+      match:
+        severity: critical
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+      continue: false
+
+    # Warning alerts (default timing)
+    - receiver: 'slack-warnings'
+      match:
+        severity: warning
+      continue: false
+
+    # Database alerts to dedicated channel
+    - receiver: 'slack-database'
+      match:
+        service: database
+      continue: false
+
+    # API Gateway alerts
+    - receiver: 'slack-api'
+      match:
+        service: api-gateway
+      continue: false
+
+# Receivers define where notifications are sent
+receivers:
+  # Default receiver - catches all unmatched alerts
+  - name: 'slack-default'
+    slack_configs:
+      - channel: '#agentauri-alerts'
+        send_resolved: true
+        title: '{{ template "slack.title" . }}'
+        text: '{{ template "slack.text" . }}'
+        color: '{{ if eq .Status "firing" }}{{ if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}{{ else }}good{{ end }}'
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'http://localhost:3000/d/system-overview'
+          - type: button
+            text: 'Silence Alert'
+            url: '{{ template "slack.silence_url" . }}'
+
+  # Critical alerts - immediate attention required
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#agentauri-critical'
+        send_resolved: true
+        title: ':rotating_light: CRITICAL: {{ .CommonLabels.alertname }}'
+        text: '{{ template "slack.critical.text" . }}'
+        color: 'danger'
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'http://localhost:3000/d/system-overview'
+          - type: button
+            text: 'Runbook'
+            url: 'https://docs.agentauri.ai/runbooks/{{ .CommonLabels.alertname }}'
+
+  # Warning alerts - needs attention but not urgent
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#agentauri-warnings'
+        send_resolved: true
+        title: ':warning: {{ .CommonLabels.alertname }}'
+        text: '{{ template "slack.text" . }}'
+        color: 'warning'
+
+  # Database-specific alerts
+  - name: 'slack-database'
+    slack_configs:
+      - channel: '#agentauri-database'
+        send_resolved: true
+        title: ':floppy_disk: Database Alert: {{ .CommonLabels.alertname }}'
+        text: '{{ template "slack.text" . }}'
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+
+  # API Gateway alerts
+  - name: 'slack-api'
+    slack_configs:
+      - channel: '#agentauri-api'
+        send_resolved: true
+        title: ':globe_with_meridians: API Alert: {{ .CommonLabels.alertname }}'
+        text: '{{ template "slack.text" . }}'
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # If the service is down, don't alert on high latency or errors
+  - source_match:
+      alertname: 'APIGatewayDown'
+    target_match_re:
+      alertname: 'HighAPI.*'
+    equal: ['service']
+
+  - source_match:
+      alertname: 'PostgreSQLDown'
+    target_match_re:
+      alertname: '.*Database.*'
+    equal: ['service']
+
+  - source_match:
+      alertname: 'RedisDown'
+    target_match_re:
+      alertname: '.*Redis.*'
+    equal: ['service']
+
+  # Critical alerts suppress warnings for same alert
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']

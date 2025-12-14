@@ -154,6 +154,44 @@ const rankingSchema = {
 };
 
 /**
+ * Circuit breaker configuration for RPC resilience
+ */
+const circuitBreakerSchema = {
+  // Number of failures before opening the circuit
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().min(1).max(20).default(5),
+  // Time in ms before attempting to close the circuit (1 minute default)
+  CIRCUIT_BREAKER_RESET_TIMEOUT_MS: z.coerce.number().int().min(10000).max(300000).default(60000),
+  // Number of successful requests in half-open state to close circuit
+  CIRCUIT_BREAKER_HALF_OPEN_SUCCESS_THRESHOLD: z.coerce.number().int().min(1).max(10).default(3),
+};
+
+/**
+ * Runtime health monitoring configuration
+ */
+const runtimeHealthSchema = {
+  // Health check interval in ms (30 seconds default)
+  RUNTIME_HEALTH_CHECK_INTERVAL_MS: z.coerce.number().int().min(10000).max(120000).default(30000),
+  // Request timeout for health checks in ms
+  RUNTIME_HEALTH_CHECK_TIMEOUT_MS: z.coerce.number().int().min(5000).max(30000).default(10000),
+  // Number of consecutive failures before marking unhealthy
+  RUNTIME_HEALTH_FAILURE_THRESHOLD: z.coerce.number().int().min(1).max(10).default(3),
+  // Enable detailed debug logging for health monitoring
+  RUNTIME_HEALTH_DEBUG_LOGGING: z.coerce.boolean().default(false),
+};
+
+/**
+ * Resilient transport configuration
+ */
+const resilientTransportSchema = {
+  // Request timeout for RPC calls in ms
+  RESILIENT_TRANSPORT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5000).max(60000).default(30000),
+  // Maximum retries per request across all providers
+  RESILIENT_TRANSPORT_MAX_RETRIES: z.coerce.number().int().min(1).max(10).default(3),
+  // Enable detailed debug logging
+  RESILIENT_TRANSPORT_DEBUG_LOGGING: z.coerce.boolean().default(false),
+};
+
+/**
  * Ponder-specific configuration
  */
 const ponderSchema = {
@@ -179,6 +217,15 @@ const envSchema = z.object({
 
   // Ranking Config
   ...rankingSchema,
+
+  // Circuit Breaker Config
+  ...circuitBreakerSchema,
+
+  // Runtime Health Monitoring Config
+  ...runtimeHealthSchema,
+
+  // Resilient Transport Config
+  ...resilientTransportSchema,
 
   // Ponder Config
   ...ponderSchema,

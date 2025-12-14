@@ -201,6 +201,7 @@ mod tests {
             ActionType::Telegram,
             1,
             serde_json::json!({"chat_id": "123"}),
+            serde_json::json!({"agent_id": 42}), // event_data
         )
     }
 

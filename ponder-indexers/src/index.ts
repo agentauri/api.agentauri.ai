@@ -65,18 +65,26 @@ ponder.on("IdentityRegistryLineaSepolia:Registered", async ({ event, context }) 
 // });
 
 async function handleRegistered(event: RegisteredEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.IDENTITY,
-    eventType: "Registered",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      owner: validateAndNormalizeAddress(event.args.owner, "owner"),
-      tokenUri: validateUri(event.args.tokenURI, "tokenURI"),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.IDENTITY,
+      eventType: "Registered",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        owner: validateAndNormalizeAddress(event.args.owner, "owner"),
+        tokenUri: validateUri(event.args.tokenURI, "tokenURI"),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] Registered event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -100,18 +108,26 @@ ponder.on("IdentityRegistryLineaSepolia:MetadataSet", async ({ event, context })
 // });
 
 async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.IDENTITY,
-    eventType: "MetadataSet",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      metadataKey: validateMetadataKey(event.args.key),
-      metadataValue: validateMetadataValue(event.args.value),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.IDENTITY,
+      eventType: "MetadataSet",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        metadataKey: validateMetadataKey(event.args.key),
+        metadataValue: validateMetadataValue(event.args.value),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] MetadataSet event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -131,18 +147,26 @@ ponder.on("IdentityRegistryLineaSepolia:UriUpdated", async ({ event, context }) 
 });
 
 async function handleUriUpdated(event: UriUpdatedEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.IDENTITY,
-    eventType: "UriUpdated",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      tokenUri: validateUri(event.args.newUri, "newUri"),
-      owner: validateAndNormalizeAddress(event.args.updatedBy, "updatedBy"), // Store updatedBy in owner field (schema reuse)
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.IDENTITY,
+      eventType: "UriUpdated",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        tokenUri: validateUri(event.args.newUri, "newUri"),
+        owner: validateAndNormalizeAddress(event.args.updatedBy, "updatedBy"), // Store updatedBy in owner field (schema reuse)
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] UriUpdated event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -162,18 +186,26 @@ ponder.on("IdentityRegistryLineaSepolia:Transfer", async ({ event, context }) =>
 });
 
 async function handleTransfer(event: TransferEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.tokenId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.tokenId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.IDENTITY,
-    eventType: "Transfer",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      owner: validateAndNormalizeAddress(event.args.to, "to"), // New owner
-      clientAddress: validateAndNormalizeAddress(event.args.from, "from"), // Previous owner (schema reuse)
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.IDENTITY,
+      eventType: "Transfer",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        owner: validateAndNormalizeAddress(event.args.to, "to"), // New owner
+        clientAddress: validateAndNormalizeAddress(event.args.from, "from"), // Previous owner (schema reuse)
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] Transfer event validation failed:`, {
+      chainId: chainId.toString(),
+      tokenId: event.args.tokenId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // ============================================================================
@@ -201,23 +233,31 @@ ponder.on("ReputationRegistryLineaSepolia:NewFeedback", async ({ event, context 
 // });
 
 async function handleNewFeedback(event: NewFeedbackEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.REPUTATION,
-    eventType: "NewFeedback",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
-      feedbackIndex: null, // NewFeedback doesn't emit feedbackIndex (contract-assigned)
-      score: validateScore(event.args.score),
-      tag1: validateTag(event.args.tag1, "tag1"),
-      tag2: validateTag(event.args.tag2, "tag2"),
-      fileUri: validateUri(event.args.feedbackUri, "feedbackUri"),
-      fileHash: validateBytes32Hash(event.args.feedbackHash, "feedbackHash"),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.REPUTATION,
+      eventType: "NewFeedback",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
+        feedbackIndex: null, // NewFeedback doesn't emit feedbackIndex (contract-assigned)
+        score: validateScore(event.args.score),
+        tag1: validateTag(event.args.tag1, "tag1"),
+        tag2: validateTag(event.args.tag2, "tag2"),
+        fileUri: validateUri(event.args.feedbackUri, "feedbackUri"),
+        fileHash: validateBytes32Hash(event.args.feedbackHash, "feedbackHash"),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] NewFeedback event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -237,18 +277,26 @@ ponder.on("ReputationRegistryLineaSepolia:FeedbackRevoked", async ({ event, cont
 });
 
 async function handleFeedbackRevoked(event: FeedbackRevokedEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.REPUTATION,
-    eventType: "FeedbackRevoked",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
-      feedbackIndex: validateFeedbackIndex(event.args.feedbackIndex),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.REPUTATION,
+      eventType: "FeedbackRevoked",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
+        feedbackIndex: validateFeedbackIndex(event.args.feedbackIndex),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] FeedbackRevoked event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -268,21 +316,29 @@ ponder.on("ReputationRegistryLineaSepolia:ResponseAppended", async ({ event, con
 });
 
 async function handleResponseAppended(event: ResponseAppendedEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.REPUTATION,
-    eventType: "ResponseAppended",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
-      feedbackIndex: validateFeedbackIndex(event.args.feedbackIndex),
-      validatorAddress: validateAndNormalizeAddress(event.args.responder, "responder"), // Reuse validatorAddress for responder (schema reuse)
-      responseUri: validateUri(event.args.responseUri, "responseUri"),
-      responseHash: validateBytes32Hash(event.args.responseHash, "responseHash"),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.REPUTATION,
+      eventType: "ResponseAppended",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
+        feedbackIndex: validateFeedbackIndex(event.args.feedbackIndex),
+        validatorAddress: validateAndNormalizeAddress(event.args.responder, "responder"), // Reuse validatorAddress for responder (schema reuse)
+        responseUri: validateUri(event.args.responseUri, "responseUri"),
+        responseHash: validateBytes32Hash(event.args.responseHash, "responseHash"),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] ResponseAppended event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // NOTE: ScoreUpdated event removed - not emitted by deployed contract
@@ -312,22 +368,30 @@ ponder.on("ValidationRegistryLineaSepolia:ValidationResponse", async ({ event, c
 // });
 
 async function handleValidationResponse(event: ValidationResponseEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.VALIDATION,
-    eventType: "ValidationResponse",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      validatorAddress: validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress"),
-      requestHash: validateBytes32Hash(event.args.requestHash, "requestHash"),
-      response: Number(event.args.response),
-      responseUri: validateUri(event.args.responseUri, "responseUri"),
-      responseHash: validateBytes32Hash(event.args.responseHash, "responseHash"),
-      tag: validateTag(event.args.tag, "tag"),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.VALIDATION,
+      eventType: "ValidationResponse",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        validatorAddress: validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress"),
+        requestHash: validateBytes32Hash(event.args.requestHash, "requestHash"),
+        response: Number(event.args.response),
+        responseUri: validateUri(event.args.responseUri, "responseUri"),
+        responseHash: validateBytes32Hash(event.args.responseHash, "responseHash"),
+        tag: validateTag(event.args.tag, "tag"),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] ValidationResponse event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**
@@ -351,17 +415,25 @@ ponder.on("ValidationRegistryLineaSepolia:ValidationRequest", async ({ event, co
 // });
 
 async function handleValidationRequest(event: ValidationRequestEvent, context: PonderContext, chainId: bigint): Promise<void> {
-  const validatedAgentId = validateAgentId(event.args.agentId);
+  try {
+    const validatedAgentId = validateAgentId(event.args.agentId);
 
-  await processEvent(context, event.block, event.transaction, event.log, {
-    registry: REGISTRIES.VALIDATION,
-    eventType: "ValidationRequest",
-    chainId,
-    agentId: validatedAgentId,
-    eventValues: {
-      validatorAddress: validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress"),
-      requestHash: validateBytes32Hash(event.args.requestHash, "requestHash"),
-      requestUri: validateUri(event.args.requestUri, "requestUri"),
-    },
-  });
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.VALIDATION,
+      eventType: "ValidationRequest",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        validatorAddress: validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress"),
+        requestHash: validateBytes32Hash(event.args.requestHash, "requestHash"),
+        requestUri: validateUri(event.args.requestUri, "requestUri"),
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] ValidationRequest event validation failed:`, {
+      chainId: chainId.toString(),
+      agentId: event.args.agentId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

@@ -73,8 +73,8 @@ argon2 = "0.5"
 # Validation
 validator = { version = "0.20", features = ["derive"] }
 
-# Redis
-redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+# Redis (with TLS support for AWS ElastiCache using native-tls to avoid rustls crypto provider conflicts)
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager", "tokio-native-tls-comp"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
