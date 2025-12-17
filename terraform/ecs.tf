@@ -112,7 +112,7 @@ resource "aws_ecs_task_definition" "api_gateway" {
         { name = "SERVER_PORT", value = "8080" },
         { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
         { name = "REDIS_PORT", value = "6379" },
-        { name = "DB_SSL_MODE", value = var.environment == "production" ? "verify-full" : "require" },
+        { name = "DB_SSL_MODE", value = "require" }, # TODO: Use verify-full after adding RDS CA cert to image
         { name = "FRONTEND_URL", value = "https://${var.domain_name}" }
       ]
 
@@ -148,6 +148,10 @@ resource "aws_ecs_task_definition" "api_gateway" {
         {
           name      = "REDIS_URL"
           valueFrom = "${aws_secretsmanager_secret.redis_auth_token.arn}:url::"
+        },
+        {
+          name      = "MONITORING_TOKEN"
+          valueFrom = aws_secretsmanager_secret.monitoring_token.arn
         }
       ]
 
@@ -200,7 +204,7 @@ resource "aws_ecs_task_definition" "event_processor" {
         { name = "ENVIRONMENT", value = var.environment },
         { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
         { name = "REDIS_PORT", value = "6379" },
-        { name = "DB_SSL_MODE", value = var.environment == "production" ? "verify-full" : "require" }
+        { name = "DB_SSL_MODE", value = "require" } # TODO: Use verify-full after adding RDS CA cert to image
       ]
 
       secrets = [
@@ -275,7 +279,7 @@ resource "aws_ecs_task_definition" "action_workers" {
         { name = "ENVIRONMENT", value = var.environment },
         { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
         { name = "REDIS_PORT", value = "6379" },
-        { name = "DB_SSL_MODE", value = var.environment == "production" ? "verify-full" : "require" }
+        { name = "DB_SSL_MODE", value = "require" } # TODO: Use verify-full after adding RDS CA cert to image
       ]
 
       secrets = [
@@ -468,9 +472,7 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
         { name = "PONDER_LOG_LEVEL", value = "info" },
         { name = "ENVIRONMENT", value = "shared" }, # Mark as shared (not tied to staging/prod)
         { name = "PONDER_DATABASE_SCHEMA", value = var.ponder_database_schema },
-        # Disable Node.js TLS certificate validation for RDS SSL
-        # TODO: Use proper AWS RDS CA certificate in production
-        { name = "NODE_TLS_REJECT_UNAUTHORIZED", value = "0" },
+        # TLS validation enabled - RDS CA bundle included in Docker image via NODE_EXTRA_CA_CERTS
 
         # ERC-8004 Contract Addresses - Ethereum Sepolia
         { name = "ETHEREUM_SEPOLIA_IDENTITY_ADDRESS", value = "0x8004a6090Cd10A7288092483047B097295Fb8847" },
@@ -577,5 +579,60 @@ resource "aws_ecs_service" "ponder_indexer" {
     Name        = "${local.name_prefix}-ponder-indexer"
     SharedBy    = "all-environments"
     Description = "Shared blockchain indexer for ERC-8004 events"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# ECS Auto Scaling - API Gateway
+# -----------------------------------------------------------------------------
+# Automatically scales the API Gateway service based on CPU utilization.
+# Scales out when CPU > 70%, scales in when CPU < 50%.
+# Min: 1 task, Max: 4 tasks for cost control.
+
+resource "aws_appautoscaling_target" "api_gateway" {
+  max_capacity       = var.environment == "production" ? 4 : 2
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.main.name}/api-gateway"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+
+  depends_on = [aws_ecs_service.api_gateway]
+}
+
+resource "aws_appautoscaling_policy" "api_gateway_cpu" {
+  name               = "${local.name_prefix}-api-gateway-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.api_gateway.resource_id
+  scalable_dimension = aws_appautoscaling_target.api_gateway.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.api_gateway.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = 70.0
+    scale_in_cooldown  = 300 # 5 minutes before scale in
+    scale_out_cooldown = 60  # 1 minute before scale out (respond quickly)
+
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+  }
+}
+
+# Optional: Scale based on ALB request count per target
+resource "aws_appautoscaling_policy" "api_gateway_requests" {
+  name               = "${local.name_prefix}-api-gateway-request-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.api_gateway.resource_id
+  scalable_dimension = aws_appautoscaling_target.api_gateway.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.api_gateway.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = 1000.0 # Requests per target per minute
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 60
+
+    predefined_metric_specification {
+      predefined_metric_type = "ALBRequestCountPerTarget"
+      resource_label         = "${aws_lb.main.arn_suffix}/${aws_lb_target_group.api.arn_suffix}"
+    }
   }
 }

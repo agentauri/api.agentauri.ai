@@ -30,6 +30,18 @@ variable "grafana_memory" {
   default     = 512
 }
 
+variable "grafana_image" {
+  description = "Docker image for custom Grafana (full ECR URI)"
+  type        = string
+  default     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-grafana"
+}
+
+variable "grafana_image_tag" {
+  description = "Docker image tag for custom Grafana image"
+  type        = string
+  default     = "v1.0.0"
+}
+
 # -----------------------------------------------------------------------------
 # EFS Filesystem for Grafana Persistent Storage
 # -----------------------------------------------------------------------------
@@ -176,8 +188,8 @@ resource "aws_ecs_task_definition" "grafana" {
   volume {
     name = "grafana-data"
     efs_volume_configuration {
-      file_system_id          = aws_efs_file_system.grafana[0].id
-      transit_encryption      = "ENABLED"
+      file_system_id     = aws_efs_file_system.grafana[0].id
+      transit_encryption = "ENABLED"
       authorization_config {
         access_point_id = aws_efs_access_point.grafana[0].id
         iam             = "ENABLED"
@@ -188,7 +200,7 @@ resource "aws_ecs_task_definition" "grafana" {
   container_definitions = jsonencode([
     {
       name      = "grafana"
-      image     = "grafana/grafana:10.2.0"
+      image     = "${var.grafana_image}:${var.grafana_image_tag}"
       essential = true
 
       portMappings = [

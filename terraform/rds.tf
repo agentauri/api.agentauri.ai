@@ -93,8 +93,9 @@ resource "aws_db_instance" "main" {
   # Parameter and option groups
   parameter_group_name = aws_db_parameter_group.main.name
 
-  # Backup configuration (free tier allows max 7 days, staging uses 1 day)
-  backup_retention_period   = var.environment == "production" ? 30 : 1
+  # Backup configuration
+  # Note: AWS free tier limits backup retention - start with 1 day, increase after account upgrade
+  backup_retention_period   = 1
   backup_window             = "03:00-04:00"
   maintenance_window        = "Mon:04:00-Mon:05:00"
   copy_tags_to_snapshot     = true

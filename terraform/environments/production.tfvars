@@ -30,23 +30,49 @@ action_workers_desired_count = 2
 
 # Container Image
 container_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-backend"
-container_image_tag = "v1.0.0"
+container_image_tag = "v1.0.12"
 
 # RDS PostgreSQL
-rds_instance_class    = "db.t3.small"
-rds_allocated_storage = 50
-rds_multi_az          = true
+# Note: Using free tier compatible settings. Upgrade later:
+# - db_instance_class = "db.t3.small" (or larger)
+# - db_multi_az = true
+db_instance_class    = "db.t3.micro"
+db_allocated_storage = 20
+db_multi_az          = false
 
 # ElastiCache Redis
 redis_node_type       = "cache.t3.small"
 redis_num_cache_nodes = 2
 
 # =============================================================================
-# Ponder Indexer (Shared Service)
+# Ponder Indexer
 # =============================================================================
-# IMPORTANT: Ponder is NOT deployed in production.
-# The staging workspace runs a single shared Ponder instance that indexes
-# blockchain events into the 'ponder' schema. Production reads from this schema.
-# This avoids duplicate indexing of public blockchain data.
+# Ponder indexes blockchain events from ERC-8004 registries into PostgreSQL
 
-ponder_indexer_enabled = false
+ponder_indexer_enabled   = true
+ponder_indexer_cpu       = 512
+ponder_indexer_memory    = 1024
+ponder_indexer_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-ponder"
+ponder_indexer_image_tag = "v1.1.0"
+ponder_database_schema   = "ponder"
+
+# =============================================================================
+# Monitoring & Alerts
+# =============================================================================
+
+ponder_monitoring_enabled = true
+alert_email               = "matteo.scurati@agentauri.ai"
+
+# =============================================================================
+# Grafana (Monitoring Dashboard)
+# =============================================================================
+
+grafana_enabled = true
+grafana_cpu     = 256
+grafana_memory  = 512
+
+# =============================================================================
+# Documentation Site (docs.agentauri.ai)
+# =============================================================================
+
+docs_enabled = true

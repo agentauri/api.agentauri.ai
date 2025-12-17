@@ -200,3 +200,23 @@ resource "aws_secretsmanager_secret" "base_sepolia_rpc_ankr" {
     Name = "${local.name_prefix}-base-sepolia-rpc-ankr"
   }
 }
+
+# -----------------------------------------------------------------------------
+# Monitoring Token (for bypassing rate limits on monitoring endpoints)
+# -----------------------------------------------------------------------------
+# This token allows Grafana, Prometheus, and health checkers to access
+# API endpoints without being subject to rate limiting.
+# Requests with X-Monitoring-Token header matching this value bypass rate limits.
+
+resource "aws_secretsmanager_secret" "monitoring_token" {
+  name                    = "agentauri/${var.environment}/monitoring-token"
+  description             = "Token for monitoring systems to bypass rate limiting"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-monitoring-token"
+  }
+
+  # Note: Secret value is managed manually via AWS Console or CLI.
+  # To update: aws secretsmanager put-secret-value --secret-id "agentauri/<env>/monitoring-token" --secret-string "<new-token>"
+}

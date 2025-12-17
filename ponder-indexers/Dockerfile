@@ -63,6 +63,11 @@ RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
 RUN addgroup -g 1001 -S ponder && \
     adduser -S ponder -u 1001 -G ponder
 
+# Add AWS RDS CA certificate bundle for proper TLS validation
+# This allows Node.js to verify RDS PostgreSQL SSL certificates
+COPY ponder-indexers/rds-ca-bundle.pem /etc/ssl/certs/rds-ca-bundle.pem
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/rds-ca-bundle.pem
+
 WORKDIR /app
 
 # Copy workspace structure for pnpm to work correctly

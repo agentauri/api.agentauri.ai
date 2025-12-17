@@ -9,6 +9,10 @@ license.workspace = true
 name = "api-gateway"
 path = "src/main.rs"
 
+[[bin]]
+name = "export-openapi"
+path = "src/bin/export_openapi.rs"
+
 [dependencies]
 # Shared library
 shared = { path = "../shared" }

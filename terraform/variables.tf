@@ -221,3 +221,13 @@ variable "ponder_monitoring_enabled" {
   type        = bool
   default     = true
 }
+
+# -----------------------------------------------------------------------------
+# Documentation Site (docs.agentauri.ai)
+# -----------------------------------------------------------------------------
+
+variable "docs_enabled" {
+  description = "Enable documentation site infrastructure (S3 + CloudFront)"
+  type        = bool
+  default     = false
+}

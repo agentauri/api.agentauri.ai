@@ -7,7 +7,57 @@ and this project follows phases and weeks for versioning during development.
 
 ## [Unreleased]
 
-### Phase 4: Advanced Triggers & Actions - In Progress (Week 14 of 16)
+### Phase 4: Advanced Triggers & Actions - COMPLETE (Week 15)
+
+---
+
+## v1.0.12 (December 17, 2025) - Ponder Status Fix
+
+### Fixed
+- **Ponder Status Endpoint** - Fixed snake_case column mapping for Ponder 0.7
+  - Changed `"blockNumber"` to `block_number` (Ponder uses snake_case in PostgreSQL)
+  - Changed `"chainId"` to `chain_id`
+  - Endpoint now correctly returns sync status per chain
+- **Monitoring Token Bypass** - Added `X-Monitoring-Token` header bypass for rate limiting
+  - Used by Grafana, Prometheus, and health checkers
+
+### Added
+- **Ponder Endpoints Documentation** - Updated API_DOCUMENTATION.md, CLAUDE.md, docs/INDEX.md
+
+---
+
+## Week 15 (December 4, 2025) - REST Worker + Circuit Breaker + Discovery
+
+### Added
+- **REST/HTTP Worker** - Complete webhook action worker
+  - Support: GET, POST, PUT, DELETE, PATCH methods
+  - Custom headers and body templating
+  - Timeout configuration and retry logic (exponential backoff)
+  - 20+ tests passing
+- **Circuit Breaker Pattern** - Auto-disable failing triggers
+  - States: Closed → Open → Half-Open
+  - Auto-recovery with configurable thresholds
+  - Per-trigger isolation
+  - 22 tests passing
+- **Discovery Endpoint** - A2A Protocol compliant Agent Card
+  - `GET /.well-known/agent.json`
+  - CORS support for cross-origin access
+  - 14 tests passing
+- **OpenAPI 3.0 Documentation**
+  - Swagger UI at `/api-docs/`
+  - Interactive API testing
+- **Social Login**
+  - Google OAuth 2.0 integration
+  - GitHub OAuth 2.0 integration
+  - Automatic account linking
+- **Account Lockout**
+  - Progressive lockout: 15min → 4h
+  - Brute-force protection
+
+### Production Deployment
+- Deployed to AWS ECS (api.agentauri.ai)
+- Grafana monitoring dashboards
+- CloudWatch alarms and alerts
 
 ---
 
@@ -547,30 +597,25 @@ Week 14 stateful triggers implementation is now **production-ready** with compre
 
 ## Roadmap
 
-### Week 13 (Next) - Auth Completion + Rate Limiting + OAuth 2.0
-- Layer 0 (Anonymous) IP-based rate limiting
-- Enhanced rate limiting middleware (per-tier, per-account, per-IP)
-- Auth layer precedence logic (L0 < L1 < L2)
-- OAuth 2.0 tables for future third-party integrations
-- Comprehensive auth integration tests
-- Estimated: 30-40 hours
-
-### Phase 4 - Advanced Triggers & Actions (Weeks 14-16)
-- Stateful triggers (EMA, counters, rate limits)
-- REST/HTTP action worker
-- Discovery endpoint (`/.well-known/agent.json`)
-- Circuit breaker implementation
-- Payment nonces for x402
-
-### Phase 5 - MCP + A2A Integration (Weeks 17-19)
+### Phase 5 - MCP + A2A Integration (Weeks 16-18) - PLANNED
 - A2A Protocol (Google Agent-to-Agent)
 - MCP Query Tools (Tier 0-3)
 - x402 crypto payment integration
 - Query caching and usage metering
 
+### Phase 6 - Testing & Observability (Weeks 19-21) - PLANNED
+- Comprehensive test suite (unit, integration, e2e)
+- Payment integration tests
+- Enhanced Prometheus metrics
+
+### Phase 7 - Production Hardening (Weeks 22-24) - PLANNED
+- Security audit and hardening
+- Performance optimization
+- Documentation completion
+
 ---
 
-**Current Version**: Phase 3.5 Complete, Week 12 (v3.5.12)
-**Production Status**: ✅ Phase 3.5 (Payment Foundation) production-ready (100%)
-**Next Milestone**: Week 13 - Enhanced Rate Limiting + OAuth 2.0 Tables
-**Total Progress**: 12/25 weeks (48% complete)
+**Current Version**: Phase 4 Complete, v1.0.12
+**Production Status**: ✅ Deployed to AWS ECS (api.agentauri.ai)
+**Next Milestone**: Phase 5 - MCP + A2A Integration
+**Total Progress**: 15/25 weeks (60% complete)

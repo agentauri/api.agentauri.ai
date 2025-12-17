@@ -14,7 +14,7 @@ The API implements a **3-layer authentication system**:
 
 | Layer | Method | Use Case | Rate Limits |
 |-------|--------|----------|-------------|
-| **Layer 0** | Anonymous | Public data, x402 payments | 10 calls/hour per IP |
+| **Layer 0** | Anonymous | Public data, [x402](https://www.x402.org) payments | 10 calls/hour per IP |
 | **Layer 1** | API Key | Account-based access | Per-plan (100-2000/hr) |
 | **Layer 2** | JWT + Wallet Signature | Full user/agent access | Per-account limits |
 
@@ -923,6 +923,102 @@ Check API and database health.
   "version": "0.1.0"
 }
 ```
+
+---
+
+### Ponder Indexer Status
+
+Monitor the blockchain indexer's sync status across all configured chains.
+
+#### Get Ponder Status
+
+Get the current sync status of the blockchain indexer.
+
+**Endpoint**: `GET /api/v1/ponder/status`
+
+**No authentication required** (but rate limited)
+
+**Response** (200 OK):
+```json
+{
+  "status": "partial",
+  "schema": "public",
+  "namespace": "7daa",
+  "chains": [
+    {
+      "chain": "ethereumSepolia",
+      "chain_id": 11155111,
+      "current_block": 9861073,
+      "is_synced": true
+    },
+    {
+      "chain": "baseSepolia",
+      "chain_id": 84532,
+      "current_block": 35112167,
+      "is_synced": true
+    },
+    {
+      "chain": "lineaSepolia",
+      "chain_id": 59141,
+      "current_block": 19590681,
+      "is_synced": true
+    },
+    {
+      "chain": "polygonAmoy",
+      "chain_id": 80002,
+      "current_block": 0,
+      "is_synced": false
+    }
+  ],
+  "total_events": 49535,
+  "last_activity_at": "1765992622"
+}
+```
+
+**Status Values**:
+- `healthy`: All configured chains are synced
+- `partial`: Some chains are synced, others are not
+- `initializing`: No chains have been indexed yet
+
+**Error Responses**:
+- `500 Internal Server Error`: Database query failed
+
+---
+
+#### Get Ponder Events
+
+Get event statistics grouped by chain and event type.
+
+**Endpoint**: `GET /api/v1/ponder/events`
+
+**No authentication required** (but rate limited)
+
+**Response** (200 OK):
+```json
+{
+  "events": [
+    {
+      "chain_id": 11155111,
+      "event_name": "AgentRegistered",
+      "count": 15234
+    },
+    {
+      "chain_id": 11155111,
+      "event_name": "ReputationUpdated",
+      "count": 8721
+    },
+    {
+      "chain_id": 84532,
+      "event_name": "AgentRegistered",
+      "count": 12456
+    }
+  ],
+  "total_types": 3
+}
+```
+
+**Error Responses**:
+- `500 Internal Server Error`: Database query failed
 
 ---
 

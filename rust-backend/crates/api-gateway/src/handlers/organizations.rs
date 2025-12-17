@@ -111,11 +111,15 @@ pub async fn create_organization(
         Ok(org) => org,
         Err(e) => {
             // Check if the error is a unique constraint violation (slug already exists)
-            let error_string = e.to_string();
-            if error_string.contains("duplicate key")
-                || error_string.contains("unique constraint")
-                || error_string.contains("organizations_slug_key")
-            {
+            // Use SQLx database error codes for robustness (PostgreSQL code 23505 = unique_violation)
+            let is_unique_violation = e
+                .downcast_ref::<sqlx::Error>()
+                .and_then(|sqlx_err| sqlx_err.as_database_error())
+                .and_then(|db_err| db_err.code())
+                .map(|code| code == "23505")
+                .unwrap_or(false);
+
+            if is_unique_violation {
                 // SECURITY: Return a generic error to prevent slug enumeration attacks
                 // An attacker could probe for existing organization slugs to gather
                 // business intelligence about competitors or targets
@@ -1000,8 +1004,15 @@ pub async fn transfer_ownership(
     {
         Ok(org) => org,
         Err(e) => {
-            let error_string = e.to_string();
-            if error_string.contains("personal organization") {
+            // Check for personal organization constraint violation
+            // The database function raises an exception with this specific message
+            let is_personal_org_error = e
+                .downcast_ref::<sqlx::Error>()
+                .and_then(|sqlx_err| sqlx_err.as_database_error())
+                .map(|db_err| db_err.message().contains("personal organization"))
+                .unwrap_or(false);
+
+            if is_personal_org_error {
                 return HttpResponse::BadRequest().json(ErrorResponse::new(
                     "bad_request",
                     "Personal organizations cannot be transferred",

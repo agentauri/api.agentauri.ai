@@ -64,3 +64,10 @@ docker/postgres/certs/*.pem
 tmp/
 temp/
 *.tmp
+
+# Terraform
+*.tfplan
+tfplan
+.terraform/
+*.tfstate
+*.tfstate.backup

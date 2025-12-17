@@ -1,0 +1,133 @@
+# =============================================================================
+# AgentAuri Documentation - Build & Deploy Workflow
+# =============================================================================
+# This workflow handles:
+# - Exporting OpenAPI spec from Rust backend
+# - Building Starlight documentation site
+# - Deploying to S3 + CloudFront (docs.agentauri.ai)
+#
+# Triggers:
+# - Push to main with changes in docs-site-starlight/ or openapi.rs
+# - Manual dispatch
+# =============================================================================
+
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs-site-starlight/**'
+      - 'rust-backend/crates/api-gateway/src/openapi.rs'
+      - 'rust-backend/crates/api-gateway/src/handlers/**'
+      - 'rust-backend/crates/api-gateway/src/models/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: agentauri-docs-production
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.DOCS_CLOUDFRONT_ID }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build Documentation
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build Docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust-backend -> target
+
+      - name: Export OpenAPI spec
+        run: |
+          cd rust-backend
+          SQLX_OFFLINE=true cargo run -p api-gateway --bin export-openapi --release > ../docs-site-starlight/src/schemas/openapi.json
+
+      - name: Install dependencies
+        run: |
+          cd docs-site-starlight
+          pnpm install
+
+      - name: Build Starlight site
+        run: |
+          cd docs-site-starlight
+          pnpm build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-build
+          path: docs-site-starlight/dist
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Deploy to S3 + CloudFront
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-build
+          path: dist
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync dist s3://${{ env.S3_BUCKET }} \
+            --delete \
+            --cache-control "public, max-age=3600"
+
+      - name: Set cache headers for static assets
+        run: |
+          # Long cache for static assets (CSS, JS, images)
+          aws s3 cp s3://${{ env.S3_BUCKET }}/_astro/ s3://${{ env.S3_BUCKET }}/_astro/ \
+            --recursive \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Notify deployment success
+        run: |
+          echo "::notice::Documentation deployed to https://docs.agentauri.ai"

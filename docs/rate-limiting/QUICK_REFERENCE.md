@@ -270,6 +270,28 @@ export REDIS_PASSWORD=your_password
 export REDIS_URL=redis://:password@redis.example.com:6379
 ```
 
+### Monitoring Token Bypass
+
+Requests with a valid `X-Monitoring-Token` header bypass rate limiting entirely. This is used by monitoring systems (Grafana, Prometheus, health checkers) to access API endpoints without being subject to rate limits.
+
+**Header Format**:
+```http
+X-Monitoring-Token: <token-value>
+```
+
+**Secret Location**: `agentauri/{env}/monitoring-token` (AWS Secrets Manager)
+
+**Use Cases**:
+- Grafana dashboards polling `/api/v1/ponder/status`
+- Prometheus scraping metrics endpoints
+- External health monitoring services
+- Load balancer health checks
+
+**Security Notes**:
+- Token should be rotated periodically
+- Only share with trusted monitoring systems
+- Monitor usage through CloudWatch logs
+
 ## Monitoring
 
 ### Key Metrics

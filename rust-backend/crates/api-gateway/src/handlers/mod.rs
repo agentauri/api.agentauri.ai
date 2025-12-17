@@ -12,6 +12,7 @@ pub mod health;
 pub mod helpers;
 pub mod oauth;
 pub mod organizations;
+pub mod ponder;
 pub mod social_auth;
 pub mod triggers;
 
@@ -53,6 +54,11 @@ pub use oauth::{
 pub use social_auth::{
     __path_github_auth, __path_github_callback, __path_google_auth, __path_google_callback,
     github_auth, github_callback, google_auth, google_callback,
+};
+
+// Explicitly re-export Ponder handlers
+pub use ponder::{
+    __path_get_ponder_events, __path_get_ponder_status, get_ponder_events, get_ponder_status,
 };
 
 // Note: helpers module is not re-exported to avoid polluting the namespace

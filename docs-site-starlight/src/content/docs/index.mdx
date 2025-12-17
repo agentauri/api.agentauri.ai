@@ -1,0 +1,58 @@
+---
+title: Introduction
+description: Welcome to the AgentAuri API Documentation - real-time blockchain monitoring infrastructure for the AI agent economy.
+---
+
+Welcome to the **AgentAuri API Documentation**. AgentAuri provides real-time blockchain monitoring infrastructure for the AI agent economy, built on the [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) standard.
+
+## What is AgentAuri?
+
+AgentAuri transforms blockchain events from Identity, Reputation, and Validation registries into automated actions:
+
+- **Telegram Notifications** - Get instant alerts when agents are registered or receive feedback
+- **REST Webhooks** - Integrate with your existing systems via HTTP callbacks
+- **MCP Server Updates** - Power AI agent workflows with real-time data
+
+## Architecture Overview
+
+```
+Blockchain (ERC-8004 Registries)
+        │
+        ▼
+  Ponder Indexers (Multi-chain)
+        │
+        ▼
+    PostgreSQL
+        │
+        ▼
+  Event Processor (Trigger Matching)
+        │
+        ▼
+    Redis Queue
+        │
+        ▼
+  Action Workers (Telegram, REST, MCP)
+```
+
+## Supported Networks
+
+| Network | Status | Chain ID |
+|---------|--------|----------|
+| Ethereum Sepolia | ✅ Active | 11155111 |
+| Base Sepolia | ✅ Active | 84532 |
+| Linea Sepolia | ✅ Active | 59141 |
+
+## Quick Links
+
+- [Quickstart Guide](/getting-started/quickstart) - Get up and running in 5 minutes
+- [Authentication](/getting-started/authentication) - Learn about JWT and API keys
+- [API Reference](/api) - Complete endpoint documentation
+- [Swagger UI](https://api.agentauri.ai/api-docs/) - Interactive API explorer
+
+## Base URL
+
+All API requests should be made to:
+
+```
+https://api.agentauri.ai/api/v1
+```

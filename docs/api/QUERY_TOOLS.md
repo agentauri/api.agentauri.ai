@@ -22,6 +22,15 @@ Query Tools provide agents with programmatic access to ERC-8004 reputation and v
 | 2 | Analysis | 0.05 USDC | <2s | Pattern detection |
 | 3 | AI-Powered | 0.20 USDC | <10s | LLM-generated insights |
 
+## Payment Methods
+
+Query pricing can be paid via:
+- **[x402](https://www.x402.org)** - HTTP-native crypto payments (USDC on Base/Ethereum/Solana)
+- **Credits** - Prepaid balance (purchased via Stripe)
+- **Stripe** - Direct card payment (for authenticated users)
+
+For x402 integration details, see [Payment System](../payments/PAYMENT_SYSTEM.md#x402-protocol-reference).
+
 ## Tier 0: Raw Queries
 
 Direct access to individual records. Fastest and cheapest queries.

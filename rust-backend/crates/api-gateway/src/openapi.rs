@@ -10,6 +10,7 @@ use crate::handlers;
 use crate::handlers::agents::{AgentLinkResponse, LinkAgentRequest};
 use crate::handlers::billing::PurchaseCreditsRequestWithOrg;
 use crate::handlers::health::HealthResponse;
+use crate::handlers::ponder::{ChainSyncStatus, PonderStatusError, PonderStatusResponse};
 use crate::models;
 
 /// OpenAPI documentation for the AgentAuri API
@@ -46,7 +47,8 @@ use crate::models;
         (name = "Circuit Breaker", description = "Circuit breaker state and configuration"),
         (name = "Agents", description = "On-chain agent linking"),
         (name = "Billing", description = "Credit balance and transactions"),
-        (name = "Discovery", description = "API discovery and metadata")
+        (name = "Discovery", description = "API discovery and metadata"),
+        (name = "Ponder", description = "Blockchain indexer status and metrics")
     ),
     modifiers(&SecurityAddon),
     paths(
@@ -117,6 +119,9 @@ use crate::models;
         handlers::list_transactions,
         handlers::get_subscription,
         handlers::handle_stripe_webhook,
+        // Ponder
+        handlers::get_ponder_status,
+        handlers::get_ponder_events,
     ),
     components(
         schemas(
@@ -183,6 +188,10 @@ use crate::models;
             models::discovery::AgentCardResponse,
             // Health
             HealthResponse,
+            // Ponder
+            PonderStatusResponse,
+            PonderStatusError,
+            ChainSyncStatus,
         )
     )
 )]

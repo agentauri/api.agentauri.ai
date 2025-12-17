@@ -24,6 +24,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/health", web::get().to(handlers::health_check))
             // OpenAPI JSON endpoint (no auth required - used by Swagger UI)
             .route("/openapi.json", web::get().to(handlers::openapi_json))
+            // Ponder indexer status endpoints (no auth required - for monitoring)
+            .service(
+                web::scope("/ponder")
+                    .route("/status", web::get().to(handlers::get_ponder_status))
+                    .route("/events", web::get().to(handlers::get_ponder_events)),
+            )
             // Authentication endpoints (no auth required)
             .service(
                 web::scope("/auth")

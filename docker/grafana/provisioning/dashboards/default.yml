@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: 'AgentAuri Dashboards'
+    orgId: 1
+    folder: 'AgentAuri'
+    folderUid: agentauri
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

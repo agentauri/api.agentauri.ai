@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
-**Last Updated**: December 4, 2025
+**Last Updated**: December 17, 2025
 **Phase**: Phase 4 Complete (REST Worker + Circuit Breaker + Agent Discovery)
 
 This index provides a comprehensive overview of all project documentation organized by category.
@@ -91,6 +91,10 @@ This index provides a comprehensive overview of all project documentation organi
 
 - **[../rust-backend/crates/api-gateway/API_DOCUMENTATION.md](../rust-backend/crates/api-gateway/API_DOCUMENTATION.md)** - Complete REST API reference
 - **[examples/trigger-examples.md](examples/trigger-examples.md)** - Trigger configuration examples
+
+### Ponder Indexer Endpoints
+- `GET /api/v1/ponder/status` - Blockchain indexer sync status (per chain)
+- `GET /api/v1/ponder/events` - Event statistics by chain and type
 
 ---
 
@@ -182,8 +186,14 @@ Historical reports, completed work, and superseded documents:
 - **Component READMEs**: 7 files
 - **Archived Documents**: 6 files
 
-**Last Comprehensive Audit**: December 4, 2025 (Phase 4 Complete)
+**Last Comprehensive Audit**: December 17, 2025 (Phase 4 Complete)
 **Recent Improvement Actions**:
+- December 17, 2025:
+  - Added Ponder indexer status endpoints (`/api/v1/ponder/status`, `/api/v1/ponder/events`)
+  - Fixed Ponder status endpoint snake_case column mapping (v1.0.12)
+  - Added monitoring token bypass for rate limiting
+  - Updated API_DOCUMENTATION.md with Ponder endpoints
+  - Updated CLAUDE.md with Ponder API reference
 - December 4, 2025:
   - Marked Week 15 as complete in CLAUDE.md (REST Worker, Circuit Breaker, Agent Discovery)
   - Archived FRONTEND_PRD.md and ROADMAP.md (superseded documents)
@@ -229,6 +239,17 @@ grep -r "POST /api/v1" docs/
 - Security: `docs/security/`
 - Protocols: `docs/protocols/`
 - API Reference: `rust-backend/crates/api-gateway/API_DOCUMENTATION.md`
+
+---
+
+## 🔗 External References
+
+Standards and protocols used in this project:
+
+- **[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)** - Agent Economy Token Standard
+- **[x402 Protocol](https://www.x402.org)** - HTTP-native cryptocurrency payments (v2 specification)
+- **[MCP Specification](https://modelcontextprotocol.io/docs)** - Model Context Protocol for AI agents
+- **[CAIP Standards](https://github.com/ChainAgnostic/CAIPs)** - Chain Agnostic Improvement Proposals
 
 ---
 

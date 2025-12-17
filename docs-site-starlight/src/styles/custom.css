@@ -1,0 +1,25 @@
+/* AgentAuri custom theme - Green accent */
+:root {
+  --sl-color-accent-low: #0d4d0d;
+  --sl-color-accent: #33FF33;
+  --sl-color-accent-high: #66FF66;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #eeeeee;
+  --sl-color-gray-2: #c2c2c2;
+  --sl-color-gray-3: #8b8b8b;
+  --sl-color-gray-4: #585858;
+  --sl-color-gray-5: #383838;
+  --sl-color-gray-6: #272727;
+  --sl-color-black: #181818;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #1a4d1a;
+  --sl-color-accent: #33FF33;
+  --sl-color-accent-high: #66FF66;
+}
+
+/* Logo styling */
+.site-title img {
+  max-height: 2rem;
+}

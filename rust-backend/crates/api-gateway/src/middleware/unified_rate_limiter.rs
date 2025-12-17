@@ -33,6 +33,12 @@
 //!   }
 //! }
 //! ```
+//!
+//! # Monitoring Token Bypass
+//!
+//! Requests with a valid `X-Monitoring-Token` header bypass rate limiting entirely.
+//! This is intended for infrastructure monitoring (Grafana, Prometheus, health checkers).
+//! The token is configured via the `MONITORING_TOKEN` environment variable.
 
 use crate::middleware::{auth_extractor::AuthContext, query_tier::QueryTier};
 use actix_web::{
@@ -42,6 +48,7 @@ use actix_web::{
     Error, HttpMessage,
 };
 use futures_util::future::LocalBoxFuture;
+use once_cell::sync::Lazy;
 use shared::RateLimiter;
 use std::{
     future::{ready, Ready},
@@ -51,6 +58,14 @@ use tracing::{debug, error, warn};
 
 /// Default window size in seconds (1 hour)
 const DEFAULT_WINDOW_SECONDS: i64 = 3600;
+
+/// Monitoring token loaded from environment variable
+/// If set, requests with matching X-Monitoring-Token header bypass rate limiting
+static MONITORING_TOKEN: Lazy<Option<String>> = Lazy::new(|| {
+    std::env::var("MONITORING_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty())
+});
 
 /// Unified rate limiter middleware
 pub struct UnifiedRateLimiter {
@@ -128,6 +143,33 @@ where
         let window_seconds = self.window_seconds;
 
         Box::pin(async move {
+            // Check for monitoring token bypass
+            // If MONITORING_TOKEN is configured and request has matching X-Monitoring-Token header,
+            // bypass rate limiting entirely (for Grafana, Prometheus, health checkers, etc.)
+            if let Some(ref expected_token) = *MONITORING_TOKEN {
+                if let Some(provided_token) = req
+                    .headers()
+                    .get("X-Monitoring-Token")
+                    .and_then(|h| h.to_str().ok())
+                {
+                    if provided_token == expected_token {
+                        debug!("Monitoring token valid - bypassing rate limit");
+                        return service.call(req).await;
+                    }
+                }
+            }
+
+            // Skip rate limiting for health check, metrics, and documentation endpoints
+            // These are called frequently by load balancers, monitoring systems, and Swagger UI
+            let path = req.path();
+            if path == "/api/v1/health"
+                || path == "/metrics"
+                || path == "/api/v1/openapi.json"
+                || path.starts_with("/api-docs")
+            {
+                return service.call(req).await;
+            }
+
             // Extract authentication context (set by AuthExtractor or DualAuth middleware)
             let auth_ctx = match req.extensions().get::<AuthContext>() {
                 Some(ctx) => ctx.clone(),

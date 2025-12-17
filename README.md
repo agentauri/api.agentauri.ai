@@ -18,11 +18,11 @@ Real-time backend infrastructure for monitoring and reacting to ERC-8004 on-chai
 **PULL Layer** (agent-initiated queries):
 - **A2A Protocol** (Google Agent-to-Agent) for async task-based queries
 - **MCP Query Tools** (4 tiers): raw queries, aggregations, analysis, AI-powered insights
-- **Payment System**: Stripe (fiat), x402 (crypto), Credits (prepaid)
+- **Payment System**: Stripe (fiat), [x402](https://www.x402.org) (crypto), Credits (prepaid)
 - **Multi-tenant Account Model** with organizations and role-based access
 
 **Authentication System** (3-layer):
-- **Layer 0**: Anonymous access with x402 micropayments, IP-based rate limiting
+- **Layer 0**: Anonymous access with [x402](https://www.x402.org) micropayments, IP-based rate limiting
 - **Layer 1**: API Key authentication (`sk_live_xxx`), per-plan rate limits
 - **Layer 2**: Wallet signature (EIP-191), agent → account linking
 - **Social Login**: Google and GitHub OAuth 2.0 with automatic account linking
@@ -373,6 +373,7 @@ See `.env.example` for configuration guidelines.
 
 - **ERC-8004 Standard**: https://eips.ethereum.org/EIPS/eip-8004
 - **ERC-8004 Contracts**: https://github.com/erc-8004/erc-8004-contracts
+- **x402 Protocol**: https://www.x402.org (HTTP-native crypto payments)
 - **OASF**: https://github.com/agntcy/oasf
 - **MCP Specification**: https://github.com/modelcontextprotocol/specification
 

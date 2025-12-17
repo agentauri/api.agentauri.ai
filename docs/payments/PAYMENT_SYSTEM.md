@@ -6,8 +6,35 @@ This document describes the payment system architecture for the Pull Layer, enab
 
 The payment system supports three payment methods:
 - **Stripe** (fiat) - Credit/debit cards, subscriptions
-- **x402** (crypto) - HTTP-native cryptocurrency payments
+- **[x402](https://www.x402.org)** (crypto) - HTTP-native cryptocurrency payments (v2 specification)
 - **Credits** - Prepaid balance system
+
+## x402 Protocol Reference
+
+This implementation follows the **x402 v2 specification**.
+
+**Official Documentation**: https://www.x402.org
+**SDK**: [@x402/paywall](https://www.npmjs.com/package/@x402/paywall) (npm)
+**Specification**: https://www.x402.org/writing/x402-v2-launch
+
+### v2 Header Format
+
+x402 v2 uses standard HTTP headers (replacing deprecated `X-*` prefix convention):
+- `PAYMENT-REQUIRED` - Payment amount, currency, and recipient details
+- `PAYMENT-SIGNATURE` - Signed payment proof from client
+- `PAYMENT-RESPONSE` - Server confirmation after payment
+
+### Supported Chains
+
+- **Base** (primary - recommended for low fees)
+- **Ethereum** (mainnet + Sepolia testnet)
+- **Solana** (via x402 SDK)
+- **Polygon** (PoS)
+- **Other EVM L2s** (Arbitrum, Optimism, Linea)
+
+### CAIP Compliance
+
+x402 v2 aligns with [CAIP](https://github.com/ChainAgnostic/CAIPs) (Chain Agnostic Improvement Proposals) for cross-chain interoperability. Future versions will support `SIGN-IN-WITH-X` (CAIP-122) for wallet-controlled sessions.
 
 ## Authentication × Payment Matrix
 
@@ -29,7 +56,7 @@ Anonymous users can only pay via x402 micropayments:
 
 ```http
 GET /api/v1/queries/getAgentProfile?agentId=42
-X-Payment: x402 <payment_proof>
+PAYMENT-SIGNATURE: <payment_proof>
 ```
 
 ### Layer 1: API Key (All Methods)
@@ -268,23 +295,52 @@ sequenceDiagram
 
 ### x402 Payment Flow (Week 18)
 
-1. Agent sends query request with x402 header
-2. Backend validates x402 payment proof
-3. If insufficient, return 402 Payment Required with pricing
-4. Agent sends crypto payment
-5. Backend verifies on-chain
-6. Process query and return result
+1. Agent sends query request
+2. If payment required, server returns `HTTP 402` with `PAYMENT-REQUIRED` header
+3. Agent constructs payment using `@x402/paywall` SDK
+4. Agent retries request with `PAYMENT-SIGNATURE` header
+5. Backend verifies payment on-chain
+6. Process query and return result with `PAYMENT-RESPONSE` header
 
-```
-Request:
+```http
+# Initial Request (no payment)
 POST /api/v1/a2a/rpc
-X-402-Payment: <payment_proof>
+Content-Type: application/json
 
-Response (if payment required):
+# Response (payment required)
 HTTP/1.1 402 Payment Required
-X-402-Price: 0.05 USDC
-X-402-Address: 0x...
-X-402-Chain: base
+PAYMENT-REQUIRED: {
+  "amount": "0.05",
+  "currency": "USDC",
+  "recipient": "0x...",
+  "chain": "base",
+  "validUntil": 1734500000
+}
+
+# Retry with payment proof
+POST /api/v1/a2a/rpc
+Content-Type: application/json
+PAYMENT-SIGNATURE: <signed_payment_proof>
+
+# Success response
+HTTP/1.1 200 OK
+PAYMENT-RESPONSE: {"txHash": "0x...", "status": "confirmed"}
+```
+
+**SDK Integration** (using `@x402/paywall`):
+```typescript
+import { createPaywall } from '@x402/paywall';
+
+const paywall = createPaywall({
+  chain: 'base',
+  currency: 'USDC',
+});
+
+// Automatically handles 402 responses and payment flow
+const response = await paywall.fetch('/api/v1/a2a/rpc', {
+  method: 'POST',
+  body: JSON.stringify({ query: '...' }),
+});
 ```
 
 ### Credit Deduction Flow

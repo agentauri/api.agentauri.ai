@@ -157,6 +157,33 @@ DELETE /api/v1/api-keys/:id           # Revoke
 POST   /api/v1/api-keys/:id/rotate    # Rotate
 ```
 
+### Ponder (Indexer Status)
+```
+GET  /api/v1/ponder/status            # Indexer sync status
+GET  /api/v1/ponder/events            # Event statistics
+```
+
+### Billing
+```
+GET  /api/v1/billing/credits          # Get credit balance
+POST /api/v1/billing/credits/purchase # Purchase credits
+GET  /api/v1/billing/transactions     # List transactions
+GET  /api/v1/billing/subscription     # Get subscription info
+```
+
+### Agents (Wallet Linking)
+```
+POST   /api/v1/agents/link            # Link agent to org
+GET    /api/v1/agents/linked          # List linked agents
+DELETE /api/v1/agents/:id/link        # Unlink agent
+```
+
+### Discovery
+```
+GET  /.well-known/agent.json          # A2A Agent Card
+GET  /.well-known/security.txt        # Security contact
+```
+
 Full API docs: `rust-backend/crates/api-gateway/API_DOCUMENTATION.md`
 
 ## Testing Requirements
