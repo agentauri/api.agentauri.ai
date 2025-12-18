@@ -58,14 +58,23 @@ pub fn evaluate_condition(condition: &TriggerCondition, event: &Event) -> Result
     })
 }
 
+/// Extract string value from JSON for parsing
+fn json_value_as_str(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        other => other.to_string(),
+    }
+}
+
 /// Evaluate agent_id_equals condition
 ///
 /// Matches when event.agent_id equals the condition value
 fn evaluate_agent_id_equals(condition: &TriggerCondition, event: &Event) -> Result<bool> {
-    let target_agent_id: i64 = condition
-        .value
+    let value_str = json_value_as_str(&condition.value);
+    let target_agent_id: i64 = value_str
         .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid agent_id value: {}", condition.value))?;
+        .map_err(|_| anyhow::anyhow!("Invalid agent_id value: {}", value_str))?;
 
     match event.agent_id {
         Some(agent_id) => Ok(agent_id == target_agent_id),
@@ -84,10 +93,10 @@ fn evaluate_agent_id_equals(condition: &TriggerCondition, event: &Event) -> Resu
 /// Compares event.score against the condition value using the operator
 /// Supported operators: <, >, =, <=, >=, !=
 fn evaluate_score_threshold(condition: &TriggerCondition, event: &Event) -> Result<bool> {
-    let threshold: i32 = condition
-        .value
+    let value_str = json_value_as_str(&condition.value);
+    let threshold: i32 = value_str
         .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid score threshold value: {}", condition.value))?;
+        .map_err(|_| anyhow::anyhow!("Invalid score threshold value: {}", value_str))?;
 
     let score = match event.score {
         Some(s) => s,
@@ -375,12 +384,12 @@ mod tests {
         value: &str,
     ) -> TriggerCondition {
         TriggerCondition {
-            id: 1,
+            id: "test-condition-1".to_string(),
             trigger_id: "test-trigger".to_string(),
             condition_type: condition_type.to_string(),
             field: field.to_string(),
             operator: operator.to_string(),
-            value: value.to_string(),
+            value: serde_json::Value::String(value.to_string()),
             config: None,
             created_at: Utc::now(),
         }

@@ -71,12 +71,13 @@ pub struct Trigger {
 /// Trigger condition
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct TriggerCondition {
-    pub id: i32,
+    pub id: String, // TEXT in production (UUID stored as text)
     pub trigger_id: String,
     pub condition_type: String,
     pub field: String,
     pub operator: String,
-    pub value: String,
+    #[sqlx(json)]
+    pub value: serde_json::Value, // JSONB in production
     #[sqlx(json(nullable))]
     pub config: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,

@@ -28,6 +28,15 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use shared::models::{Event, TriggerCondition};
 
+/// Extract string value from JSON for parsing
+fn json_value_as_str(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        other => other.to_string(),
+    }
+}
+
 /// Maximum number of timestamps to store (防止内存爆炸)
 const MAX_TIMESTAMPS: usize = 10_000;
 
@@ -170,10 +179,10 @@ impl RateCounterEvaluator {
         state.window_start = now - self.time_window;
 
         // Extract threshold and operator
-        let threshold = condition
-            .value
+        let value_str = json_value_as_str(&condition.value);
+        let threshold = value_str
             .parse::<u32>()
-            .with_context(|| format!("Invalid threshold value: {}", condition.value))?;
+            .with_context(|| format!("Invalid threshold value: {}", value_str))?;
 
         let operator = condition.operator.as_str();
 
@@ -279,12 +288,12 @@ mod tests {
     /// Create a test condition
     fn create_test_condition(operator: &str, value: &str) -> TriggerCondition {
         TriggerCondition {
-            id: 1,
+            id: "test-condition-1".to_string(),
             trigger_id: "test-trigger".to_string(),
             condition_type: "rate_limit".to_string(),
             field: "event_count".to_string(),
             operator: operator.to_string(),
-            value: value.to_string(),
+            value: serde_json::Value::String(value.to_string()),
             config: Some(serde_json::json!({
                 "time_window": "1h",
                 "reset_on_trigger": false
@@ -749,8 +758,7 @@ mod tests {
         let evaluator = RateCounterEvaluator::from_config(&config).unwrap();
 
         let event = create_test_event(Utc::now().timestamp());
-        let mut condition = create_test_condition(">", "not_a_number");
-        condition.value = "not_a_number".to_string();
+        let condition = create_test_condition(">", "not_a_number");
 
         let result = evaluator.evaluate(&event, &condition, None);
         assert!(result.is_err());

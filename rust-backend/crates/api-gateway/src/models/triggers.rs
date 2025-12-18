@@ -91,7 +91,7 @@ pub struct TriggerDetailResponse {
 /// Condition response
 #[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct ConditionResponse {
-    pub id: i32,
+    pub id: String,
     pub trigger_id: String,
     pub condition_type: String,
     pub field: String,
@@ -103,13 +103,18 @@ pub struct ConditionResponse {
 
 impl From<shared::models::TriggerCondition> for ConditionResponse {
     fn from(condition: shared::models::TriggerCondition) -> Self {
+        // Convert JSON value to string representation for API response
+        let value_str = match &condition.value {
+            serde_json::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        };
         Self {
             id: condition.id,
             trigger_id: condition.trigger_id,
             condition_type: condition.condition_type,
             field: condition.field,
             operator: condition.operator,
-            value: condition.value,
+            value: value_str,
             config: condition.config,
             created_at: condition.created_at,
         }
@@ -340,7 +345,7 @@ mod tests {
     #[test]
     fn test_condition_response_serialization() {
         let response = ConditionResponse {
-            id: 1,
+            id: "condition-1".to_string(),
             trigger_id: "trigger-123".to_string(),
             condition_type: "score_threshold".to_string(),
             field: "score".to_string(),
