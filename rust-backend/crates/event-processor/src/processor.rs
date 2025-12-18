@@ -586,7 +586,7 @@ async fn fetch_trigger_relations(
     }
 
     // Batch fetch all conditions with a single query using ANY($1)
-    let conditions = sqlx::query_as::<_, TriggerCondition>(
+    let conditions = match sqlx::query_as::<_, TriggerCondition>(
         r#"
         SELECT id, trigger_id, condition_type, field, operator, value, config, created_at
         FROM trigger_conditions
@@ -597,10 +597,24 @@ async fn fetch_trigger_relations(
     .bind(trigger_ids)
     .fetch_all(db_pool)
     .await
-    .context("Failed to batch fetch trigger conditions")?;
+    {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!(
+                trigger_ids = ?trigger_ids,
+                error = ?e,
+                error_id = "BATCH_FETCH_CONDITIONS_FAILED",
+                "SQLx error fetching trigger conditions"
+            );
+            return Err(anyhow::anyhow!(
+                "Failed to batch fetch trigger conditions: {:?}",
+                e
+            ));
+        }
+    };
 
     // Batch fetch all actions with a single query using ANY($1)
-    let actions = sqlx::query_as::<_, TriggerAction>(
+    let actions = match sqlx::query_as::<_, TriggerAction>(
         r#"
         SELECT id, trigger_id, action_type, priority, config, created_at
         FROM trigger_actions
@@ -611,7 +625,21 @@ async fn fetch_trigger_relations(
     .bind(trigger_ids)
     .fetch_all(db_pool)
     .await
-    .context("Failed to batch fetch trigger actions")?;
+    {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::error!(
+                trigger_ids = ?trigger_ids,
+                error = ?e,
+                error_id = "BATCH_FETCH_ACTIONS_FAILED",
+                "SQLx error fetching trigger actions"
+            );
+            return Err(anyhow::anyhow!(
+                "Failed to batch fetch trigger actions: {:?}",
+                e
+            ));
+        }
+    };
 
     // Group conditions by trigger_id
     let mut conditions_map: HashMap<String, Vec<TriggerCondition>> = HashMap::new();
