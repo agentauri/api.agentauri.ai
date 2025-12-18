@@ -263,7 +263,9 @@ resource "aws_iam_role_policy" "github_actions_ecs" {
           "ecs:DescribeServices"
         ]
         Resource = [
-          "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/${local.name_prefix}/*"
+          # Allow deployment to both staging and production clusters
+          "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/agentauri-staging/*",
+          "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/agentauri-production/*"
         ]
       },
       {
