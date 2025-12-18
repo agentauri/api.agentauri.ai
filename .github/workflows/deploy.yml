@@ -26,9 +26,9 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: agentauri-backend
   ECS_CLUSTER: agentauri-production
-  ECS_SERVICE_API: agentauri-api-gateway
-  ECS_SERVICE_PROCESSOR: agentauri-event-processor
-  ECS_SERVICE_WORKERS: agentauri-action-workers
+  ECS_SERVICE_API: api-gateway
+  ECS_SERVICE_PROCESSOR: event-processor
+  ECS_SERVICE_WORKERS: action-workers
 
 jobs:
   # ---------------------------------------------------------------------------
