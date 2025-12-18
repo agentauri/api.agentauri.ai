@@ -13,11 +13,12 @@ variable "aws_region" {
 }
 
 variable "environment" {
-  description = "Environment name (staging, production)"
+  description = "Environment name"
   type        = string
+  default     = "production"
   validation {
-    condition     = contains(["staging", "production"], var.environment)
-    error_message = "Environment must be 'staging' or 'production'."
+    condition     = var.environment == "production"
+    error_message = "Only 'production' environment is supported."
   }
 }
 
@@ -114,7 +115,7 @@ variable "ponder_indexer_image_tag" {
 }
 
 variable "ponder_indexer_enabled" {
-  description = "Enable Ponder Indexer deployment. Set to true only in ONE workspace (staging) since Ponder indexes public blockchain data that is shared across all environments."
+  description = "Enable Ponder Indexer deployment. Ponder indexes public blockchain data."
   type        = bool
   default     = false
 }

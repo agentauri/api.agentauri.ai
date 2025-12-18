@@ -837,7 +837,7 @@ See [Authentication Documentation](../docs/auth/AUTHENTICATION.md) for details.
 **Deliverables**:
 - GitHub Actions workflows for CI
 - Automated testing on PR
-- Deployment pipelines for staging and production
+- Deployment pipelines for production and production
 - Docker images for all services
 
 **Subagents**:
@@ -845,7 +845,7 @@ See [Authentication Documentation](../docs/auth/AUTHENTICATION.md) for details.
 
 **Tasks**:
 1. Create .github/workflows/ci.yml (Rust tests, TypeScript tests, linting)
-2. Create .github/workflows/deploy.yml (build Docker images, deploy to staging/prod)
+2. Create .github/workflows/deploy.yml (build Docker images, deploy to production/prod)
 3. Set up Docker Hub or GitHub Container Registry
 4. Create production Dockerfiles (optimized, multi-stage builds)
 5. Implement deployment scripts

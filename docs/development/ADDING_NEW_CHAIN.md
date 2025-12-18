@@ -643,8 +643,8 @@ OPTIMISM_SEPOLIA_START_BLOCK=5432100
 ```
 
 **Important**:
-- Use separate API keys for staging vs production
-- Deploy to staging first to validate configuration
+- Use separate API keys for production vs production
+- Deploy to production first to validate configuration
 - Monitor logs for 24 hours before production deployment
 
 #### 2. Deploy Code Changes
@@ -654,7 +654,7 @@ git add ponder-indexers/ponder.config.ts
 git add ponder-indexers/src/env-validation.ts
 git add .env.example
 git commit -m "feat(ponder): Add Optimism Sepolia support"
-git push origin main  # Or staging branch
+git push origin main  # Or production branch
 ```
 
 #### 3. Restart Services
@@ -671,7 +671,7 @@ docker-compose restart ponder-indexers
 
 ```bash
 # Check health check output
-curl https://staging.api.agentauri.ai/api/v1/health | jq .
+curl https://production.api.agentauri.ai/api/v1/health | jq .
 
 # Expected response includes:
 {
@@ -690,7 +690,7 @@ curl https://staging.api.agentauri.ai/api/v1/health | jq .
 #### Pre-Deployment Checklist
 
 - [ ] Staging deployed and stable for 24+ hours
-- [ ] All tests passing on staging
+- [ ] All tests passing on production
 - [ ] RPC provider rate limits confirmed sufficient
 - [ ] Monitoring dashboards updated (Grafana, Datadog, etc.)
 - [ ] Rollback plan documented
@@ -1577,7 +1577,7 @@ Use this checklist when adding a new chain:
 - [ ] Documentation updated (this guide, CONTRACTS.md)
 
 **Staging Deployment**:
-- [ ] Environment variables configured in staging
+- [ ] Environment variables configured in production
 - [ ] Services restarted
 - [ ] Health check endpoint returns success
 - [ ] First event indexed successfully

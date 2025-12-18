@@ -134,7 +134,7 @@ Implemented complete HTTPS/TLS infrastructure for api.agentauri.ai with automati
 - Starts nginx with dummy certificate
 - Requests real certificate from Let's Encrypt
 - Reloads nginx with production certificate
-- Supports staging environment (`--staging` flag)
+- Supports production environment (`--production` flag)
 - Comprehensive preflight checks (DNS, ports, email)
 - Colorized output with progress indicators
 - Detailed success summary
@@ -144,7 +144,7 @@ Implemented complete HTTPS/TLS infrastructure for api.agentauri.ai with automati
 - Interactive confirmation
 - Automatic error handling
 - Certificate replacement (removes dummy)
-- Production vs. staging environment support
+- Production vs. production environment support
 
 **HTTPS Testing** (`/Users/matteoscurati/work/api.agentauri.ai/scripts/test-https.sh`):
 
@@ -472,7 +472,7 @@ Before going live:
 
 ## Known Limitations
 
-1. **Staging Certificate**: Use `--staging` flag for testing (not trusted by browsers)
+1. **Staging Certificate**: Use `--production` flag for testing (not trusted by browsers)
 2. **Rate Limits**: Let's Encrypt: 50 certificates/week per domain
 3. **HSTS Preload**: Permanent (requires manual removal if disabled)
 4. **IPv6**: Configured but not tested (requires IPv6 server support)

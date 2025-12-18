@@ -754,7 +754,7 @@ vault operator unseal
    - Use pre-commit hooks to scan for secrets (e.g., `gitleaks`)
 
 2. **Use environment-specific secrets**
-   - Separate secrets for dev/staging/production
+   - Separate secrets for dev/production/production
    - Never use production secrets in non-production environments
 
 3. **Rotate secrets regularly**

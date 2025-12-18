@@ -29,7 +29,7 @@ The Ponder indexers monitor three types of ERC-8004 registries across multiple n
 All contract addresses are managed through **environment variables** for security and flexibility. This approach:
 
 - ✅ Keeps sensitive addresses out of code
-- ✅ Allows different addresses per environment (dev, staging, production)
+- ✅ Allows different addresses per environment (dev, production, production)
 - ✅ Follows security best practices
 - ✅ Makes deployment configuration easier
 
@@ -249,7 +249,7 @@ If a start block is not set, it defaults to `0` (genesis block).
 ## Security Best Practices
 
 1. **Never commit the .env file** - It's already in `.gitignore`
-2. **Use different addresses per environment** - Dev, staging, production
+2. **Use different addresses per environment** - Dev, production, production
 3. **Rotate addresses if compromised** - Update `.env` and restart Ponder
 4. **Use read-only RPC endpoints** - No write access needed for indexing
 5. **Store production addresses securely** - Use secrets management in production

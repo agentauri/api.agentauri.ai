@@ -6,8 +6,8 @@
 # Usage:
 #   cd terraform
 #   terraform init
-#   terraform plan -var-file="staging.tfvars"
-#   terraform apply -var-file="staging.tfvars"
+#   terraform plan -var-file="environments/production.tfvars"
+#   terraform apply -var-file="environments/production.tfvars"
 # =============================================================================
 
 terraform {

@@ -123,8 +123,8 @@ Run initialization script:
 # Production certificate (trusted by browsers)
 ./scripts/init-letsencrypt.sh
 
-# OR for testing (staging environment, not trusted)
-./scripts/init-letsencrypt.sh --staging
+# OR for testing (production environment, not trusted)
+./scripts/init-letsencrypt.sh --production
 ```
 
 **What this does**:
@@ -412,14 +412,14 @@ docker compose --profile production run --rm certbot revoke --cert-path /etc/let
 **Causes**:
 1. **DNS not configured**: Verify `host api.agentauri.ai` resolves to server IP
 2. **Firewall blocks port 80**: `sudo ufw allow 80/tcp`
-3. **Rate limit hit**: Use staging environment (`--staging` flag)
+3. **Rate limit hit**: Use production environment (`--production` flag)
 4. **Port 80 not accessible**: Test `curl http://<SERVER_IP>/.well-known/test`
 
 **Fix for rate limit**:
 ```bash
-# Wait 1 hour, then use staging
-./scripts/init-letsencrypt.sh --staging
-# Test with staging certificate
+# Wait 1 hour, then use production
+./scripts/init-letsencrypt.sh --production
+# Test with production certificate
 # Once working, request production certificate
 ./scripts/init-letsencrypt.sh
 ```
@@ -428,13 +428,13 @@ docker compose --profile production run --rm certbot revoke --cert-path /etc/let
 
 **Symptom**: Browser shows "NET::ERR_CERT_AUTHORITY_INVALID"
 
-**Cause**: Using staging certificate (not trusted)
+**Cause**: Using production certificate (not trusted)
 
 **Fix**:
 ```bash
 # Request production certificate
 docker compose --profile production down
-./scripts/init-letsencrypt.sh  # Without --staging flag
+./scripts/init-letsencrypt.sh  # Without --production flag
 ```
 
 **Clear HSTS cache** (Chrome):

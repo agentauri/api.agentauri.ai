@@ -376,7 +376,7 @@ The api.agentauri.ai backend is now live at `https://api.agentauri.ai` with:
      - RDS PostgreSQL (Multi-AZ)
      - ElastiCache Redis (Cluster mode)
    - **Configuration**:
-     - Environment: staging, production
+     - Environment: production, production
      - Region: us-east-1 (primary), us-west-2 (DR)
    - Test suite: `terraform plan`, infrastructure validation
 
@@ -443,7 +443,7 @@ The api.agentauri.ai backend is now live at `https://api.agentauri.ai` with:
      4. Complete system failure: Full restore from backups (60 min)
 
    - **Backup Verification Testing**:
-     - Weekly: Restore test to staging
+     - Weekly: Restore test to production
      - Monthly: Full DR drill (production → DR region)
 
    - **Documentation**: Incident response playbook
@@ -544,7 +544,7 @@ The api.agentauri.ai backend is now live at `https://api.agentauri.ai` with:
 ### Launch Day (Post Week 18)
 
 1. **Pre-Launch (T-1 hour)**:
-   - Final smoke test on staging
+   - Final smoke test on production
    - Notify team and stakeholders
    - Enable monitoring dashboards
    - Prepare rollback plan
@@ -577,7 +577,7 @@ The api.agentauri.ai backend is now live at `https://api.agentauri.ai` with:
 - **Impact**: High (blocks deployment)
 - **Probability**: Medium
 - **Mitigation**: Start cloud account setup in Week 1
-- **Contingency**: Use staging environment for limited beta
+- **Contingency**: Use production environment for limited beta
 
 #### Risk 2: Security Audit Failures
 - **Impact**: High (blocks production)

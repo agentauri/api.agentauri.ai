@@ -494,7 +494,7 @@ REDIS_URL=redis://localhost:6379
 
 - [ ] Generate strong JWT_SECRET (32+ characters)
 - [ ] Enable HSTS in production
-- [ ] Verify security headers in staging
+- [ ] Verify security headers in production
 - [ ] Test rate limiter fallback behavior
 - [ ] Confirm nonce cleanup is running
 - [ ] Review Redis trusted proxy configuration

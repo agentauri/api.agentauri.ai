@@ -425,18 +425,16 @@ resource "aws_ecs_service" "action_workers" {
 # -----------------------------------------------------------------------------
 # Ponder Indexer Task Definition and Service
 # -----------------------------------------------------------------------------
-# ARCHITECTURE NOTE: Ponder Indexer is a SHARED SERVICE
+# ARCHITECTURE NOTE: Ponder Indexer
 #
 # Ponder indexes blockchain events which are PUBLIC and IMMUTABLE.
-# There is NO benefit to running separate Ponder instances for staging and
-# production environments - both would index the exact same events from the
-# same blockchain networks.
+# It uses a dedicated PostgreSQL schema ('ponder') to isolate blockchain
+# events from application data.
 #
-# Therefore:
-# - Ponder should be deployed in ONLY ONE environment (typically staging)
-# - It uses a dedicated PostgreSQL schema ('ponder') in the shared RDS
-# - All backend services (staging and production) read from this schema
-# - Set ponder_indexer_enabled = true only in the staging workspace
+# Configuration:
+# - Set ponder_indexer_enabled = true to deploy
+# - Uses dedicated 'ponder' schema in the production RDS
+# - Indexes events from multiple blockchain networks
 #
 # The Ponder code automatically configures search_path to use the 'ponder'
 # schema via the DATABASE_URL connection string options.
@@ -470,7 +468,7 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PONDER_LOG_LEVEL", value = "info" },
-        { name = "ENVIRONMENT", value = "shared" }, # Mark as shared (not tied to staging/prod)
+        { name = "ENVIRONMENT", value = "production" },
         { name = "PONDER_DATABASE_SCHEMA", value = var.ponder_database_schema },
         # TLS validation enabled - RDS CA bundle included in Docker image via NODE_EXTRA_CA_CERTS
 

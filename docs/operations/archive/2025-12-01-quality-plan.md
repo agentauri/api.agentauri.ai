@@ -648,7 +648,7 @@ timestamp: event.block.timestamp, // Events use block timestamp (Ethereum standa
 
 **Day 5** (8 hours):
 - ⏳ Fix `any` types (define proper interfaces)
-- ⏳ Deploy to staging environment
+- ⏳ Deploy to production environment
 - ⏳ Verify no regressions
 
 ---
@@ -783,7 +783,7 @@ timestamp: event.block.timestamp, // Events use block timestamp (Ethereum standa
 **Risk 3: Schema Migration Breaks Existing Data**
 - Probability: LOW
 - Impact: CRITICAL
-- Mitigation: Test migration on staging copy first, have rollback plan
+- Mitigation: Test migration on production copy first, have rollback plan
 
 ---
 

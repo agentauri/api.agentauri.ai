@@ -27,7 +27,7 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
 
 5. **RPC Provider API Keys**
    - Alchemy, Infura, QuickNode, Ankr API keys
-   - Store per environment (staging/production)
+   - Store per environment (production/production)
 
 ## Option 1: AWS Secrets Manager
 
@@ -318,7 +318,7 @@ This guide explains how to integrate AWS Secrets Manager or HashiCorp Vault for 
    }
    ```
 
-2. **Integration Tests** (staging environment):
+2. **Integration Tests** (production environment):
    ```bash
    # Test secret loading
    ENABLE_SECRETS_MANAGER=true cargo test --test secrets_integration

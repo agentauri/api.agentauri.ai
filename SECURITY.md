@@ -184,7 +184,7 @@ The following security best practices are already implemented:
 
 ### ✅ Configuration Management
 - Passwords required (not optional) for all services
-- Clear separation of dev/staging/prod configs
+- Clear separation of dev/production/prod configs
 - Strong password generation instructions
 
 ---

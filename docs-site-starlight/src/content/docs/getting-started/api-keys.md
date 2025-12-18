@@ -130,7 +130,7 @@ All API key operations are logged:
 
 ### Best Practices
 
-1. **Use separate keys per environment** - Don't share keys between dev/staging/production
+1. **Use separate keys per environment** - Don't share keys between dev/production/production
 2. **Scope minimally** - Only grant permissions the integration needs
 3. **Rotate quarterly** - Or immediately if compromised
 4. **Monitor usage** - Check `last_used_at` for inactive keys

@@ -944,7 +944,7 @@ if (!isAddress(event.args.owner)) {
 
 2. **Create Database Indexes** (1 hour)
    - Create SQL migration for Event table indexes
-   - Run migration on staging environment
+   - Run migration on production environment
    - Verify query performance improvement
 
 3. **Verify Transaction Handling** (2 hours)

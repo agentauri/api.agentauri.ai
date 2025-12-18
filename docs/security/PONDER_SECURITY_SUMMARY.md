@@ -269,7 +269,7 @@ pnpm test
 4. **Week 3** (Days 11-15):
    - Final production hardening
    - Complete testing
-   - Deploy to staging
+   - Deploy to production
    - Production deployment
 
 ---

@@ -167,8 +167,8 @@ sudo ufw status
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
-# Use staging environment (testing)
-./scripts/init-letsencrypt.sh --staging
+# Use production environment (testing)
+./scripts/init-letsencrypt.sh --production
 
 # Check certbot logs
 docker compose --profile production logs certbot

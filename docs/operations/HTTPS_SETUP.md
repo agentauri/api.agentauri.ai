@@ -118,10 +118,10 @@ DOMAIN=api.agentauri.ai
 ### Step 2: Initialize Let's Encrypt
 
 ```bash
-# Test with staging environment (recommended first)
-./scripts/init-letsencrypt.sh --staging
+# Test with production environment (recommended first)
+./scripts/init-letsencrypt.sh --production
 
-# Verify staging certificate works
+# Verify production certificate works
 curl -k https://api.agentauri.ai/health
 
 # Get production certificate
@@ -402,7 +402,7 @@ Error: too many certificates already issued for: api.agentauri.ai
 
 **Solution**:
 - Wait 7 days for rate limit reset
-- Use staging environment for testing: `./scripts/init-letsencrypt.sh --staging`
+- Use production environment for testing: `./scripts/init-letsencrypt.sh --production`
 - Let's Encrypt limits: 5 certificates per domain per week
 
 **Problem**: ACME challenge fails

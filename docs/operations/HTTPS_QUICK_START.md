@@ -53,8 +53,8 @@ DOMAIN=api.agentauri.ai
 
 ### 3. Initialize Let's Encrypt
 ```bash
-# Test with staging first (recommended)
-./scripts/init-letsencrypt.sh --staging
+# Test with production first (recommended)
+./scripts/init-letsencrypt.sh --production
 
 # Get production certificate
 ./scripts/init-letsencrypt.sh

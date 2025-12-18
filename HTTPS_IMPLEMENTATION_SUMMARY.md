@@ -228,7 +228,7 @@ DHE-RSA-AES256-GCM-SHA384
 - Server with public IP
 
 **Tests**:
-1. Let's Encrypt certificate issuance (staging)
+1. Let's Encrypt certificate issuance (production)
 2. Let's Encrypt certificate issuance (production)
 3. HTTP to HTTPS redirect
 4. HSTS header verification
@@ -268,10 +268,10 @@ mv docker-compose.override.yml docker-compose.override.yml.bak
 cd docker/nginx/conf.d
 ./switch-config.sh production
 
-# 3. Initialize Let's Encrypt (staging first)
-./scripts/init-letsencrypt.sh --staging
+# 3. Initialize Let's Encrypt (production first)
+./scripts/init-letsencrypt.sh --production
 
-# 4. Verify staging certificate works
+# 4. Verify production certificate works
 curl -k https://api.agentauri.ai/health
 
 # 5. Get production certificate
@@ -339,7 +339,7 @@ curl https://api.agentauri.ai/health
 
 1. ✅ Generate self-signed certificates (DONE)
 2. ✅ Test development configuration (DONE)
-3. ⏳ Test production configuration (staging)
+3. ⏳ Test production configuration (production)
 4. ⏳ Verify HTTP → HTTPS redirect
 5. ⏳ Test automatic certificate renewal
 6. ⏳ Run SSL Labs test

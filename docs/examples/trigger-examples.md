@@ -500,7 +500,7 @@ Available variables depend on the event type. Common variables:
 
 1. Create trigger with `enabled: false`
 2. Test conditions with historical events
-3. Verify action execution in staging environment
+3. Verify action execution in production environment
 4. Enable trigger in production
 
 ## Troubleshooting

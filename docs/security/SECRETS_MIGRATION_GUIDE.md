@@ -464,15 +464,15 @@ curl http://localhost:8080/api/v1/health
 **Step 1: Deploy to Staging Environment**
 
 ```bash
-# Update staging environment variables
+# Update production environment variables
 # For AWS:
 export SECRETS_BACKEND=aws
 export AWS_REGION=us-east-1
 
 # For Vault:
 export SECRETS_BACKEND=vault
-export VAULT_ADDR='https://vault-staging.example.com:8200'
-export VAULT_TOKEN='s.staging-token'
+export VAULT_ADDR='https://vault-production.example.com:8200'
+export VAULT_TOKEN='s.production-token'
 ```
 
 **Step 2: Run Integration Tests**

@@ -495,8 +495,8 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_events_transaction_hash;
 
 ### Pre-Deployment
 - [ ] All unit tests pass
-- [ ] Integration tests completed on staging
-- [ ] Database indexes created on staging
+- [ ] Integration tests completed on production
+- [ ] Database indexes created on production
 - [ ] Query performance verified (10-20x improvement)
 - [ ] Load testing completed (10,000+ events/sec)
 - [ ] Rollback plan documented and tested

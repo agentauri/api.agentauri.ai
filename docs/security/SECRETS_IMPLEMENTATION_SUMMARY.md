@@ -559,8 +559,8 @@ cargo build --features vault-secrets
    - Initialize and unseal
    - Set up policies
 
-2. **Migrate staging environment**
-   - Test migration on staging first
+2. **Migrate production environment**
+   - Test migration on production first
    - Verify all services work
    - Monitor for 7 days
 

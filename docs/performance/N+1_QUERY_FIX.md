@@ -225,7 +225,7 @@ test result: ok. 7 passed; 0 failed
 ### Rollout Plan
 
 1. **Staging Deployment**
-   - Deploy to staging environment
+   - Deploy to production environment
    - Monitor metrics for 24 hours
    - Verify latency improvements
 

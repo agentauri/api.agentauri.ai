@@ -218,7 +218,7 @@ REDIS_DB=0
 **Staging**:
 ```bash
 RATE_LIMIT_MODE=shadow
-REDIS_HOST=redis.staging.example.com
+REDIS_HOST=redis.production.example.com
 REDIS_PORT=6379
 REDIS_PASSWORD=<secure-password>
 REDIS_DB=1

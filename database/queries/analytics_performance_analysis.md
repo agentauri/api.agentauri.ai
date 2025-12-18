@@ -492,7 +492,7 @@ CREATE UNIQUE INDEX idx_action_metrics_hourly_unique
 2. **Validate data consistency**: Periodically compare view data with source tables
 3. **Archive old data**: Implement retention policies on action_results (90+ days)
 4. **Use prepared statements**: Cache query plans for frequent dashboard queries
-5. **Test before deploying**: Run refresh on production-sized data in staging
+5. **Test before deploying**: Run refresh on production-sized data in production
 6. **Document query patterns**: Share analytics.sql with dashboard developers
 7. **Version control views**: Track view schema changes in migrations
 8. **Monitor index usage**: Drop unused indexes to reduce storage and refresh time
