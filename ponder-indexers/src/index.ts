@@ -59,10 +59,9 @@ ponder.on("IdentityRegistryLineaSepolia:Registered", async ({ event, context }) 
   await handleRegistered(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// PolygonAmoy handlers commented out (RPC not configured)
-// ponder.on("IdentityRegistryPolygonAmoy:Registered", async ({ event, context }) => {
-//   await handleRegistered(event, context, CHAIN_IDS.POLYGON_AMOY);
-// });
+ponder.on("IdentityRegistryPolygonAmoy:Registered", async ({ event, context }) => {
+  await handleRegistered(event, context, CHAIN_IDS.POLYGON_AMOY);
+});
 
 async function handleRegistered(event: RegisteredEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -103,9 +102,9 @@ ponder.on("IdentityRegistryLineaSepolia:MetadataSet", async ({ event, context })
   await handleMetadataSet(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("IdentityRegistryPolygonAmoy:MetadataSet", async ({ event, context }) => {
-//   await handleMetadataSet(event, context, CHAIN_IDS.POLYGON_AMOY);
-// });
+ponder.on("IdentityRegistryPolygonAmoy:MetadataSet", async ({ event, context }) => {
+  await handleMetadataSet(event, context, CHAIN_IDS.POLYGON_AMOY);
+});
 
 async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -228,9 +227,9 @@ ponder.on("ReputationRegistryLineaSepolia:NewFeedback", async ({ event, context 
   await handleNewFeedback(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ReputationRegistryPolygonAmoy:NewFeedback", async ({ event, context }) => {
-//   await handleNewFeedback(event, context, CHAIN_IDS.POLYGON_AMOY);
-// });
+ponder.on("ReputationRegistryPolygonAmoy:NewFeedback", async ({ event, context }) => {
+  await handleNewFeedback(event, context, CHAIN_IDS.POLYGON_AMOY);
+});
 
 async function handleNewFeedback(event: NewFeedbackEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -363,9 +362,9 @@ ponder.on("ValidationRegistryLineaSepolia:ValidationResponse", async ({ event, c
   await handleValidationResponse(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ValidationRegistryPolygonAmoy:ValidationResponse", async ({ event, context }) => {
-//   await handleValidationResponse(event, context, CHAIN_IDS.POLYGON_AMOY);
-// });
+ponder.on("ValidationRegistryPolygonAmoy:ValidationResponse", async ({ event, context }) => {
+  await handleValidationResponse(event, context, CHAIN_IDS.POLYGON_AMOY);
+});
 
 async function handleValidationResponse(event: ValidationResponseEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -410,9 +409,9 @@ ponder.on("ValidationRegistryLineaSepolia:ValidationRequest", async ({ event, co
   await handleValidationRequest(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
-// ponder.on("ValidationRegistryPolygonAmoy:ValidationRequest", async ({ event, context }) => {
-//   await handleValidationRequest(event, context, CHAIN_IDS.POLYGON_AMOY);
-// });
+ponder.on("ValidationRegistryPolygonAmoy:ValidationRequest", async ({ event, context }) => {
+  await handleValidationRequest(event, context, CHAIN_IDS.POLYGON_AMOY);
+});
 
 async function handleValidationRequest(event: ValidationRequestEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {

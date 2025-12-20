@@ -47,9 +47,9 @@ COPY --from=deps /app/ponder-indexers/node_modules ./ponder-indexers/node_module
 # Copy ponder-indexers source files
 COPY ponder-indexers ./ponder-indexers
 
-# Generate Ponder types (Ponder compiles on start, no separate build step needed)
+# Skip codegen - Ponder 0.7.x compiles TypeScript at runtime
+# This avoids requiring RPC connections at build time
 WORKDIR /app/ponder-indexers
-RUN pnpm codegen
 
 # -----------------------------------------------------------------------------
 # Stage 3: Production
