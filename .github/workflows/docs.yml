@@ -108,18 +108,51 @@ jobs:
           name: docs-build
           path: dist
 
-      - name: Sync to S3
+      - name: Sync to S3 with correct MIME types
         run: |
+          # Sync HTML files
           aws s3 sync dist s3://${{ env.S3_BUCKET }} \
             --delete \
+            --exclude "*" \
+            --include "*.html" \
+            --content-type "text/html; charset=utf-8" \
             --cache-control "public, max-age=3600"
 
-      - name: Set cache headers for static assets
-        run: |
-          # Long cache for static assets (CSS, JS, images)
-          aws s3 cp s3://${{ env.S3_BUCKET }}/_astro/ s3://${{ env.S3_BUCKET }}/_astro/ \
-            --recursive \
-            --metadata-directive REPLACE \
+          # Sync CSS files
+          aws s3 sync dist s3://${{ env.S3_BUCKET }} \
+            --exclude "*" \
+            --include "*.css" \
+            --content-type "text/css; charset=utf-8" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # Sync JS files
+          aws s3 sync dist s3://${{ env.S3_BUCKET }} \
+            --exclude "*" \
+            --include "*.js" \
+            --content-type "application/javascript; charset=utf-8" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # Sync SVG files
+          aws s3 sync dist s3://${{ env.S3_BUCKET }} \
+            --exclude "*" \
+            --include "*.svg" \
+            --content-type "image/svg+xml" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # Sync JSON files
+          aws s3 sync dist s3://${{ env.S3_BUCKET }} \
+            --exclude "*" \
+            --include "*.json" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, max-age=3600"
+
+          # Sync remaining files (images, fonts, etc.)
+          aws s3 sync dist s3://${{ env.S3_BUCKET }} \
+            --exclude "*.html" \
+            --exclude "*.css" \
+            --exclude "*.js" \
+            --exclude "*.svg" \
+            --exclude "*.json" \
             --cache-control "public, max-age=31536000, immutable"
 
       - name: Invalidate CloudFront cache
