@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 mod consumer;
 mod dlq;
 mod error;
+mod mcp;
 mod metrics;
 mod rate_limiter;
 mod rest;
@@ -24,12 +25,13 @@ mod workers;
 
 use consumer::{JobConsumer, RedisJobConsumer};
 use dlq::RedisDlq;
+use mcp::HttpMcpClient;
 use rate_limiter::TelegramRateLimiter;
 use rest::ReqwestHttpClient;
 use result_logger::PostgresResultLogger;
 use retry::RetryPolicy;
 use telegram::TeloxideTelegramClient;
-use workers::{RestWorker, TelegramWorker};
+use workers::{McpWorker, RestWorker, TelegramWorker};
 
 /// Number of concurrent workers
 const NUM_WORKERS: usize = 5;
@@ -98,6 +100,10 @@ async fn main() -> Result<()> {
     let http_client = Arc::new(ReqwestHttpClient::new().context("Failed to create HTTP client")?);
     tracing::info!("HTTP client initialized for REST worker");
 
+    // Create MCP client
+    let mcp_client = Arc::new(HttpMcpClient::new().context("Failed to create MCP client")?);
+    tracing::info!("MCP client initialized for MCP worker");
+
     // Cancellation token for graceful shutdown
     let cancel_token = CancellationToken::new();
 
@@ -125,7 +131,15 @@ async fn main() -> Result<()> {
     );
 
     // Create REST worker
-    let rest_worker = RestWorker::new(http_client, logger, dlq, RetryPolicy::default());
+    let rest_worker = RestWorker::new(
+        http_client,
+        logger.clone(),
+        dlq.clone(),
+        RetryPolicy::default(),
+    );
+
+    // Create MCP worker
+    let mcp_worker = McpWorker::new(mcp_client, logger, dlq, RetryPolicy::default());
 
     // Spawn worker pool
     let mut handles = Vec::new();
@@ -135,10 +149,19 @@ async fn main() -> Result<()> {
         let consumer = consumer.clone();
         let telegram_worker = telegram_worker.clone();
         let rest_worker = rest_worker.clone();
+        let mcp_worker = mcp_worker.clone();
         let token = cancel_token.clone();
 
         let handle = tokio::spawn(async move {
-            run_worker(worker_id, consumer, telegram_worker, rest_worker, token).await;
+            run_worker(
+                worker_id,
+                consumer,
+                telegram_worker,
+                rest_worker,
+                mcp_worker,
+                token,
+            )
+            .await;
         });
         handles.push(handle);
     }
@@ -167,11 +190,12 @@ async fn main() -> Result<()> {
 }
 
 /// Run a single worker that consumes jobs from the queue
-async fn run_worker<C, T, L1, D1, R, H, L2, D2>(
+async fn run_worker<C, T, L1, D1, R, H, L2, D2, M, L3, D3>(
     worker_id: usize,
     consumer: Arc<C>,
     telegram_worker: TelegramWorker<T, L1, D1, R>,
     rest_worker: RestWorker<H, L2, D2>,
+    mcp_worker: McpWorker<M, L3, D3>,
     cancel_token: CancellationToken,
 ) where
     C: JobConsumer,
@@ -182,6 +206,9 @@ async fn run_worker<C, T, L1, D1, R, H, L2, D2>(
     H: rest::HttpClient + 'static,
     L2: result_logger::ResultLogger + 'static,
     D2: dlq::DeadLetterQueue + 'static,
+    M: mcp::McpClient + 'static,
+    L3: result_logger::ResultLogger + 'static,
+    D3: dlq::DeadLetterQueue + 'static,
 {
     tracing::info!(worker_id = worker_id, "Worker started");
 
@@ -222,12 +249,14 @@ async fn run_worker<C, T, L1, D1, R, H, L2, D2>(
                                 }
                             }
                             ActionType::Mcp => {
-                                tracing::debug!(
-                                    worker_id = worker_id,
-                                    job_id = %job.id,
-                                    "Skipping MCP job (not implemented yet)"
-                                );
-                                // TODO: Implement MCP worker in Phase 5
+                                if let Err(e) = mcp_worker.process(&job, &event_data).await {
+                                    tracing::error!(
+                                        worker_id = worker_id,
+                                        job_id = %job.id,
+                                        error = %e,
+                                        "MCP job processing failed (already moved to DLQ)"
+                                    );
+                                }
                             }
                         }
                     }

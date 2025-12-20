@@ -15,6 +15,10 @@ pub enum WorkerError {
     #[error("Telegram API error: {0}")]
     TelegramApi(String),
 
+    /// MCP API error
+    #[error("MCP API error: {0}")]
+    McpApi(String),
+
     /// Rate limit exceeded
     #[error("Rate limit exceeded: {0}")]
     RateLimitExceeded(String),
@@ -60,6 +64,7 @@ impl WorkerError {
             self,
             WorkerError::Redis(_)
                 | WorkerError::TelegramApi(_)
+                | WorkerError::McpApi(_)
                 | WorkerError::RateLimitExceeded(_)
                 | WorkerError::Database(_)
                 | WorkerError::Queue(_)
@@ -83,6 +88,7 @@ impl WorkerError {
         match self {
             WorkerError::Redis(_) => "Database connection error".to_string(),
             WorkerError::TelegramApi(_) => "Failed to send notification".to_string(),
+            WorkerError::McpApi(_) => "Failed to call MCP tool".to_string(),
             WorkerError::RateLimitExceeded(_) => {
                 "Rate limit exceeded, please try again later".to_string()
             }
@@ -119,6 +125,11 @@ impl WorkerError {
     /// Create a Telegram API error
     pub fn telegram(details: impl Into<String>) -> Self {
         WorkerError::TelegramApi(details.into())
+    }
+
+    /// Create an MCP API error
+    pub fn mcp(details: impl Into<String>) -> Self {
+        WorkerError::McpApi(details.into())
     }
 
     /// Create a queue error
