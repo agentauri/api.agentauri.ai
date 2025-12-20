@@ -1,10 +1,13 @@
 # =============================================================================
-# AgentAuri Backend - Multi-Stage Docker Build
+# AgentAuri Backend - Multi-Stage Docker Build with Cargo Chef
 # =============================================================================
-# This Dockerfile builds all three Rust services:
+# This Dockerfile builds all three Rust services with optimized caching:
 # - api-gateway (main REST API server)
 # - event-processor (blockchain event processing)
 # - action-workers (trigger action execution)
+#
+# Uses cargo-chef for dependency caching - dependencies are only recompiled
+# when Cargo.toml or Cargo.lock changes, not on every source code change.
 #
 # Usage:
 #   docker build -t agentauri-backend .
@@ -14,9 +17,29 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Stage 1: Build Environment
+# Stage 1: Chef - Install cargo-chef tool
 # -----------------------------------------------------------------------------
-FROM rust:1.88-slim-bookworm AS builder
+FROM rust:1.88-slim-bookworm AS chef
+
+RUN cargo install cargo-chef
+WORKDIR /app
+
+# -----------------------------------------------------------------------------
+# Stage 2: Planner - Generate dependency recipe
+# -----------------------------------------------------------------------------
+FROM chef AS planner
+
+# Copy only what's needed to generate the recipe
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+
+# Generate recipe.json - a hash of all dependencies
+RUN cargo chef prepare --recipe-path recipe.json
+
+# -----------------------------------------------------------------------------
+# Stage 3: Builder - Compile dependencies then source
+# -----------------------------------------------------------------------------
+FROM chef AS builder
 
 # Install build dependencies
 # Note: curl is needed for utoipa-swagger-ui to download Swagger UI assets at build time
@@ -25,17 +48,6 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy workspace configuration first (for better layer caching)
-COPY Cargo.toml Cargo.lock ./
-
-# Copy all crates
-COPY crates/ crates/
-
-# Copy SQLx offline query data (required for compile-time SQL verification)
-COPY .sqlx/ .sqlx/
 
 # Configure Cargo for memory-efficient release builds
 # - Uses "thin" LTO instead of "fat" LTO (much less memory intensive)
@@ -46,12 +58,21 @@ RUN mkdir -p .cargo && echo '[profile.release]\nlto = "thin"\ncodegen-units = 4'
 # Enable SQLx offline mode (uses cached query metadata)
 ENV SQLX_OFFLINE=true
 
-# Build all binaries in release mode with AWS Secrets Manager support
-# This produces optimized binaries for production use
+# Copy recipe from planner and build ONLY dependencies
+# This layer is cached as long as Cargo.toml/Cargo.lock don't change
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --features aws-secrets --recipe-path recipe.json
+
+# Now copy actual source code
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+COPY .sqlx/ .sqlx/
+
+# Build workspace binaries (dependencies already compiled above)
 RUN cargo build --release --features aws-secrets
 
 # -----------------------------------------------------------------------------
-# Stage 2: Runtime Environment
+# Stage 4: Runtime Environment
 # -----------------------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
 
