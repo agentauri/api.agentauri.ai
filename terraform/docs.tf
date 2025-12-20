@@ -79,6 +79,38 @@ resource "aws_s3_bucket_policy" "docs" {
 }
 
 # -----------------------------------------------------------------------------
+# CloudFront Function for URL Rewriting (Static Site Support)
+# -----------------------------------------------------------------------------
+# Starlight generates static HTML files (e.g., /getting-started/quickstart/index.html)
+# This function rewrites directory URLs to serve the correct index.html file
+
+resource "aws_cloudfront_function" "docs_url_rewrite" {
+  count   = var.docs_enabled ? 1 : 0
+  name    = "agentauri-docs-url-rewrite-${var.environment}"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite URLs to append index.html for directory requests"
+  publish = true
+
+  code = <<-EOF
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+
+      // If URI ends with '/', append 'index.html'
+      if (uri.endsWith('/')) {
+        request.uri += 'index.html';
+      }
+      // If URI doesn't have an extension, assume it's a directory and append '/index.html'
+      else if (!uri.includes('.')) {
+        request.uri += '/index.html';
+      }
+
+      return request;
+    }
+  EOF
+}
+
+# -----------------------------------------------------------------------------
 # CloudFront Distribution
 # -----------------------------------------------------------------------------
 
@@ -116,20 +148,17 @@ resource "aws_cloudfront_distribution" "docs" {
     default_ttl            = 3600  # 1 hour
     max_ttl                = 86400 # 24 hours
     compress               = true
+
+    # URL rewriting for static site (append index.html to directory requests)
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.docs_url_rewrite[0].arn
+    }
   }
 
-  # Handle SPA routing - serve index.html for all paths
-  custom_error_response {
-    error_code         = 403
-    response_code      = 200
-    response_page_path = "/index.html"
-  }
-
-  custom_error_response {
-    error_code         = 404
-    response_code      = 200
-    response_page_path = "/index.html"
-  }
+  # Note: custom_error_response for 403/404 removed
+  # The CloudFront Function handles URL rewriting for static site routing
+  # 404 errors will now return actual 404 status (no custom error page configured)
 
   restrictions {
     geo_restriction {
@@ -138,9 +167,9 @@ resource "aws_cloudfront_distribution" "docs" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = var.environment == "production" ? "arn:aws:acm:us-east-1:781863585732:certificate/e8af92ac-7b78-44e6-bae0-85c6a096a111" : null
-    ssl_support_method       = var.environment == "production" ? "sni-only" : null
-    minimum_protocol_version = var.environment == "production" ? "TLSv1.2_2021" : null
+    acm_certificate_arn            = var.environment == "production" ? "arn:aws:acm:us-east-1:781863585732:certificate/e8af92ac-7b78-44e6-bae0-85c6a096a111" : null
+    ssl_support_method             = var.environment == "production" ? "sni-only" : null
+    minimum_protocol_version       = var.environment == "production" ? "TLSv1.2_2021" : null
     cloudfront_default_certificate = var.environment != "production"
   }
 
