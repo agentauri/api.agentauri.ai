@@ -1,49 +1,55 @@
-# Starlight Starter Kit: Basics
+# AgentAuri Public Documentation Site
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+Public-facing documentation for the AgentAuri API, built with [Starlight](https://starlight.astro.build/).
 
-```
-npm create astro@latest -- --template starlight
-```
+**Live URL**: https://docs.agentauri.ai
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
+## Content Structure
 
 ```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+src/content/docs/
+├── index.mdx                    # Homepage
+├── getting-started/
+│   ├── quickstart.md            # 5-minute quickstart guide
+│   ├── authentication.md        # JWT and API key auth
+│   └── api-keys.md              # API key management
+├── concepts/
+│   ├── triggers.md              # Trigger system overview
+│   ├── actions.md               # Available action types
+│   └── events.md                # ERC-8004 events
+└── guides/
+    ├── webhook-integration.md   # REST webhook setup
+    └── telegram-notifications.md # Telegram bot setup
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## Local Development
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+```bash
+cd docs-site-starlight
+pnpm install
+pnpm dev          # http://localhost:4321
+```
 
-Static assets, like favicons, can be placed in the `public/` directory.
+## Deployment
 
-## 🧞 Commands
+The site is deployed via GitHub Actions to AWS S3 + CloudFront on push to main.
 
-All commands are run from the root of the project, from a terminal:
+See `.github/workflows/docs.yml` for deployment configuration.
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+## Adding New Content
 
-## 👀 Want to learn more?
+1. Create a `.md` or `.mdx` file in `src/content/docs/`
+2. Add frontmatter with `title` and `description`
+3. Optionally set `sidebar.order` for navigation ordering
 
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+Example:
+```markdown
+---
+title: My New Guide
+description: A guide to something useful
+sidebar:
+  order: 5
+---
+
+Content goes here...
+```

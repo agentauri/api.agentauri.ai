@@ -1,5 +1,7 @@
-<!-- STATUS: PHASE 5 - NOT YET IMPLEMENTED -->
-<!-- This is a design document for Phase 5 (Weeks 16-18) -->
+> ⚠️ **DESIGN DOCUMENT - NOT YET IMPLEMENTED**
+>
+> This describes planned functionality for Phase 5 (Weeks 16-18).
+> MCP Query Tools are not yet available.
 
 # MCP Query Tools
 

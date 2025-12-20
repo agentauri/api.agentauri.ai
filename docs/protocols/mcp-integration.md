@@ -1,5 +1,7 @@
-<!-- STATUS: PHASE 5 - NOT YET IMPLEMENTED -->
-<!-- This is a design document for Phase 5 (Weeks 16-18) -->
+> ⚠️ **DESIGN DOCUMENT - PHASE 5 (PARTIALLY IMPLEMENTED)**
+>
+> This describes planned functionality for Phase 5 (Weeks 16-18).
+> The MCP worker infrastructure exists but full agent feedback delivery is not yet complete.
 
 # MCP Integration Guide
 

@@ -1,5 +1,7 @@
-<!-- STATUS: PHASE 5 - NOT YET IMPLEMENTED -->
-<!-- This is a design document for Phase 5 (Weeks 16-18) -->
+> ⚠️ **DESIGN DOCUMENT - NOT YET IMPLEMENTED**
+>
+> This describes planned functionality for Phase 5 (Weeks 16-18).
+> A2A Protocol integration has not been started.
 
 # A2A Protocol Integration
 

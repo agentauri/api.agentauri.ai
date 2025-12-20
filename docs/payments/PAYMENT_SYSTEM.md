@@ -1,3 +1,8 @@
+> ⚠️ **PARTIALLY IMPLEMENTED**
+>
+> **Implemented**: Stripe Credits system, credit transactions, balance tracking
+> **Not Yet Implemented**: x402 crypto payments, per-query micropayments
+
 # Payment System
 
 This document describes the payment system architecture for the Pull Layer, enabling monetization of agent queries through multiple payment methods.
