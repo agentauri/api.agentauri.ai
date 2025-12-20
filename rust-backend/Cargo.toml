@@ -17,12 +17,12 @@ license = "MIT"
 # Async runtime
 # Optimized features: removed "full" to speed up compilation
 # Required features: rt-multi-thread, macros, time, sync, net, io-util, signal, fs
-tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "signal", "fs"] }
+tokio = { version = "1.47", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "signal", "fs"] }
 tokio-util = "0.7"
 futures-util = "0.3"
 
 # Web framework
-actix-web = "4.10"
+actix-web = "4.12"
 actix-cors = "0.7"
 actix-rt = "2.10"
 
@@ -74,13 +74,13 @@ argon2 = "0.5"
 validator = { version = "0.20", features = ["derive"] }
 
 # Redis (with TLS support for AWS ElastiCache using native-tls to avoid rustls crypto provider conflicts)
-redis = { version = "0.27", features = ["tokio-comp", "connection-manager", "tokio-native-tls-comp"] }
+redis = { version = "0.32", features = ["tokio-comp", "connection-manager", "tokio-native-tls-comp"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Telegram
-teloxide = { version = "0.13", features = ["macros"] }
+teloxide = { version = "0.17", features = ["macros"] }
 
 # Testing
 mockall = "0.13"
@@ -122,8 +122,8 @@ urlencoding = "2.1"
 
 # OpenAPI documentation
 # NOTE: vendored feature embeds Swagger UI assets in the binary for both debug and release builds
-utoipa = { version = "5", features = ["actix_extras", "chrono", "uuid"] }
-utoipa-swagger-ui = { version = "8", features = ["actix-web", "vendored"] }
+utoipa = { version = "5.4", features = ["actix_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9.0", features = ["actix-web", "vendored"] }
 
 # System utilities
 hostname = "0.4"

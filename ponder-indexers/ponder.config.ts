@@ -1,11 +1,17 @@
 import { createConfig, mergeAbis } from "@ponder/core";
-import { http, fallback, type Transport } from "viem";
+import { http, fallback, type Transport, type Abi } from "viem";
 import { loadBalance, rateLimit } from "@ponder/utils";
 
-import ERC1967ProxyAbi from "./abis/ERC1967Proxy.json";
-import IdentityRegistryAbi from "./abis/IdentityRegistry.json";
-import ReputationRegistryAbi from "./abis/ReputationRegistry.json";
-import ValidationRegistryAbi from "./abis/ValidationRegistry.json";
+// Import ABIs with type assertion for strict viem types
+import _ERC1967ProxyAbi from "./abis/ERC1967Proxy.json";
+import _IdentityRegistryAbi from "./abis/IdentityRegistry.json";
+import _ReputationRegistryAbi from "./abis/ReputationRegistry.json";
+import _ValidationRegistryAbi from "./abis/ValidationRegistry.json";
+
+const ERC1967ProxyAbi = _ERC1967ProxyAbi as unknown as Abi;
+const IdentityRegistryAbi = _IdentityRegistryAbi as unknown as Abi;
+const ReputationRegistryAbi = _ReputationRegistryAbi as unknown as Abi;
+const ValidationRegistryAbi = _ValidationRegistryAbi as unknown as Abi;
 import { getEnv, getConfiguredChains, type EnvConfig } from "./src/env-validation";
 import {
   logRpcConfig,
@@ -137,10 +143,10 @@ async function getHealthyProviders(chainPrefix: string): Promise<Record<string, 
 
   // Build provider map for health checks
   const providerMap: Record<string, string> = {};
-  if (urls.alchemy) providerMap.alchemy = urls.alchemy;
-  if (urls.infura) providerMap.infura = urls.infura;
-  if (urls.quiknode) providerMap.quiknode = urls.quiknode;
-  if (urls.ankr) providerMap.ankr = urls.ankr;
+  if (urls.alchemy) providerMap["alchemy"] = urls.alchemy;
+  if (urls.infura) providerMap["infura"] = urls.infura;
+  if (urls.quiknode) providerMap["quiknode"] = urls.quiknode;
+  if (urls.ankr) providerMap["ankr"] = urls.ankr;
 
   if (Object.keys(providerMap).length === 0) {
     return {};
@@ -202,22 +208,22 @@ function createResilientTransport(
   // Create rate-limited transports ONLY for healthy providers
   const transports: Transport[] = [];
 
-  if (urls.alchemy && healthyProviders.alchemy) {
+  if (urls.alchemy && healthyProviders["alchemy"]) {
     transports.push(
       rateLimit(http(urls.alchemy), { requestsPerSecond: RATE_LIMITS.alchemy })
     );
   }
-  if (urls.infura && healthyProviders.infura) {
+  if (urls.infura && healthyProviders["infura"]) {
     transports.push(
       rateLimit(http(urls.infura), { requestsPerSecond: RATE_LIMITS.infura })
     );
   }
-  if (urls.quiknode && healthyProviders.quiknode) {
+  if (urls.quiknode && healthyProviders["quiknode"]) {
     transports.push(
       rateLimit(http(urls.quiknode), { requestsPerSecond: RATE_LIMITS.quiknode })
     );
   }
-  if (urls.ankr && healthyProviders.ankr) {
+  if (urls.ankr && healthyProviders["ankr"]) {
     transports.push(
       rateLimit(http(urls.ankr), { requestsPerSecond: RATE_LIMITS.ankr })
     );
@@ -505,7 +511,7 @@ for (const networkKey of enabledNetworkKeys) {
   configLogger.info({
     networkKey,
     hasContractAddrs: !!contractAddrs,
-    identityAddr: contractAddrs?.identity?.slice(0, 10),
+    identityAddr: contractAddrs?.["identity"]?.slice(0, 10),
     startBlock,
   }, `Processing contracts for ${networkKey}`);
 
