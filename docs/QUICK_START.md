@@ -9,7 +9,8 @@ This guide will help you get started with the api.agentauri.ai API quickly, incl
 3. [Making Your First Request](#making-your-first-request)
 4. [Handling Rate Limits](#handling-rate-limits)
 5. [Code Examples](#code-examples)
-6. [Best Practices](#best-practices)
+6. [A2A Protocol](#a2a-protocol-agent-to-agent-queries)
+7. [Best Practices](#best-practices)
 
 ## Authentication
 
@@ -477,6 +478,81 @@ func main() {
 }
 ```
 
+## A2A Protocol (Agent-to-Agent Queries)
+
+The A2A Protocol enables AI agents to query reputation data asynchronously through a JSON-RPC 2.0 interface.
+
+### Submit a Query Task
+
+```bash
+curl -X POST https://api.agentauri.ai/api/v1/a2a/rpc \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tasks/send",
+    "params": {
+      "task": {
+        "tool": "getReputationSummary",
+        "arguments": {"agentId": 42}
+      }
+    },
+    "id": "1"
+  }'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "submitted",
+    "estimated_cost": "0.01 USDC"
+  },
+  "id": "1"
+}
+```
+
+### Check Task Status
+
+```bash
+curl -X POST https://api.agentauri.ai/api/v1/a2a/rpc \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tasks/get",
+    "params": {"task_id": "550e8400-e29b-41d4-a716-446655440000"},
+    "id": "2"
+  }'
+```
+
+### Stream Task Progress (SSE)
+
+```bash
+curl -N https://api.agentauri.ai/api/v1/a2a/tasks/550e8400-e29b-41d4-a716-446655440000/stream \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Accept: text/event-stream"
+```
+
+### Available Tools
+
+| Tool | Tier | Cost | Description |
+|------|------|------|-------------|
+| `getMyFeedbacks` | 0 | 0.001 USDC | Get feedback records |
+| `getAgentProfile` | 0 | 0.001 USDC | Get agent profile |
+| `getReputationSummary` | 1 | 0.01 USDC | Get aggregated stats |
+| `getTrend` | 1 | 0.01 USDC | Get reputation trend |
+| `getValidationHistory` | 1 | 0.01 USDC | Get validation history |
+| `getReputationReport` | 3 | 0.20 USDC | AI-powered analysis |
+
+For complete A2A documentation, see [A2A Protocol Integration](protocols/A2A_INTEGRATION.md).
+
+---
+
 ## Best Practices
 
 ### 1. Always Check Rate Limit Headers
@@ -677,5 +753,5 @@ curl -v https://api.agentauri.ai/api/v1/queries/tier3/... 2>&1 | grep -i tier
 
 ---
 
-**Last Updated**: November 28, 2024
-**Version**: 1.0.0
+**Last Updated**: December 21, 2024
+**Version**: 1.1.0 (A2A Protocol added)

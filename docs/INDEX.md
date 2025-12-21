@@ -1,8 +1,8 @@
 # Documentation Index
 
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
-**Last Updated**: December 17, 2025
-**Phase**: Phase 4 Complete (REST Worker + Circuit Breaker + Agent Discovery)
+**Last Updated**: December 21, 2024
+**Phase**: A2A Protocol Complete (Task Processor + Audit Logging + Tool Registry)
 
 This index provides a comprehensive overview of all project documentation organized by category.
 
@@ -35,6 +35,8 @@ This index provides a comprehensive overview of all project documentation organi
 - **[operations/CIRCUIT_BREAKER_GUIDE.md](operations/CIRCUIT_BREAKER_GUIDE.md)** - Circuit breaker practical guide for trigger reliability
 - **[operations/TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide for common issues
 - **[operations/RUNBOOK.md](operations/RUNBOOK.md)** - Operations runbook for system startup/shutdown, health checks, and incident response
+- **[operations/AUDIT_LOGGING.md](operations/AUDIT_LOGGING.md)** - A2A task audit logging for compliance and analytics
+- **[operations/METRICS.md](operations/METRICS.md)** - Prometheus metrics and observability guide
 - **[operations/LINK_AUDIT_REPORT.md](operations/LINK_AUDIT_REPORT.md)** - Documentation link audit report and fix recommendations
 - **[../rust-backend/crates/event-processor/CIRCUIT_BREAKER_INTEGRATION.md](../rust-backend/crates/event-processor/CIRCUIT_BREAKER_INTEGRATION.md)** - Technical implementation details
 
@@ -62,10 +64,13 @@ This index provides a comprehensive overview of all project documentation organi
 
 - **[protocols/erc-8004-integration.md](protocols/erc-8004-integration.md)** - ERC-8004 standard integration
 
+### A2A Protocol (Implemented)
+- **[protocols/A2A_INTEGRATION.md](protocols/A2A_INTEGRATION.md)** - Agent-to-Agent (A2A) protocol for async queries
+- **[api/TOOL_REGISTRY.md](api/TOOL_REGISTRY.md)** - A2A tool catalog with tiers and pricing
+- **[api/QUERY_TOOLS.md](api/QUERY_TOOLS.md)** - MCP query tools (Tier 0-3)
+
 ### Phase 5 Design Documents (Not Yet Implemented)
 - **[protocols/mcp-integration.md](protocols/mcp-integration.md)** - Model Context Protocol for agent communication *(Phase 5)*
-- **[protocols/A2A_INTEGRATION.md](protocols/A2A_INTEGRATION.md)** - Agent-to-Agent (A2A) protocol *(Phase 5)*
-- **[api/QUERY_TOOLS.md](api/QUERY_TOOLS.md)** - MCP query tools (Tier 0-3) *(Phase 5)*
 
 ---
 
@@ -161,33 +166,43 @@ Historical reports, completed work, and superseded documents:
 
 ### For Protocol Integrators
 1. [protocols/erc-8004-integration.md](protocols/erc-8004-integration.md) - ERC-8004 events
-2. [protocols/mcp-integration.md](protocols/mcp-integration.md) - MCP protocol
-3. [protocols/A2A_INTEGRATION.md](protocols/A2A_INTEGRATION.md) - A2A integration
+2. [protocols/A2A_INTEGRATION.md](protocols/A2A_INTEGRATION.md) - A2A protocol integration
+3. [api/TOOL_REGISTRY.md](api/TOOL_REGISTRY.md) - A2A tool catalog and pricing
+4. [protocols/mcp-integration.md](protocols/mcp-integration.md) - MCP protocol (Phase 5)
 
 ### For Operations & SRE Teams
 1. [operations/RUNBOOK.md](operations/RUNBOOK.md) - Startup/shutdown procedures, health checks, incident response
 2. [operations/TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md) - Common issues and solutions
-3. [operations/CIRCUIT_BREAKER_GUIDE.md](operations/CIRCUIT_BREAKER_GUIDE.md) - Circuit breaker patterns
-4. [security/DATABASE_ENCRYPTION.md](security/DATABASE_ENCRYPTION.md) - Database security
+3. [operations/METRICS.md](operations/METRICS.md) - Prometheus metrics and alerting
+4. [operations/AUDIT_LOGGING.md](operations/AUDIT_LOGGING.md) - A2A task audit trail
+5. [operations/CIRCUIT_BREAKER_GUIDE.md](operations/CIRCUIT_BREAKER_GUIDE.md) - Circuit breaker patterns
+6. [security/DATABASE_ENCRYPTION.md](security/DATABASE_ENCRYPTION.md) - Database security
 
 ---
 
 ## 📊 Documentation Statistics
 
-- **Total Documents**: 60+ markdown files (Phase 4 complete)
+- **Total Documents**: 65+ markdown files (A2A Protocol implemented)
 - **Root Level**: 7 essential files (CLAUDE.md, README, CHANGELOG, etc.)
 - **Architecture Docs**: 5 files
 - **Authentication Docs**: 6 files (including Social Login)
 - **Security Docs**: 13 files (DATABASE_ENCRYPTION, SECURITY_HEADERS, SECRETS_MANAGER, etc.)
-- **Operations Docs**: 6 files (background tasks, circuit breaker, troubleshooting, runbook, link audit, event-processor integration)
-- **API Documentation**: 2 files (API_DOCUMENTATION.md, trigger-examples.md)
-- **Protocol Docs**: 3 files (1 implemented, 2 Phase 5 design docs)
+- **Operations Docs**: 8 files (background tasks, circuit breaker, troubleshooting, runbook, audit logging, metrics, link audit, event-processor integration)
+- **API Documentation**: 3 files (API_DOCUMENTATION.md, TOOL_REGISTRY.md, trigger-examples.md)
+- **Protocol Docs**: 3 files (ERC-8004 + A2A implemented, MCP Phase 5)
 - **Development Guides**: 5 files (setup, testing strategy, adding chains, contributing, CI/CD)
 - **Component READMEs**: 7 files
 - **Archived Documents**: 6 files
 
-**Last Comprehensive Audit**: December 17, 2025 (Phase 4 Complete)
+**Last Comprehensive Audit**: December 21, 2024 (A2A Protocol Complete)
 **Recent Improvement Actions**:
+- December 21, 2024:
+  - A2A Protocol documentation complete in API_DOCUMENTATION.md
+  - Added TOOL_REGISTRY.md for A2A tool catalog
+  - Added AUDIT_LOGGING.md for task audit trail
+  - Added METRICS.md for observability guide
+  - Updated A2A_INTEGRATION.md to "Implemented" status
+  - Updated INDEX.md with new documentation structure
 - December 17, 2025:
   - Added Ponder indexer status endpoints (`/api/v1/ponder/status`, `/api/v1/ponder/events`)
   - Fixed Ponder status endpoint snake_case column mapping (v1.0.12)

@@ -2072,6 +2072,361 @@ Handle Stripe webhook events. No authentication required (uses Stripe signature 
 
 ---
 
+### A2A Protocol
+
+The Agent-to-Agent (A2A) Protocol enables AI agents to query on-chain reputation data through a JSON-RPC 2.0 interface. This protocol is designed for programmatic access to agent reputation, feedback, and validation data.
+
+#### JSON-RPC Endpoint
+
+**Endpoint**: `POST /api/v1/a2a/rpc`
+
+**Headers**:
+- `Authorization: Bearer <token>` or
+- `X-API-Key: <api_key>`
+- `X-Organization-Id: <org_id>` (required when using API key)
+- `Content-Type: application/json`
+
+**Request Format**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "<method_name>",
+  "params": { ... },
+  "id": "<request_id>"
+}
+```
+
+**Response Format (Success)**:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": { ... },
+  "id": "<request_id>"
+}
+```
+
+**Response Format (Error)**:
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32000,
+    "message": "Error description",
+    "data": { ... }
+  },
+  "id": "<request_id>"
+}
+```
+
+---
+
+#### tasks/send
+
+Submit a new query task for asynchronous execution.
+
+**Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/send",
+  "params": {
+    "task": {
+      "tool": "getReputationSummary",
+      "arguments": {
+        "agentId": 42
+      }
+    }
+  },
+  "id": "req-001"
+}
+```
+
+**Response** (Success):
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "submitted",
+    "estimated_cost": "0.01 USDC"
+  },
+  "id": "req-001"
+}
+```
+
+**Example (curl)**:
+```bash
+curl -X POST http://localhost:8080/api/v1/a2a/rpc \
+  -H "Authorization: Bearer <token>" \
+  -H "X-Organization-Id: <org_id>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tasks/send",
+    "params": {
+      "task": {
+        "tool": "getReputationSummary",
+        "arguments": {"agentId": 42}
+      }
+    },
+    "id": "1"
+  }'
+```
+
+**Validation**:
+- `tool`: Must be a valid tool from the Tool Catalog
+- `arguments`: Max 100KB JSON payload
+- Organization must have sufficient credits
+- Max 100 pending tasks per organization (rate limiting)
+
+---
+
+#### tasks/get
+
+Retrieve the status and result of a previously submitted task.
+
+**Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "id": "req-002"
+}
+```
+
+**Response** (Task Working):
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "working",
+    "progress": 0.5,
+    "created_at": "2024-11-15T10:30:00Z",
+    "started_at": "2024-11-15T10:30:01Z"
+  },
+  "id": "req-002"
+}
+```
+
+**Response** (Task Completed):
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "completed",
+    "progress": 1.0,
+    "result": {
+      "agent_id": 42,
+      "reputation_score": 0.85,
+      "total_feedbacks": 127,
+      "positive_feedbacks": 112,
+      "negative_feedbacks": 15,
+      "computed_at": "2024-11-15T10:30:02Z"
+    },
+    "cost": 0.01,
+    "created_at": "2024-11-15T10:30:00Z",
+    "completed_at": "2024-11-15T10:30:02Z"
+  },
+  "id": "req-002"
+}
+```
+
+**Task Status Values**:
+- `submitted`: Task queued for processing
+- `working`: Task is being executed
+- `completed`: Task finished successfully
+- `failed`: Task execution failed
+- `cancelled`: Task was cancelled by user
+
+---
+
+#### tasks/cancel
+
+Cancel a pending or working task.
+
+**Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/cancel",
+  "params": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "id": "req-003"
+}
+```
+
+**Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "cancelled"
+  },
+  "id": "req-003"
+}
+```
+
+**Note**: Only tasks with status `submitted` or `working` can be cancelled.
+
+---
+
+#### REST Convenience Endpoints
+
+For simpler integrations, REST endpoints are also available:
+
+**Get Task Status**:
+- **Endpoint**: `GET /api/v1/a2a/tasks/{id}`
+- **Headers**: `Authorization: Bearer <token>`
+
+**Response** (200 OK):
+```json
+{
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "progress": 1.0,
+  "result": { ... },
+  "cost": 0.01,
+  "created_at": "2024-11-15T10:30:00Z",
+  "completed_at": "2024-11-15T10:30:02Z"
+}
+```
+
+---
+
+#### SSE Streaming
+
+Stream real-time task progress updates via Server-Sent Events.
+
+**Endpoint**: `GET /api/v1/a2a/tasks/{id}/stream`
+
+**Headers**:
+- `Authorization: Bearer <token>`
+- `Accept: text/event-stream`
+
+**Event Types**:
+- `progress`: Task is still being processed
+- `complete`: Task finished successfully
+- `error`: Task failed or was cancelled
+- `timeout`: Stream reached maximum duration (5 minutes)
+
+**Example**:
+```bash
+curl -N http://localhost:8080/api/v1/a2a/tasks/<task_id>/stream \
+  -H "Authorization: Bearer <token>" \
+  -H "Accept: text/event-stream"
+```
+
+**Event Stream**:
+```
+event: progress
+data: {"task_id":"xxx","status":"working","progress":0.3}
+
+event: progress
+data: {"task_id":"xxx","status":"working","progress":0.7}
+
+event: complete
+data: {"task_id":"xxx","status":"completed","progress":1.0,"result":{...}}
+```
+
+**Behavior**:
+- Poll interval: 2 seconds
+- Max stream duration: 5 minutes (returns `timeout` event)
+- Stream closes automatically on terminal status
+
+---
+
+#### A2A Error Codes
+
+| Code | Name | Description |
+|------|------|-------------|
+| -32700 | Parse Error | Invalid JSON received |
+| -32600 | Invalid Request | JSON is not a valid JSON-RPC request |
+| -32601 | Method Not Found | Method does not exist |
+| -32602 | Invalid Params | Invalid method parameters |
+| -32603 | Internal Error | Internal server error |
+| -32000 | Unauthorized | Missing or invalid authentication |
+| -32001 | Insufficient Credits | Not enough credits to execute query |
+| -32002 | Rate Limited | Too many pending tasks |
+| -32003 | Task Not Found | Task does not exist or not accessible |
+| -32004 | Credits Not Initialized | Organization has no credits initialized |
+
+---
+
+### Tool Catalog
+
+The A2A Protocol provides tools organized by tiers based on query complexity and cost.
+
+#### Available Tools
+
+| Tool | Tier | Cost | Description |
+|------|------|------|-------------|
+| `getMyFeedbacks` | Tier 0 | 0.001 USDC | Get feedback records for an agent |
+| `getAgentProfile` | Tier 0 | 0.001 USDC | Get agent profile and metadata |
+| `getReputationSummary` | Tier 1 | 0.01 USDC | Get aggregated reputation statistics |
+| `getTrend` | Tier 1 | 0.01 USDC | Get reputation trend over time |
+| `getValidationHistory` | Tier 1 | 0.01 USDC | Get validation history for an agent |
+| `getReputationReport` | Tier 3 | 0.20 USDC | AI-powered reputation analysis report |
+
+#### Tool Tiers
+
+| Tier | Name | Description | Cost Range |
+|------|------|-------------|------------|
+| **Tier 0** | Raw Data | Direct database queries, lowest latency | 0.001 USDC |
+| **Tier 1** | Aggregated | Computed aggregations, moderate cost | 0.01 USDC |
+| **Tier 2** | Analysis | Complex analysis (future) | TBD |
+| **Tier 3** | AI-Powered | LLM-enhanced analysis, highest cost | 0.20 USDC |
+
+#### Tool Parameters
+
+**getMyFeedbacks / getAgentProfile / getReputationSummary / getTrend / getValidationHistory**:
+```json
+{
+  "agentId": 42
+}
+```
+
+**getReputationReport**:
+```json
+{
+  "agentId": 42,
+  "includeRecommendations": true
+}
+```
+
+---
+
+### Audit Logging
+
+All A2A task operations are logged in the `a2a_task_audit_log` table for security, compliance, and analytics.
+
+#### Audit Event Types
+
+| Event | Description |
+|-------|-------------|
+| `created` | Task was created via tasks/send |
+| `started` | Task processor began execution |
+| `completed` | Task finished successfully (includes cost and duration) |
+| `failed` | Task execution failed (includes error message) |
+| `cancelled` | Task was cancelled by user |
+| `timeout` | Task execution timed out (30 second limit) |
+
+#### Audit Actor Types
+
+| Actor | Description |
+|-------|-------------|
+| `user` | Authenticated user via JWT |
+| `api_key` | Request via API key (logs key prefix) |
+| `system` | Background task processor |
+
+---
+
 ## Rate Limiting
 
 All API requests are rate limited to ensure fair usage and system stability. The rate limiting system is tier-aware, meaning different query complexity levels consume different amounts of your quota.
