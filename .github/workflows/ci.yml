@@ -187,27 +187,24 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # sccache for faster incremental builds (with graceful fallback)
-      - name: Setup sccache
-        id: sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
-        continue-on-error: true
-
-      - name: Configure sccache
-        run: |
-          # Only enable sccache if action succeeded AND server can connect to cache backend
-          # Test with --show-stats which attempts actual server connection
-          if [ "${{ steps.sccache.outcome }}" = "success" ] && \
-             command -v sccache &> /dev/null && \
-             timeout 10 sccache --show-stats &> /dev/null; then
-            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            echo "::notice::sccache enabled for faster builds"
-          else
-            echo "::notice::sccache not available or cache backend unreachable, using standard build"
-            # Ensure RUSTC_WRAPPER is NOT set if sccache fails
-            echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-          fi
+      # NOTE: sccache temporarily disabled due to GitHub Actions cache backend
+      # instability causing "Our services aren't available right now" errors.
+      # The sccache-action sets RUSTC_WRAPPER before we can verify the backend,
+      # causing builds to fail even with fallback logic. Re-enable when stable.
+      # See: https://github.com/mozilla/sccache/issues/2259
+      #
+      # - name: Setup sccache
+      #   id: sccache
+      #   uses: mozilla-actions/sccache-action@v0.0.4
+      #   continue-on-error: true
+      #
+      # - name: Configure sccache
+      #   run: |
+      #     if [ "${{ steps.sccache.outcome }}" = "success" ] && \
+      #        timeout 10 sccache --show-stats &> /dev/null; then
+      #       echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+      #       echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+      #     fi
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
