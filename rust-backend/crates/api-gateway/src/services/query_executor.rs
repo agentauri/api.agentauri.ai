@@ -87,8 +87,18 @@ impl QueryExecutor {
         let params: GetFeedbacksParams =
             serde_json::from_value(args.clone()).context("Invalid arguments for getMyFeedbacks")?;
 
+        // Input validation
+        if params.agent_id <= 0 {
+            anyhow::bail!("agent_id must be a positive integer");
+        }
+
         let limit = params.limit.unwrap_or(50).min(100);
         let offset = params.offset.unwrap_or(0);
+
+        // Prevent excessive offset (DoS protection)
+        if offset > 100_000 {
+            anyhow::bail!("offset cannot exceed 100,000");
+        }
 
         let feedbacks = sqlx::query_as::<_, FeedbackRow>(
             r#"
@@ -152,6 +162,11 @@ impl QueryExecutor {
     async fn get_agent_profile(&self, args: &serde_json::Value) -> Result<serde_json::Value> {
         let params: GetAgentParams = serde_json::from_value(args.clone())
             .context("Invalid arguments for getAgentProfile")?;
+
+        // Input validation
+        if params.agent_id <= 0 {
+            anyhow::bail!("agent_id must be a positive integer");
+        }
 
         // Get the AgentCreated event
         let created_event = sqlx::query_as::<_, AgentCreatedRow>(
@@ -247,6 +262,11 @@ impl QueryExecutor {
     async fn get_reputation_summary(&self, args: &serde_json::Value) -> Result<serde_json::Value> {
         let params: GetAgentParams = serde_json::from_value(args.clone())
             .context("Invalid arguments for getReputationSummary")?;
+
+        // Input validation
+        if params.agent_id <= 0 {
+            anyhow::bail!("agent_id must be a positive integer");
+        }
 
         // Aggregate reputation statistics
         let stats = sqlx::query_as::<_, ReputationStatsRow>(
@@ -354,17 +374,34 @@ impl QueryExecutor {
         let params: GetTrendParams =
             serde_json::from_value(args.clone()).context("Invalid arguments for getTrend")?;
 
-        let period = params.period.as_deref().unwrap_or("day");
+        // Input validation
+        if params.agent_id <= 0 {
+            anyhow::bail!("agent_id must be a positive integer");
+        }
+
+        // Validate and sanitize period (whitelist approach - prevents injection)
+        let period = match params.period.as_deref().unwrap_or("day") {
+            "day" => "day",
+            "week" => "week",
+            "month" => "month",
+            other => anyhow::bail!(
+                "Invalid period '{}': must be 'day', 'week', or 'month'",
+                other
+            ),
+        };
+
         let limit = params.limit.unwrap_or(30).min(365);
 
-        // Calculate lookback days based on period
-        let lookback_days = match period {
+        // Calculate lookback days based on period (safe integer math)
+        let lookback_days: i32 = match period {
             "week" => limit as i32 * 7,
             "month" => limit as i32 * 30,
             _ => limit as i32,
         };
 
         // Get trend data grouped by period
+        // SECURITY FIX: Use INTERVAL multiplication with integer instead of string concatenation
+        // This prevents SQL injection via the lookback_days parameter
         let trend = sqlx::query_as::<_, TrendRow>(
             r#"
             WITH time_buckets AS (
@@ -377,7 +414,7 @@ impl QueryExecutor {
                 WHERE registry = 'reputation'
                   AND event_type = 'NewFeedback'
                   AND agent_id = $1
-                  AND timestamp >= EXTRACT(EPOCH FROM NOW() - ($3::text || ' days')::INTERVAL)
+                  AND timestamp >= EXTRACT(EPOCH FROM NOW() - (INTERVAL '1 day' * $3))
                 GROUP BY period_start
                 ORDER BY period_start DESC
                 LIMIT $4
@@ -393,7 +430,7 @@ impl QueryExecutor {
         )
         .bind(params.agent_id)
         .bind(period)
-        .bind(lookback_days.to_string())
+        .bind(lookback_days)
         .bind(limit as i64)
         .fetch_all(&self.pool)
         .await
@@ -421,8 +458,18 @@ impl QueryExecutor {
         let params: GetValidationParams = serde_json::from_value(args.clone())
             .context("Invalid arguments for getValidationHistory")?;
 
+        // Input validation
+        if params.agent_id <= 0 {
+            anyhow::bail!("agent_id must be a positive integer");
+        }
+
         let limit = params.limit.unwrap_or(50).min(100);
         let offset = params.offset.unwrap_or(0);
+
+        // Prevent excessive offset (DoS protection)
+        if offset > 100_000 {
+            anyhow::bail!("offset cannot exceed 100,000");
+        }
 
         let validations = sqlx::query_as::<_, ValidationRow>(
             r#"
@@ -484,6 +531,11 @@ impl QueryExecutor {
     async fn get_reputation_report(&self, args: &serde_json::Value) -> Result<serde_json::Value> {
         let params: GetAgentParams = serde_json::from_value(args.clone())
             .context("Invalid arguments for getReputationReport")?;
+
+        // Input validation
+        if params.agent_id <= 0 {
+            anyhow::bail!("agent_id must be a positive integer");
+        }
 
         // For now, return a stub response
         // TODO: Integrate with LLM service for actual AI analysis

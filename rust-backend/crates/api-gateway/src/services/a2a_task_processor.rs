@@ -32,6 +32,9 @@ const DEFAULT_POLL_INTERVAL_SECS: u64 = 1;
 /// Maximum tasks to claim per poll cycle
 const MAX_TASKS_PER_CYCLE: i64 = 10;
 
+/// Query execution timeout (prevents stuck queries)
+const QUERY_EXECUTION_TIMEOUT_SECS: u64 = 30;
+
 /// A2A Task Processor configuration
 #[derive(Debug, Clone)]
 pub struct A2aTaskProcessorConfig {
@@ -131,20 +134,26 @@ impl A2aTaskProcessor {
 
     /// Claim tasks for processing
     ///
-    /// Uses UPDATE ... RETURNING to atomically claim tasks.
+    /// SECURITY FIX: Uses a single atomic CTE to prevent race conditions.
+    /// The previous implementation with subquery SELECT could allow multiple
+    /// processor instances to claim the same task under high concurrency.
+    /// This CTE pattern ensures truly atomic claiming with FOR UPDATE SKIP LOCKED.
     async fn claim_tasks(&self) -> anyhow::Result<Vec<ClaimedTask>> {
         let tasks = sqlx::query_as::<_, ClaimedTask>(
             r#"
-            UPDATE a2a_tasks
-            SET status = 'working', started_at = NOW(), updated_at = NOW()
-            WHERE id IN (
-                SELECT id FROM a2a_tasks
+            WITH claimed AS (
+                SELECT id
+                FROM a2a_tasks
                 WHERE status = 'submitted'
                 ORDER BY created_at ASC
                 LIMIT $1
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING id, tool, arguments
+            UPDATE a2a_tasks t
+            SET status = 'working', started_at = NOW(), updated_at = NOW()
+            FROM claimed
+            WHERE t.id = claimed.id
+            RETURNING t.id, t.tool, t.arguments
             "#,
         )
         .bind(self.config.max_tasks_per_cycle)
@@ -155,6 +164,9 @@ impl A2aTaskProcessor {
     }
 
     /// Process a single task
+    ///
+    /// SECURITY FIX: Added timeout to prevent queries from running indefinitely.
+    /// This protects against stuck queries consuming resources.
     async fn process_task(&self, task: &ClaimedTask) {
         info!(
             task_id = %task.id,
@@ -163,10 +175,17 @@ impl A2aTaskProcessor {
         );
 
         let start = std::time::Instant::now();
+        let timeout_duration = Duration::from_secs(QUERY_EXECUTION_TIMEOUT_SECS);
 
-        // Execute the query
-        match self.executor.execute(&task.tool, &task.arguments).await {
-            Ok((result, cost)) => {
+        // Execute the query with timeout
+        let execution_result = tokio::time::timeout(
+            timeout_duration,
+            self.executor.execute(&task.tool, &task.arguments),
+        )
+        .await;
+
+        match execution_result {
+            Ok(Ok((result, cost))) => {
                 let duration = start.elapsed();
 
                 // Update task as completed
@@ -186,10 +205,10 @@ impl A2aTaskProcessor {
                     );
                 }
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 let duration = start.elapsed();
 
-                // Update task as failed
+                // Update task as failed (query error)
                 if let Err(update_err) = self.fail_task(&task.id, &e.to_string()).await {
                     error!(
                         task_id = %task.id,
@@ -204,6 +223,31 @@ impl A2aTaskProcessor {
                     error = %e,
                     duration_ms = duration.as_millis(),
                     "A2A task failed"
+                );
+            }
+            Err(_elapsed) => {
+                let duration = start.elapsed();
+
+                // Update task as failed (timeout)
+                let timeout_error = format!(
+                    "Query execution timeout after {}s",
+                    QUERY_EXECUTION_TIMEOUT_SECS
+                );
+
+                if let Err(update_err) = self.fail_task(&task.id, &timeout_error).await {
+                    error!(
+                        task_id = %task.id,
+                        error = %update_err,
+                        "Failed to mark task as timed out"
+                    );
+                }
+
+                error!(
+                    task_id = %task.id,
+                    tool = %task.tool,
+                    duration_ms = duration.as_millis(),
+                    timeout_secs = QUERY_EXECUTION_TIMEOUT_SECS,
+                    "A2A task timed out"
                 );
             }
         }

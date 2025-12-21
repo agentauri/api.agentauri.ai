@@ -97,6 +97,12 @@ pub async fn a2a_rpc(
 // Method Handlers
 // ============================================================================
 
+/// Maximum pending tasks per organization (rate limiting)
+const MAX_PENDING_TASKS_PER_ORG: i64 = 100;
+
+/// Maximum size for task arguments JSON (100KB)
+const MAX_ARGUMENTS_SIZE_BYTES: usize = 100_000;
+
 /// Handle tasks/send method
 async fn handle_tasks_send(
     pool: &DbPool,
@@ -119,6 +125,59 @@ async fn handle_tasks_send(
     if !is_valid_tool(&send_params.task.tool) {
         return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
             JsonRpcError::invalid_params(&format!("Unknown tool: {}", send_params.task.tool)),
+            request_id,
+        ));
+    }
+
+    // SECURITY: Validate arguments size to prevent DoS via large payloads
+    let args_json = match serde_json::to_string(&send_params.task.arguments) {
+        Ok(json) => json,
+        Err(e) => {
+            tracing::error!("Failed to serialize arguments: {:?}", e);
+            return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+                JsonRpcError::invalid_params("Invalid arguments format"),
+                request_id,
+            ));
+        }
+    };
+
+    if args_json.len() > MAX_ARGUMENTS_SIZE_BYTES {
+        return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+            JsonRpcError::invalid_params(&format!(
+                "Arguments too large: {} bytes (max: {} bytes)",
+                args_json.len(),
+                MAX_ARGUMENTS_SIZE_BYTES
+            )),
+            request_id,
+        ));
+    }
+
+    // SECURITY: Rate limiting - check pending task count per organization
+    let pending_count = match A2aTaskRepository::count_pending_by_organization(pool, org_id).await {
+        Ok(count) => count,
+        Err(e) => {
+            tracing::error!("Failed to count pending tasks: {:?}", e);
+            return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+                JsonRpcError::internal_error(),
+                request_id,
+            ));
+        }
+    };
+
+    if pending_count >= MAX_PENDING_TASKS_PER_ORG {
+        tracing::warn!(
+            org_id = %org_id,
+            pending_count = pending_count,
+            "Rate limit exceeded for task creation"
+        );
+        return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+            JsonRpcError::new(
+                -32003,
+                format!(
+                    "Rate limit exceeded: {} pending tasks (max: {})",
+                    pending_count, MAX_PENDING_TASKS_PER_ORG
+                ),
+            ),
             request_id,
         ));
     }
