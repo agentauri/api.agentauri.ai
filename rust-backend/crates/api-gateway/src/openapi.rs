@@ -46,6 +46,7 @@ use crate::models;
         (name = "Actions", description = "Trigger action management"),
         (name = "Circuit Breaker", description = "Circuit breaker state and configuration"),
         (name = "Agents", description = "On-chain agent linking"),
+        (name = "Agent Follows", description = "Simplified agent monitoring across all registries"),
         (name = "Billing", description = "Credit balance and transactions"),
         (name = "Discovery", description = "API discovery and metadata"),
         (name = "Ponder", description = "Blockchain indexer status and metrics"),
@@ -114,6 +115,11 @@ use crate::models;
         handlers::link_agent,
         handlers::list_linked_agents,
         handlers::unlink_agent,
+        // Agent Follows
+        handlers::follow_agent,
+        handlers::list_following,
+        handlers::update_follow,
+        handlers::unfollow_agent,
         // Billing
         handlers::get_credits,
         handlers::purchase_credits,
@@ -189,6 +195,14 @@ use crate::models;
             // Agents
             LinkAgentRequest,
             AgentLinkResponse,
+            // Agent Follows
+            models::agent_follows::FollowAgentRequest,
+            models::agent_follows::FollowActionRequest,
+            models::agent_follows::UpdateFollowRequest,
+            models::agent_follows::AgentFollowResponse,
+            models::agent_follows::AgentFollowDetailResponse,
+            models::agent_follows::FollowActionSummary,
+            models::agent_follows::TriggerIds,
             // Discovery
             models::discovery::AgentCardResponse,
             // Health

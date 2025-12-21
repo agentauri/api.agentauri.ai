@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use shared::models::Trigger;
 use shared::DbPool;
+use sqlx::{Executor, Postgres};
 use uuid::Uuid;
 
 pub struct TriggerRepository;
@@ -47,6 +48,98 @@ impl TriggerRepository {
         .context("Failed to create trigger")?;
 
         Ok(trigger)
+    }
+
+    /// Create a new trigger within a transaction
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_in_tx<'e, E>(
+        executor: E,
+        user_id: &str,
+        organization_id: &str,
+        name: &str,
+        description: Option<&str>,
+        chain_id: i32,
+        registry: &str,
+        enabled: bool,
+        is_stateful: bool,
+    ) -> Result<Trigger>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let trigger_id = Uuid::new_v4().to_string();
+        let now = chrono::Utc::now();
+
+        let trigger = sqlx::query_as::<_, Trigger>(
+            r#"
+            INSERT INTO triggers (id, user_id, organization_id, name, description, chain_id, registry, enabled, is_stateful, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING *
+            "#,
+        )
+        .bind(&trigger_id)
+        .bind(user_id)
+        .bind(organization_id)
+        .bind(name)
+        .bind(description)
+        .bind(chain_id)
+        .bind(registry)
+        .bind(enabled)
+        .bind(is_stateful)
+        .bind(now)
+        .bind(now)
+        .fetch_one(executor)
+        .await
+        .context("Failed to create trigger")?;
+
+        Ok(trigger)
+    }
+
+    /// Delete trigger within a transaction
+    pub async fn delete_in_tx<'e, E>(executor: E, trigger_id: &str) -> Result<bool>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM triggers
+            WHERE id = $1
+            "#,
+        )
+        .bind(trigger_id)
+        .execute(executor)
+        .await
+        .context("Failed to delete trigger")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Update trigger enabled status within a transaction
+    pub async fn update_enabled_in_tx<'e, E>(
+        executor: E,
+        trigger_id: &str,
+        enabled: bool,
+    ) -> Result<()>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let now = chrono::Utc::now();
+
+        sqlx::query(
+            r#"
+            UPDATE triggers SET
+                enabled = $1,
+                updated_at = $2
+            WHERE id = $3
+            "#,
+        )
+        .bind(enabled)
+        .bind(now)
+        .bind(trigger_id)
+        .execute(executor)
+        .await
+        .context("Failed to update trigger enabled status")?;
+
+        Ok(())
     }
 
     /// Find trigger by ID

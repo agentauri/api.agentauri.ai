@@ -2,6 +2,7 @@
 
 pub mod a2a;
 pub mod actions;
+pub mod agent_follows;
 pub mod api_keys;
 pub mod auth;
 pub mod billing;
@@ -16,6 +17,7 @@ pub mod wallet;
 
 // Re-exports for commonly used types
 pub use actions::*;
+pub use agent_follows::*;
 pub use api_keys::*;
 pub use auth::*;
 pub use circuit_breaker::*;

@@ -2,6 +2,7 @@
 
 pub mod a2a;
 pub mod actions;
+pub mod agent_follows;
 pub mod agents;
 pub mod api_keys;
 pub mod auth;
@@ -35,6 +36,12 @@ pub use triggers::*;
 pub use agents::{
     __path_link_agent, __path_list_linked_agents, __path_unlink_agent, link_agent,
     list_linked_agents, unlink_agent,
+};
+
+// Explicitly re-export agent follow handlers
+pub use agent_follows::{
+    __path_follow_agent, __path_list_following, __path_unfollow_agent, __path_update_follow,
+    follow_agent, list_following, unfollow_agent, update_follow,
 };
 
 // Explicitly re-export billing handlers

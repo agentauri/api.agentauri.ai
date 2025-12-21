@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use shared::models::TriggerAction;
 use shared::DbPool;
+use sqlx::{Executor, Postgres};
 
 pub struct ActionRepository;
 
@@ -34,6 +35,57 @@ impl ActionRepository {
         .context("Failed to create action")?;
 
         Ok(action)
+    }
+
+    /// Create a new action within a transaction
+    pub async fn create_in_tx<'e, E>(
+        executor: E,
+        trigger_id: &str,
+        action_type: &str,
+        priority: i32,
+        config: &serde_json::Value,
+    ) -> Result<TriggerAction>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let now = chrono::Utc::now();
+
+        let action = sqlx::query_as::<_, TriggerAction>(
+            r#"
+            INSERT INTO trigger_actions (trigger_id, action_type, priority, config, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            "#,
+        )
+        .bind(trigger_id)
+        .bind(action_type)
+        .bind(priority)
+        .bind(config)
+        .bind(now)
+        .fetch_one(executor)
+        .await
+        .context("Failed to create action")?;
+
+        Ok(action)
+    }
+
+    /// Delete all actions for a trigger within a transaction
+    pub async fn delete_by_trigger_in_tx<'e, E>(executor: E, trigger_id: &str) -> Result<u64>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM trigger_actions
+            WHERE trigger_id = $1
+            "#,
+        )
+        .bind(trigger_id)
+        .execute(executor)
+        .await
+        .context("Failed to delete actions")?;
+
+        Ok(result.rows_affected())
     }
 
     /// Find action by ID

@@ -52,6 +52,30 @@ pub struct OrganizationMember {
     pub created_at: DateTime<Utc>,
 }
 
+/// Agent follow relationship for simplified multi-registry monitoring.
+///
+/// Creates 3 underlying triggers (identity, reputation, validation) to
+/// monitor all activities of a specific ERC-8004 agent.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AgentFollow {
+    pub id: String,
+    /// ERC-8004 token ID being followed
+    pub agent_id: i64,
+    /// Blockchain chain ID
+    pub chain_id: i32,
+    pub organization_id: String,
+    pub user_id: String,
+    /// Auto-managed trigger for identity registry events
+    pub trigger_identity_id: String,
+    /// Auto-managed trigger for reputation registry events
+    pub trigger_reputation_id: String,
+    /// Auto-managed trigger for validation registry events
+    pub trigger_validation_id: String,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Trigger configuration
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Trigger {

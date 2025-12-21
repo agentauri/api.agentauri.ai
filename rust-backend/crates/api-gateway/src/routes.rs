@@ -93,12 +93,21 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("", web::get().to(handlers::list_oauth_clients))
                             .route("/{id}", web::delete().to(handlers::delete_oauth_client)),
                     )
-                    // Agent linking endpoints (Layer 2 - wallet signature auth)
+                    // Agent endpoints
                     .service(
                         web::scope("/agents")
+                            // Agent linking (Layer 2 - wallet signature auth)
                             .route("/link", web::post().to(handlers::link_agent))
                             .route("/linked", web::get().to(handlers::list_linked_agents))
-                            .route("/{agent_id}/link", web::delete().to(handlers::unlink_agent)),
+                            .route("/{agent_id}/link", web::delete().to(handlers::unlink_agent))
+                            // Agent following (simplified multi-registry monitoring)
+                            .route("/following", web::get().to(handlers::list_following))
+                            .route("/{agent_id}/follow", web::post().to(handlers::follow_agent))
+                            .route("/{agent_id}/follow", web::put().to(handlers::update_follow))
+                            .route(
+                                "/{agent_id}/follow",
+                                web::delete().to(handlers::unfollow_agent),
+                            ),
                     )
                     // Billing endpoints
                     .service(

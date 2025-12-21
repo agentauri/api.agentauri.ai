@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use shared::models::TriggerCondition;
 use shared::DbPool;
+use sqlx::{Executor, Postgres};
 
 pub struct ConditionRepository;
 
@@ -38,6 +39,61 @@ impl ConditionRepository {
         .context("Failed to create condition")?;
 
         Ok(condition)
+    }
+
+    /// Create a new condition within a transaction
+    pub async fn create_in_tx<'e, E>(
+        executor: E,
+        trigger_id: &str,
+        condition_type: &str,
+        field: &str,
+        operator: &str,
+        value: &str,
+        config: Option<&serde_json::Value>,
+    ) -> Result<TriggerCondition>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let now = chrono::Utc::now();
+
+        let condition = sqlx::query_as::<_, TriggerCondition>(
+            r#"
+            INSERT INTO trigger_conditions (trigger_id, condition_type, field, operator, value, config, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+            "#,
+        )
+        .bind(trigger_id)
+        .bind(condition_type)
+        .bind(field)
+        .bind(operator)
+        .bind(value)
+        .bind(config)
+        .bind(now)
+        .fetch_one(executor)
+        .await
+        .context("Failed to create condition")?;
+
+        Ok(condition)
+    }
+
+    /// Delete all conditions for a trigger within a transaction
+    pub async fn delete_by_trigger_in_tx<'e, E>(executor: E, trigger_id: &str) -> Result<u64>
+    where
+        E: Executor<'e, Database = Postgres>,
+    {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM trigger_conditions
+            WHERE trigger_id = $1
+            "#,
+        )
+        .bind(trigger_id)
+        .execute(executor)
+        .await
+        .context("Failed to delete conditions")?;
+
+        Ok(result.rows_affected())
     }
 
     /// Find condition by ID
