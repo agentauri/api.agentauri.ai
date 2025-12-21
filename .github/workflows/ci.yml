@@ -189,17 +189,19 @@ jobs:
 
       # sccache for faster incremental builds (with graceful fallback)
       - name: Setup sccache
+        id: sccache
         uses: mozilla-actions/sccache-action@v0.0.4
         continue-on-error: true
 
       - name: Configure sccache
         run: |
-          if command -v sccache &> /dev/null; then
+          # Only enable sccache if the action succeeded AND sccache actually works
+          if [ "${{ steps.sccache.outcome }}" = "success" ] && command -v sccache &> /dev/null && sccache --version &> /dev/null; then
             echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
             echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
             echo "::notice::sccache enabled for faster builds"
           else
-            echo "::notice::sccache not available, using standard build"
+            echo "::notice::sccache not available or failed to start, using standard build"
           fi
 
       - name: Cache Rust dependencies
