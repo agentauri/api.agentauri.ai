@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # =============================================================================
 # AgentAuri Backend - Multi-Stage Docker Build with Cargo Chef
 # =============================================================================
@@ -8,6 +9,11 @@
 #
 # Uses cargo-chef for dependency caching - dependencies are only recompiled
 # when Cargo.toml or Cargo.lock changes, not on every source code change.
+#
+# Build optimizations:
+# - cargo-chef: Separates dependency compilation from source changes
+# - thin LTO + codegen-units=4: Faster builds, lower memory usage
+# - BuildKit cache: Persistent cargo registry cache between builds
 #
 # Usage:
 #   docker build -t agentauri-backend .
@@ -49,19 +55,30 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure Cargo for memory-efficient release builds
+# Configure Cargo for optimized CI/CD builds
 # - Uses "thin" LTO instead of "fat" LTO (much less memory intensive)
-# - Increases codegen-units to reduce peak memory during compilation
+# - codegen-units = 4: reduces peak memory, enables parallel compilation
+# - jobs = 4: parallel Cargo jobs for faster builds
 # - Still produces optimized binaries suitable for production
-RUN mkdir -p .cargo && echo '[profile.release]\nlto = "thin"\ncodegen-units = 4' > .cargo/config.toml
+RUN mkdir -p .cargo && cat > .cargo/config.toml << 'EOF'
+[profile.release]
+lto = "thin"
+codegen-units = 4
+
+[build]
+jobs = 4
+EOF
 
 # Enable SQLx offline mode (uses cached query metadata)
 ENV SQLX_OFFLINE=true
 
 # Copy recipe from planner and build ONLY dependencies
 # This layer is cached as long as Cargo.toml/Cargo.lock don't change
+# BuildKit cache mounts persist cargo registry between builds
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --features aws-secrets --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo chef cook --release --features aws-secrets --recipe-path recipe.json
 
 # Now copy actual source code
 COPY Cargo.toml Cargo.lock ./
@@ -69,7 +86,10 @@ COPY crates/ crates/
 COPY .sqlx/ .sqlx/
 
 # Build workspace binaries (dependencies already compiled above)
-RUN cargo build --release --features aws-secrets
+# Cache mounts provide incremental compilation benefits
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo build --release --features aws-secrets
 
 # -----------------------------------------------------------------------------
 # Stage 4: Runtime Environment

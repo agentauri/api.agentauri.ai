@@ -82,9 +82,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # mode=max caches all layers, not just final; improves incremental builds
           cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-to: type=gha,mode=max
           platforms: linux/amd64
+          # Enable inline cache for ECR-to-ECR builds
+          provenance: false
 
       - name: Output image URI
         run: |

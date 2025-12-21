@@ -183,17 +183,32 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           components: rustfmt, clippy
+
+      # sccache for faster incremental builds (with graceful fallback)
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.4
+        continue-on-error: true
+
+      - name: Configure sccache
+        run: |
+          if command -v sccache &> /dev/null; then
+            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            echo "::notice::sccache enabled for faster builds"
+          else
+            echo "::notice::sccache not available, using standard build"
+          fi
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: rust-backend
+          workspaces: rust-backend -> target
+          shared-key: ci-rust
+          cache-targets: true
+          cache-all-crates: true
 
       - name: Run database migrations
         run: |
@@ -207,6 +222,8 @@ jobs:
 
       - name: Run Clippy
         working-directory: rust-backend
+        env:
+          SQLX_OFFLINE: true
         # Note: Clippy runs WITHOUT DATABASE_URL, using SQLx offline mode.
         # If this fails with "set DATABASE_URL...", run `cargo sqlx prepare --workspace`
         # locally and commit the updated .sqlx/ directory.
