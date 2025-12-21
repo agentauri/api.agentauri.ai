@@ -1,0 +1,309 @@
+//! A2A Task Processor Service
+//!
+//! Background task processor for A2A Protocol tasks.
+//! Polls the database for submitted tasks and executes them using the QueryExecutor.
+//!
+//! ## Architecture
+//!
+//! 1. Polls `a2a_tasks` table for tasks with status = 'submitted'
+//! 2. Updates task to 'working' and sets `started_at`
+//! 3. Executes the query using QueryExecutor
+//! 4. Updates task with result/error and sets `completed_at`
+//!
+//! ## Concurrency
+//!
+//! - Single processor instance to avoid duplicate processing
+//! - Database-level locking via status update
+//! - Future: Add worker pool for parallel processing
+
+use std::time::Duration;
+use tokio::time::interval;
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, info, warn};
+
+use shared::DbPool;
+use uuid::Uuid;
+
+use super::query_executor::QueryExecutor;
+
+/// Default poll interval for checking new tasks
+const DEFAULT_POLL_INTERVAL_SECS: u64 = 1;
+
+/// Maximum tasks to claim per poll cycle
+const MAX_TASKS_PER_CYCLE: i64 = 10;
+
+/// A2A Task Processor configuration
+#[derive(Debug, Clone)]
+pub struct A2aTaskProcessorConfig {
+    /// Interval between poll cycles
+    pub poll_interval: Duration,
+    /// Maximum tasks to claim per cycle
+    pub max_tasks_per_cycle: i64,
+}
+
+impl Default for A2aTaskProcessorConfig {
+    fn default() -> Self {
+        let poll_interval_secs = std::env::var("A2A_POLL_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(DEFAULT_POLL_INTERVAL_SECS);
+
+        Self {
+            poll_interval: Duration::from_secs(poll_interval_secs),
+            max_tasks_per_cycle: MAX_TASKS_PER_CYCLE,
+        }
+    }
+}
+
+/// A2A Task Processor
+///
+/// Runs in the background and processes A2A tasks.
+pub struct A2aTaskProcessor {
+    pool: DbPool,
+    config: A2aTaskProcessorConfig,
+    executor: QueryExecutor,
+}
+
+impl A2aTaskProcessor {
+    /// Create a new task processor
+    pub fn new(pool: DbPool) -> Self {
+        Self::with_config(pool.clone(), A2aTaskProcessorConfig::default())
+    }
+
+    /// Create a new task processor with custom configuration
+    pub fn with_config(pool: DbPool, config: A2aTaskProcessorConfig) -> Self {
+        let executor = QueryExecutor::new(pool.clone());
+        Self {
+            pool,
+            config,
+            executor,
+        }
+    }
+
+    /// Start the task processor
+    ///
+    /// Runs until the cancellation token is triggered.
+    pub async fn run(&self, cancel_token: CancellationToken) {
+        let mut poll_interval = interval(self.config.poll_interval);
+
+        info!(
+            poll_interval_ms = ?self.config.poll_interval.as_millis(),
+            max_tasks_per_cycle = self.config.max_tasks_per_cycle,
+            "A2A Task Processor started"
+        );
+
+        loop {
+            tokio::select! {
+                _ = cancel_token.cancelled() => {
+                    info!("A2A Task Processor stopping due to shutdown");
+                    break;
+                }
+                _ = poll_interval.tick() => {
+                    if let Err(e) = self.process_pending_tasks().await {
+                        error!(error = %e, "Error processing A2A tasks");
+                    }
+                }
+            }
+        }
+
+        info!("A2A Task Processor stopped");
+    }
+
+    /// Process pending tasks
+    async fn process_pending_tasks(&self) -> anyhow::Result<()> {
+        // Claim tasks atomically by updating status from 'submitted' to 'working'
+        let tasks = self.claim_tasks().await?;
+
+        if tasks.is_empty() {
+            debug!("No pending A2A tasks");
+            return Ok(());
+        }
+
+        info!(count = tasks.len(), "Processing A2A tasks");
+
+        // Process each task
+        for task in tasks {
+            self.process_task(&task).await;
+        }
+
+        Ok(())
+    }
+
+    /// Claim tasks for processing
+    ///
+    /// Uses UPDATE ... RETURNING to atomically claim tasks.
+    async fn claim_tasks(&self) -> anyhow::Result<Vec<ClaimedTask>> {
+        let tasks = sqlx::query_as::<_, ClaimedTask>(
+            r#"
+            UPDATE a2a_tasks
+            SET status = 'working', started_at = NOW(), updated_at = NOW()
+            WHERE id IN (
+                SELECT id FROM a2a_tasks
+                WHERE status = 'submitted'
+                ORDER BY created_at ASC
+                LIMIT $1
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id, tool, arguments
+            "#,
+        )
+        .bind(self.config.max_tasks_per_cycle)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(tasks)
+    }
+
+    /// Process a single task
+    async fn process_task(&self, task: &ClaimedTask) {
+        info!(
+            task_id = %task.id,
+            tool = %task.tool,
+            "Processing A2A task"
+        );
+
+        let start = std::time::Instant::now();
+
+        // Execute the query
+        match self.executor.execute(&task.tool, &task.arguments).await {
+            Ok((result, cost)) => {
+                let duration = start.elapsed();
+
+                // Update task as completed
+                if let Err(e) = self.complete_task(&task.id, &result, cost).await {
+                    error!(
+                        task_id = %task.id,
+                        error = %e,
+                        "Failed to mark task as completed"
+                    );
+                } else {
+                    info!(
+                        task_id = %task.id,
+                        tool = %task.tool,
+                        duration_ms = duration.as_millis(),
+                        cost = cost,
+                        "A2A task completed successfully"
+                    );
+                }
+            }
+            Err(e) => {
+                let duration = start.elapsed();
+
+                // Update task as failed
+                if let Err(update_err) = self.fail_task(&task.id, &e.to_string()).await {
+                    error!(
+                        task_id = %task.id,
+                        error = %update_err,
+                        "Failed to mark task as failed"
+                    );
+                }
+
+                warn!(
+                    task_id = %task.id,
+                    tool = %task.tool,
+                    error = %e,
+                    duration_ms = duration.as_millis(),
+                    "A2A task failed"
+                );
+            }
+        }
+    }
+
+    /// Mark a task as completed
+    async fn complete_task(
+        &self,
+        task_id: &Uuid,
+        result: &serde_json::Value,
+        cost: f64,
+    ) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE a2a_tasks
+            SET
+                status = 'completed',
+                progress = 1.0,
+                result = $2,
+                cost = $3,
+                completed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+        )
+        .bind(task_id)
+        .bind(result)
+        .bind(cost)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Mark a task as failed
+    async fn fail_task(&self, task_id: &Uuid, error: &str) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE a2a_tasks
+            SET
+                status = 'failed',
+                error = $2,
+                completed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+        )
+        .bind(task_id)
+        .bind(error)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+}
+
+/// Task claimed for processing
+#[derive(Debug, sqlx::FromRow)]
+struct ClaimedTask {
+    id: Uuid,
+    tool: String,
+    arguments: serde_json::Value,
+}
+
+/// Start the A2A task processor as a background task
+///
+/// Returns a cancellation token to stop the processor.
+pub fn start_a2a_task_processor(pool: DbPool) -> CancellationToken {
+    let processor = A2aTaskProcessor::new(pool);
+    let cancel_token = CancellationToken::new();
+    let token_clone = cancel_token.clone();
+
+    tokio::spawn(async move {
+        processor.run(token_clone).await;
+    });
+
+    cancel_token
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = A2aTaskProcessorConfig::default();
+        assert_eq!(
+            config.poll_interval,
+            Duration::from_secs(DEFAULT_POLL_INTERVAL_SECS)
+        );
+        assert_eq!(config.max_tasks_per_cycle, MAX_TASKS_PER_CYCLE);
+    }
+
+    #[test]
+    fn test_custom_config() {
+        let config = A2aTaskProcessorConfig {
+            poll_interval: Duration::from_secs(5),
+            max_tasks_per_cycle: 5,
+        };
+        assert_eq!(config.poll_interval, Duration::from_secs(5));
+        assert_eq!(config.max_tasks_per_cycle, 5);
+    }
+}

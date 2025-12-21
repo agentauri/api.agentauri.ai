@@ -16,7 +16,7 @@ use api_gateway::middleware::request_id::RequestId;
 use api_gateway::middleware::security_headers::SecurityHeaders;
 use api_gateway::middleware::unified_rate_limiter::UnifiedRateLimiter;
 use api_gateway::openapi::ApiDoc;
-use api_gateway::services::{SocialAuthService, WalletService};
+use api_gateway::services::{start_a2a_task_processor, SocialAuthService, WalletService};
 use api_gateway::{middleware, routes};
 
 #[actix_web::main]
@@ -122,6 +122,10 @@ async fn main() -> anyhow::Result<()> {
         "Background tasks started (nonces, OAuth tokens, payment nonces, auth failures cleanup)"
     );
 
+    // Start A2A task processor (processes submitted A2A Protocol tasks)
+    let a2a_shutdown_token = start_a2a_task_processor(db_pool.clone());
+    tracing::info!("A2A Task Processor started");
+
     let server_addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("API Gateway listening on {}", server_addr);
 
@@ -174,6 +178,7 @@ async fn main() -> anyhow::Result<()> {
             Ok(()) => {
                 tracing::info!("Shutdown signal received, stopping background tasks...");
                 shutdown_token.cancel();
+                a2a_shutdown_token.cancel();
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to listen for shutdown signal");
