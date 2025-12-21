@@ -195,13 +195,18 @@ jobs:
 
       - name: Configure sccache
         run: |
-          # Only enable sccache if the action succeeded AND sccache actually works
-          if [ "${{ steps.sccache.outcome }}" = "success" ] && command -v sccache &> /dev/null && sccache --version &> /dev/null; then
+          # Only enable sccache if action succeeded AND server can connect to cache backend
+          # Test with --show-stats which attempts actual server connection
+          if [ "${{ steps.sccache.outcome }}" = "success" ] && \
+             command -v sccache &> /dev/null && \
+             timeout 10 sccache --show-stats &> /dev/null; then
             echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
             echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
             echo "::notice::sccache enabled for faster builds"
           else
-            echo "::notice::sccache not available or failed to start, using standard build"
+            echo "::notice::sccache not available or cache backend unreachable, using standard build"
+            # Ensure RUSTC_WRAPPER is NOT set if sccache fails
+            echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
           fi
 
       - name: Cache Rust dependencies
