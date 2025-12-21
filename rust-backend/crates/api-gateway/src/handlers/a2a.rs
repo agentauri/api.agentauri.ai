@@ -18,6 +18,7 @@ use crate::models::a2a::{
     TaskGetParams, TaskGetResult, TaskSendParams, TaskSendResult, TaskStatus,
 };
 use crate::repositories::{A2aTaskRepository, CreditRepository};
+use crate::services::{A2aAuditService, AuditActor, ToolRegistry};
 
 // ============================================================================
 // JSON-RPC Main Endpoint
@@ -127,10 +128,14 @@ async fn handle_tasks_send(
         }
     };
 
-    // Validate tool name
-    if !is_valid_tool(&send_params.task.tool) {
+    // Validate tool name using centralized ToolRegistry
+    if !ToolRegistry::is_valid(&send_params.task.tool) {
+        let valid_tools = ToolRegistry::tool_names().join(", ");
         return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
-            JsonRpcError::invalid_params(&format!("Unknown tool: {}", send_params.task.tool)),
+            JsonRpcError::invalid_params(&format!(
+                "Unknown tool: '{}'. Valid tools: {}",
+                send_params.task.tool, valid_tools
+            )),
             request_id,
         ));
     }
@@ -189,7 +194,8 @@ async fn handle_tasks_send(
     }
 
     // SECURITY: Credit validation - check sufficient balance before creating task
-    let cost_micro_usdc = get_cost_micro_usdc(&send_params.task.tool);
+    // Use centralized ToolRegistry for cost lookup
+    let cost_micro_usdc = ToolRegistry::get_cost_micro_usdc(&send_params.task.tool);
     if cost_micro_usdc > 0 {
         match CreditRepository::get_balance(pool, org_id).await {
             Ok(Some(credit)) => {
@@ -248,10 +254,25 @@ async fn handle_tasks_send(
     .await
     {
         Ok(task) => {
+            // AUDIT: Log task creation
+            if let Err(e) = A2aAuditService::log_created(
+                pool,
+                &task.id,
+                org_id,
+                &send_params.task.tool,
+                AuditActor::ApiKey(org_id.to_string()), // In production, use actual API key prefix
+            )
+            .await
+            {
+                tracing::warn!("Failed to log task creation audit: {:?}", e);
+                // Don't fail the request for audit failures
+            }
+
             let result = TaskSendResult {
                 task_id: task.id.to_string(),
                 status: TaskStatus::Submitted,
-                estimated_cost: estimate_cost(&send_params.task.tool),
+                estimated_cost: ToolRegistry::get_cost_display(&send_params.task.tool)
+                    .map(String::from),
             };
             HttpResponse::Ok().json(JsonRpcResponse::success(result, request_id))
         }
@@ -346,6 +367,18 @@ async fn handle_tasks_cancel(
     // Cancel task
     match A2aTaskRepository::cancel_task(pool, &task_id, org_id).await {
         Ok(Some(task)) => {
+            // AUDIT: Log task cancellation
+            if let Err(e) = A2aAuditService::log_cancelled(
+                pool,
+                &task.id,
+                org_id,
+                AuditActor::ApiKey(org_id.to_string()),
+            )
+            .await
+            {
+                tracing::warn!("Failed to log task cancellation audit: {:?}", e);
+            }
+
             let result = TaskCancelResult {
                 task_id: task.id.to_string(),
                 status: TaskStatus::Cancelled,
@@ -597,54 +630,6 @@ pub async fn stream_task_progress(
 }
 
 // ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Validate tool name
-fn is_valid_tool(tool: &str) -> bool {
-    matches!(
-        tool,
-        "getMyFeedbacks"
-            | "getAgentProfile"
-            | "getReputationSummary"
-            | "getTrend"
-            | "getValidationHistory"
-            | "getReputationReport"
-    )
-}
-
-/// Estimate cost based on tool tier (returns human-readable string)
-fn estimate_cost(tool: &str) -> Option<String> {
-    let cost = match tool {
-        // Tier 0: Raw data
-        "getMyFeedbacks" | "getAgentProfile" => "0.001 USDC",
-        // Tier 1: Aggregated
-        "getReputationSummary" | "getTrend" | "getValidationHistory" => "0.01 USDC",
-        // Tier 2: Analysis
-        // Tier 3: AI-powered
-        "getReputationReport" => "0.20 USDC",
-        _ => return None,
-    };
-    Some(cost.to_string())
-}
-
-/// Get cost in micro-USDC (6 decimals) for credit validation
-///
-/// Returns the cost as an i64 where 1 USDC = 1,000,000 micro-USDC
-fn get_cost_micro_usdc(tool: &str) -> i64 {
-    match tool {
-        // Tier 0: Raw data (0.001 USDC = 1,000 micro-USDC)
-        "getMyFeedbacks" | "getAgentProfile" => 1_000,
-        // Tier 1: Aggregated (0.01 USDC = 10,000 micro-USDC)
-        "getReputationSummary" | "getTrend" | "getValidationHistory" => 10_000,
-        // Tier 2: Analysis - not yet implemented
-        // Tier 3: AI-powered (0.20 USDC = 200,000 micro-USDC)
-        "getReputationReport" => 200_000,
-        _ => 0,
-    }
-}
-
-// ============================================================================
 // Tests
 // ============================================================================
 
@@ -653,59 +638,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_valid_tool() {
-        assert!(is_valid_tool("getMyFeedbacks"));
-        assert!(is_valid_tool("getReputationSummary"));
-        assert!(is_valid_tool("getReputationReport"));
-        assert!(!is_valid_tool("unknownTool"));
-        assert!(!is_valid_tool(""));
+    fn test_tool_registry_is_valid() {
+        // Valid tools
+        assert!(ToolRegistry::is_valid("getMyFeedbacks"));
+        assert!(ToolRegistry::is_valid("getAgentProfile"));
+        assert!(ToolRegistry::is_valid("getReputationSummary"));
+        assert!(ToolRegistry::is_valid("getTrend"));
+        assert!(ToolRegistry::is_valid("getValidationHistory"));
+        assert!(ToolRegistry::is_valid("getReputationReport"));
+
+        // Invalid tools
+        assert!(!ToolRegistry::is_valid("unknownTool"));
+        assert!(!ToolRegistry::is_valid(""));
     }
 
     #[test]
-    fn test_estimate_cost() {
+    fn test_tool_registry_get_cost_display() {
         assert_eq!(
-            estimate_cost("getMyFeedbacks"),
-            Some("0.001 USDC".to_string())
+            ToolRegistry::get_cost_display("getMyFeedbacks"),
+            Some("0.001 USDC")
         );
         assert_eq!(
-            estimate_cost("getReputationSummary"),
-            Some("0.01 USDC".to_string())
+            ToolRegistry::get_cost_display("getReputationSummary"),
+            Some("0.01 USDC")
         );
         assert_eq!(
-            estimate_cost("getReputationReport"),
-            Some("0.20 USDC".to_string())
+            ToolRegistry::get_cost_display("getReputationReport"),
+            Some("0.20 USDC")
         );
-        assert_eq!(estimate_cost("unknownTool"), None);
+        assert_eq!(ToolRegistry::get_cost_display("unknownTool"), None);
     }
 
     #[test]
-    fn test_get_cost_micro_usdc() {
+    fn test_tool_registry_get_cost_micro_usdc() {
         // Tier 0: 0.001 USDC = 1,000 micro-USDC
-        assert_eq!(get_cost_micro_usdc("getMyFeedbacks"), 1_000);
-        assert_eq!(get_cost_micro_usdc("getAgentProfile"), 1_000);
+        assert_eq!(ToolRegistry::get_cost_micro_usdc("getMyFeedbacks"), 1_000);
+        assert_eq!(ToolRegistry::get_cost_micro_usdc("getAgentProfile"), 1_000);
 
         // Tier 1: 0.01 USDC = 10,000 micro-USDC
-        assert_eq!(get_cost_micro_usdc("getReputationSummary"), 10_000);
-        assert_eq!(get_cost_micro_usdc("getTrend"), 10_000);
-        assert_eq!(get_cost_micro_usdc("getValidationHistory"), 10_000);
+        assert_eq!(
+            ToolRegistry::get_cost_micro_usdc("getReputationSummary"),
+            10_000
+        );
+        assert_eq!(ToolRegistry::get_cost_micro_usdc("getTrend"), 10_000);
+        assert_eq!(
+            ToolRegistry::get_cost_micro_usdc("getValidationHistory"),
+            10_000
+        );
 
         // Tier 3: 0.20 USDC = 200,000 micro-USDC
-        assert_eq!(get_cost_micro_usdc("getReputationReport"), 200_000);
+        assert_eq!(
+            ToolRegistry::get_cost_micro_usdc("getReputationReport"),
+            200_000
+        );
 
         // Unknown tool returns 0
-        assert_eq!(get_cost_micro_usdc("unknownTool"), 0);
-    }
-
-    #[test]
-    fn test_cost_consistency() {
-        // Verify that estimate_cost and get_cost_micro_usdc are consistent
-        // 0.001 USDC = 1,000 micro-USDC
-        assert_eq!(get_cost_micro_usdc("getMyFeedbacks"), 1_000);
-
-        // 0.01 USDC = 10,000 micro-USDC
-        assert_eq!(get_cost_micro_usdc("getReputationSummary"), 10_000);
-
-        // 0.20 USDC = 200,000 micro-USDC
-        assert_eq!(get_cost_micro_usdc("getReputationReport"), 200_000);
+        assert_eq!(ToolRegistry::get_cost_micro_usdc("unknownTool"), 0);
     }
 }
