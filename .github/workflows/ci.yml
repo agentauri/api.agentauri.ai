@@ -187,24 +187,42 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # NOTE: sccache temporarily disabled due to GitHub Actions cache backend
-      # instability causing "Our services aren't available right now" errors.
-      # The sccache-action sets RUSTC_WRAPPER before we can verify the backend,
-      # causing builds to fail even with fallback logic. Re-enable when stable.
-      # See: https://github.com/mozilla/sccache/issues/2259
-      #
-      # - name: Setup sccache
-      #   id: sccache
-      #   uses: mozilla-actions/sccache-action@v0.0.4
-      #   continue-on-error: true
-      #
-      # - name: Configure sccache
-      #   run: |
-      #     if [ "${{ steps.sccache.outcome }}" = "success" ] && \
-      #        timeout 10 sccache --show-stats &> /dev/null; then
-      #       echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-      #       echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      #     fi
+      # sccache with manual setup for proper fallback control
+      # The mozilla-actions/sccache-action sets RUSTC_WRAPPER before we can verify
+      # the backend, so we install manually and test the connection first.
+      - name: Setup sccache
+        id: sccache
+        continue-on-error: true
+        run: |
+          # Install sccache
+          SCCACHE_VERSION="0.8.2"
+          curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz
+          sudo mv "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" /usr/local/bin/
+          sccache --version
+
+      - name: Configure sccache
+        run: |
+          if command -v sccache &> /dev/null; then
+            # Configure for GitHub Actions cache backend
+            export SCCACHE_GHA_ENABLED=true
+            export ACTIONS_CACHE_URL="${ACTIONS_CACHE_URL}"
+            export ACTIONS_RUNTIME_TOKEN="${ACTIONS_RUNTIME_TOKEN}"
+
+            # Test if the cache backend is actually reachable
+            # sccache --start-server will fail if backend is unavailable
+            if timeout 15 sccache --start-server 2>/dev/null && \
+               timeout 5 sccache --show-stats &>/dev/null; then
+              echo "::notice::sccache enabled - cache backend is reachable"
+              echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            else
+              echo "::warning::sccache cache backend unreachable, using standard build"
+              # Stop any partially started server
+              sccache --stop-server 2>/dev/null || true
+            fi
+          else
+            echo "::notice::sccache not installed, using standard build"
+          fi
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
