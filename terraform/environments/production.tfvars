@@ -30,7 +30,7 @@ action_workers_desired_count = 2
 
 # Container Image
 container_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-backend"
-container_image_tag = "v1.0.12"
+container_image_tag = "latest"
 
 # RDS PostgreSQL
 # Note: Using free tier compatible settings. Upgrade later:
