@@ -18,12 +18,10 @@ pub use a2a_tasks::A2aTaskRepository;
 pub use actions::ActionRepository;
 pub use agent_links::AgentLinkRepository;
 pub use api_keys::{ApiKeyAuditRepository, ApiKeyRepository, AuthFailureRepository};
+pub use billing::CreditRepository;
 pub use conditions::ConditionRepository;
 pub use oauth::{OAuthClientRepository, OAuthTokenRepository};
 pub use organizations::{MemberRepository, OrganizationRepository, OrganizationWithRole};
 pub use triggers::TriggerRepository;
 pub use user_identities::UserIdentityRepository;
 pub use users::UserRepository;
-
-// Billing and wallet repositories are accessed via their modules
-// when needed (e.g., crate::repositories::billing::CreditRepository)

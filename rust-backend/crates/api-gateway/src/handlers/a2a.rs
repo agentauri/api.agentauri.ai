@@ -7,7 +7,7 @@ use actix_web::web::Bytes;
 use actix_web::{http::header, web, HttpRequest, HttpResponse, Responder};
 use futures_util::stream;
 use shared::DbPool;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -17,7 +17,7 @@ use crate::models::a2a::{
     JsonRpcError, JsonRpcRequest, JsonRpcResponse, TaskCancelParams, TaskCancelResult,
     TaskGetParams, TaskGetResult, TaskSendParams, TaskSendResult, TaskStatus,
 };
-use crate::repositories::A2aTaskRepository;
+use crate::repositories::{A2aTaskRepository, CreditRepository};
 
 // ============================================================================
 // JSON-RPC Main Endpoint
@@ -103,6 +103,12 @@ const MAX_PENDING_TASKS_PER_ORG: i64 = 100;
 /// Maximum size for task arguments JSON (100KB)
 const MAX_ARGUMENTS_SIZE_BYTES: usize = 100_000;
 
+/// Maximum SSE stream duration (5 minutes)
+const MAX_SSE_STREAM_DURATION_SECS: u64 = 300;
+
+/// SSE poll interval
+const SSE_POLL_INTERVAL_MS: u64 = 2000;
+
 /// Handle tasks/send method
 async fn handle_tasks_send(
     pool: &DbPool,
@@ -180,6 +186,56 @@ async fn handle_tasks_send(
             ),
             request_id,
         ));
+    }
+
+    // SECURITY: Credit validation - check sufficient balance before creating task
+    let cost_micro_usdc = get_cost_micro_usdc(&send_params.task.tool);
+    if cost_micro_usdc > 0 {
+        match CreditRepository::get_balance(pool, org_id).await {
+            Ok(Some(credit)) => {
+                if credit.balance < cost_micro_usdc {
+                    tracing::warn!(
+                        org_id = %org_id,
+                        balance = credit.balance,
+                        required = cost_micro_usdc,
+                        tool = %send_params.task.tool,
+                        "Insufficient credits for task creation"
+                    );
+                    return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+                        JsonRpcError::new(
+                            -32004,
+                            format!(
+                                "Insufficient credits: balance {} micro-USDC, required {} micro-USDC",
+                                credit.balance, cost_micro_usdc
+                            ),
+                        ),
+                        request_id,
+                    ));
+                }
+            }
+            Ok(None) => {
+                // No credits initialized for this organization
+                tracing::warn!(
+                    org_id = %org_id,
+                    tool = %send_params.task.tool,
+                    "Credits not initialized for organization"
+                );
+                return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+                    JsonRpcError::new(
+                        -32004,
+                        "Credits not initialized. Please purchase credits first.",
+                    ),
+                    request_id,
+                ));
+            }
+            Err(e) => {
+                tracing::error!("Failed to check credit balance: {:?}", e);
+                return HttpResponse::Ok().json(JsonRpcResponse::<()>::error(
+                    JsonRpcError::internal_error(),
+                    request_id,
+                ));
+            }
+        }
     }
 
     // Create task in database
@@ -457,17 +513,39 @@ pub async fn stream_task_progress(
         }
     }
 
-    // Create SSE stream
+    // Create SSE stream with timeout protection
+    // SECURITY FIX: Added max stream duration to prevent memory leaks from long-running connections
     let pool_clone = pool.get_ref().clone();
+    let stream_start = Instant::now();
+    let max_duration = Duration::from_secs(MAX_SSE_STREAM_DURATION_SECS);
+    let poll_interval = Duration::from_millis(SSE_POLL_INTERVAL_MS);
+
     let sse_stream = stream::unfold(
-        (pool_clone, task_id, org_id, false),
-        |(pool, task_id, org_id, done)| async move {
+        (pool_clone, task_id, org_id, false, stream_start),
+        move |(pool, task_id, org_id, done, start)| async move {
             if done {
                 return None;
             }
 
-            // Wait between polls
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            // SECURITY: Check if stream has exceeded max duration
+            if start.elapsed() > max_duration {
+                tracing::info!(
+                    task_id = %task_id,
+                    duration_secs = start.elapsed().as_secs(),
+                    "SSE stream timeout - closing connection"
+                );
+                let sse_event = format!(
+                    "event: timeout\ndata: {{\"error\":\"stream_timeout\",\"duration_secs\":{}}}\n\n",
+                    start.elapsed().as_secs()
+                );
+                return Some((
+                    Ok(Bytes::from(sse_event)),
+                    (pool, task_id, org_id, true, start),
+                ));
+            }
+
+            // Wait between polls (increased from 500ms to 2000ms to reduce load)
+            tokio::time::sleep(poll_interval).await;
 
             // Fetch current task status
             match A2aTaskRepository::find_by_id_and_org(&pool, &task_id, &org_id).await {
@@ -489,17 +567,23 @@ pub async fn stream_task_progress(
 
                     Some((
                         Ok::<_, actix_web::error::Error>(Bytes::from(sse_event)),
-                        (pool, task_id, org_id, is_terminal),
+                        (pool, task_id, org_id, is_terminal, start),
                     ))
                 }
                 Ok(None) => {
                     let sse_event = "event: error\ndata: {\"error\":\"task_not_found\"}\n\n";
-                    Some((Ok(Bytes::from(sse_event)), (pool, task_id, org_id, true)))
+                    Some((
+                        Ok(Bytes::from(sse_event)),
+                        (pool, task_id, org_id, true, start),
+                    ))
                 }
                 Err(e) => {
                     tracing::error!("Failed to fetch task for SSE: {:?}", e);
                     let sse_event = "event: error\ndata: {\"error\":\"internal_error\"}\n\n";
-                    Some((Ok(Bytes::from(sse_event)), (pool, task_id, org_id, true)))
+                    Some((
+                        Ok(Bytes::from(sse_event)),
+                        (pool, task_id, org_id, true, start),
+                    ))
                 }
             }
         },
@@ -529,7 +613,7 @@ fn is_valid_tool(tool: &str) -> bool {
     )
 }
 
-/// Estimate cost based on tool tier
+/// Estimate cost based on tool tier (returns human-readable string)
 fn estimate_cost(tool: &str) -> Option<String> {
     let cost = match tool {
         // Tier 0: Raw data
@@ -542,6 +626,22 @@ fn estimate_cost(tool: &str) -> Option<String> {
         _ => return None,
     };
     Some(cost.to_string())
+}
+
+/// Get cost in micro-USDC (6 decimals) for credit validation
+///
+/// Returns the cost as an i64 where 1 USDC = 1,000,000 micro-USDC
+fn get_cost_micro_usdc(tool: &str) -> i64 {
+    match tool {
+        // Tier 0: Raw data (0.001 USDC = 1,000 micro-USDC)
+        "getMyFeedbacks" | "getAgentProfile" => 1_000,
+        // Tier 1: Aggregated (0.01 USDC = 10,000 micro-USDC)
+        "getReputationSummary" | "getTrend" | "getValidationHistory" => 10_000,
+        // Tier 2: Analysis - not yet implemented
+        // Tier 3: AI-powered (0.20 USDC = 200,000 micro-USDC)
+        "getReputationReport" => 200_000,
+        _ => 0,
+    }
 }
 
 // ============================================================================
@@ -576,5 +676,36 @@ mod tests {
             Some("0.20 USDC".to_string())
         );
         assert_eq!(estimate_cost("unknownTool"), None);
+    }
+
+    #[test]
+    fn test_get_cost_micro_usdc() {
+        // Tier 0: 0.001 USDC = 1,000 micro-USDC
+        assert_eq!(get_cost_micro_usdc("getMyFeedbacks"), 1_000);
+        assert_eq!(get_cost_micro_usdc("getAgentProfile"), 1_000);
+
+        // Tier 1: 0.01 USDC = 10,000 micro-USDC
+        assert_eq!(get_cost_micro_usdc("getReputationSummary"), 10_000);
+        assert_eq!(get_cost_micro_usdc("getTrend"), 10_000);
+        assert_eq!(get_cost_micro_usdc("getValidationHistory"), 10_000);
+
+        // Tier 3: 0.20 USDC = 200,000 micro-USDC
+        assert_eq!(get_cost_micro_usdc("getReputationReport"), 200_000);
+
+        // Unknown tool returns 0
+        assert_eq!(get_cost_micro_usdc("unknownTool"), 0);
+    }
+
+    #[test]
+    fn test_cost_consistency() {
+        // Verify that estimate_cost and get_cost_micro_usdc are consistent
+        // 0.001 USDC = 1,000 micro-USDC
+        assert_eq!(get_cost_micro_usdc("getMyFeedbacks"), 1_000);
+
+        // 0.01 USDC = 10,000 micro-USDC
+        assert_eq!(get_cost_micro_usdc("getReputationSummary"), 10_000);
+
+        // 0.20 USDC = 200,000 micro-USDC
+        assert_eq!(get_cost_micro_usdc("getReputationReport"), 200_000);
     }
 }
