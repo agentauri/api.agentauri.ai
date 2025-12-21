@@ -1,5 +1,6 @@
 //! Request handlers for API endpoints
 
+pub mod a2a;
 pub mod actions;
 pub mod agents;
 pub mod api_keys;
@@ -59,6 +60,12 @@ pub use social_auth::{
 // Explicitly re-export Ponder handlers
 pub use ponder::{
     __path_get_ponder_events, __path_get_ponder_status, get_ponder_events, get_ponder_status,
+};
+
+// Explicitly re-export A2A Protocol handlers
+pub use a2a::{
+    __path_a2a_rpc, __path_get_task_status, __path_stream_task_progress, a2a_rpc, get_task_status,
+    stream_task_progress,
 };
 
 // Note: helpers module is not re-exported to avoid polluting the namespace

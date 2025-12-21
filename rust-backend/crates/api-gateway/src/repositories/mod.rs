@@ -1,5 +1,6 @@
 //! Repository layer for database access
 
+pub mod a2a_tasks;
 pub mod actions;
 pub mod agent_links;
 pub mod api_keys;
@@ -13,6 +14,7 @@ pub mod users;
 pub mod wallet;
 
 // Re-exports for commonly used repositories
+pub use a2a_tasks::A2aTaskRepository;
 pub use actions::ActionRepository;
 pub use agent_links::AgentLinkRepository;
 pub use api_keys::{ApiKeyAuditRepository, ApiKeyRepository, AuthFailureRepository};

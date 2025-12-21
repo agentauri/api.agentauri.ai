@@ -111,6 +111,16 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("/transactions", web::get().to(handlers::list_transactions))
                             .route("/subscription", web::get().to(handlers::get_subscription)),
                     )
+                    // A2A Protocol endpoints (JSON-RPC 2.0)
+                    .service(
+                        web::scope("/a2a")
+                            .route("/rpc", web::post().to(handlers::a2a_rpc))
+                            .route("/tasks/{id}", web::get().to(handlers::get_task_status))
+                            .route(
+                                "/tasks/{id}/stream",
+                                web::get().to(handlers::stream_task_progress),
+                            ),
+                    )
                     // Trigger endpoints
                     .service(
                         web::scope("/triggers")

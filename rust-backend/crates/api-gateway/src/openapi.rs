@@ -48,7 +48,8 @@ use crate::models;
         (name = "Agents", description = "On-chain agent linking"),
         (name = "Billing", description = "Credit balance and transactions"),
         (name = "Discovery", description = "API discovery and metadata"),
-        (name = "Ponder", description = "Blockchain indexer status and metrics")
+        (name = "Ponder", description = "Blockchain indexer status and metrics"),
+        (name = "A2A Protocol", description = "Agent-to-Agent JSON-RPC 2.0 protocol for async task queries")
     ),
     modifiers(&SecurityAddon),
     paths(
@@ -122,6 +123,10 @@ use crate::models;
         // Ponder
         handlers::get_ponder_status,
         handlers::get_ponder_events,
+        // A2A Protocol
+        handlers::a2a_rpc,
+        handlers::get_task_status,
+        handlers::stream_task_progress,
     ),
     components(
         schemas(
@@ -192,6 +197,18 @@ use crate::models;
             PonderStatusResponse,
             PonderStatusError,
             ChainSyncStatus,
+            // A2A Protocol
+            models::a2a::JsonRpcRequest,
+            models::a2a::JsonRpcResponse<serde_json::Value>,
+            models::a2a::JsonRpcError,
+            models::a2a::TaskStatus,
+            models::a2a::TaskDefinition,
+            models::a2a::TaskSendParams,
+            models::a2a::TaskGetParams,
+            models::a2a::TaskCancelParams,
+            models::a2a::TaskSendResult,
+            models::a2a::TaskGetResult,
+            models::a2a::TaskCancelResult,
         )
     )
 )]

@@ -1,5 +1,6 @@
 //! Data Transfer Objects (DTOs) for API requests and responses
 
+pub mod a2a;
 pub mod actions;
 pub mod api_keys;
 pub mod auth;
