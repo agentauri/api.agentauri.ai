@@ -136,7 +136,7 @@ jobs:
         if: steps.check_dockerfiles.outputs.dockerfiles_exist == 'true'
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: docker/*.Dockerfile
+          dockerfile: rust-backend/Dockerfile
           failure-threshold: warning
           ignore: DL3008,DL3009
 
