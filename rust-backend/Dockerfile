@@ -60,14 +60,8 @@ RUN apt-get update && apt-get install -y \
 # - codegen-units = 4: reduces peak memory, enables parallel compilation
 # - jobs = 4: parallel Cargo jobs for faster builds
 # - Still produces optimized binaries suitable for production
-RUN mkdir -p .cargo && cat > .cargo/config.toml << 'EOF'
-[profile.release]
-lto = "thin"
-codegen-units = 4
-
-[build]
-jobs = 4
-EOF
+RUN mkdir -p .cargo && \
+    printf '[profile.release]\nlto = "thin"\ncodegen-units = 4\n\n[build]\njobs = 4\n' > .cargo/config.toml
 
 # Enable SQLx offline mode (uses cached query metadata)
 ENV SQLX_OFFLINE=true
