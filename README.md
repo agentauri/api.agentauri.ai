@@ -379,7 +379,7 @@ See `.env.example` for configuration guidelines.
 
 ## Roadmap
 
-See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed development timeline and milestones.
+See [docs/operations/PRODUCTION_READINESS_PLAN.md](./docs/operations/PRODUCTION_READINESS_PLAN.md) for production deployment timeline.
 
 **Total Timeline**: 24 weeks (Phases 1-7)
 

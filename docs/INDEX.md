@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
-**Last Updated**: December 21, 2024
+**Last Updated**: December 24, 2025
 **Phase**: A2A Protocol Complete (Task Processor + Audit Logging + Tool Registry)
 
 This index provides a comprehensive overview of all project documentation organized by category.
@@ -128,11 +128,7 @@ This index provides a comprehensive overview of all project documentation organi
 
 ## 📦 Archive
 
-Historical reports, completed work, and superseded documents:
-
-### December 2025
-- **[archive/FRONTEND_PRD.md](archive/FRONTEND_PRD.md)** - Frontend PRD draft (Nov 2024, not in scope)
-- **[archive/ROADMAP.md](archive/ROADMAP.md)** - Legacy roadmap (superseded by README.md)
+Historical reports and completed work:
 
 ### Operations Archive
 - **[operations/archive/2025-12-01-ponder-event-fix.md](operations/archive/2025-12-01-ponder-event-fix.md)** - Ponder event handler fixes (Week 15)
@@ -192,10 +188,15 @@ Historical reports, completed work, and superseded documents:
 - **Protocol Docs**: 3 files (ERC-8004 + A2A implemented, MCP Phase 5)
 - **Development Guides**: 5 files (setup, testing strategy, adding chains, contributing, CI/CD)
 - **Component READMEs**: 7 files
-- **Archived Documents**: 6 files
+- **Archived Documents**: 4 files
 
-**Last Comprehensive Audit**: December 21, 2024 (A2A Protocol Complete)
+**Last Comprehensive Audit**: December 24, 2025 (Documentation Cleanup)
 **Recent Improvement Actions**:
+- December 24, 2025:
+  - Removed outdated DEPLOYMENT.md stub (content in docs/deployment/)
+  - Removed superseded FRONTEND_PRD.md and ROADMAP.md from archive
+  - Updated README.md roadmap link to point to PRODUCTION_READINESS_PLAN.md
+  - Updated documentation statistics
 - December 21, 2024:
   - A2A Protocol documentation complete in API_DOCUMENTATION.md
   - Added TOOL_REGISTRY.md for A2A tool catalog
@@ -211,7 +212,6 @@ Historical reports, completed work, and superseded documents:
   - Updated CLAUDE.md with Ponder API reference
 - December 4, 2025:
   - Marked Week 15 as complete in CLAUDE.md (REST Worker, Circuit Breaker, Agent Discovery)
-  - Archived FRONTEND_PRD.md and ROADMAP.md (superseded documents)
   - Added Phase 5/6 status markers to design documents
   - Reorganized INDEX.md with design document sections
   - Updated production readiness assessment to 65%
@@ -223,7 +223,6 @@ Historical reports, completed work, and superseded documents:
   - Updated CLAUDE.md with new features and endpoints
 - December 1, 2025:
   - 4 temporary reports archived to operations/archive/
-  - DEPLOYMENT.md moved to deployment/PRODUCTION_DEPLOYMENT_GUIDE.md
   - PRODUCTION_ROADMAP.md moved to operations/PRODUCTION_READINESS_PLAN.md
   - RATE_LIMITING.md renamed to RATE_LIMITS_USER_GUIDE.md for clarity
   - Cross-references added between rate-limiting docs

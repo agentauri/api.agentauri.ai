@@ -66,6 +66,9 @@ tmp/
 temp/
 *.tmp
 
+# Presentation files (not for commit)
+ELEVATOR_PITCH.md
+
 # Terraform
 *.tfplan
 tfplan
