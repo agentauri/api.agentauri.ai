@@ -48,6 +48,12 @@ const MAX_FAILURES_PER_BATCH: usize = 10;
 /// At 60s intervals, 1M iterations = ~2 years uptime (reasonable restart cycle)
 const MAX_POLLING_ITERATIONS: u64 = 1_000_000;
 
+/// Maximum backoff interval in seconds for exponential backoff
+const MAX_BACKOFF_SECS: u64 = 300; // 5 minutes max
+
+/// Number of consecutive errors before logging at reduced frequency
+const ERROR_LOG_THRESHOLD: u64 = 5;
+
 /// Simplified event structure for polling queries
 #[derive(Debug, Clone, FromRow)]
 struct UnprocessedEvent {
@@ -71,6 +77,7 @@ pub struct PollingFallback {
     state_manager: Arc<TriggerStateManager>,
     last_poll_time: Arc<RwLock<Option<std::time::Instant>>>,
     events_recovered: Arc<RwLock<u64>>,
+    consecutive_errors: Arc<RwLock<u64>>,
 }
 
 impl PollingFallback {
@@ -86,6 +93,7 @@ impl PollingFallback {
             state_manager,
             last_poll_time: Arc::new(RwLock::new(None)),
             events_recovered: Arc::new(RwLock::new(0)),
+            consecutive_errors: Arc::new(RwLock::new(0)),
         }
     }
 
@@ -136,6 +144,16 @@ impl PollingFallback {
             // Poll for unprocessed events
             match self.poll_unprocessed_events().await {
                 Ok(count) => {
+                    // Reset consecutive errors on success
+                    let prev_errors = *self.consecutive_errors.read().await;
+                    if prev_errors > 0 {
+                        info!(
+                            consecutive_errors = prev_errors,
+                            "Polling fallback recovered from error state"
+                        );
+                        *self.consecutive_errors.write().await = 0;
+                    }
+
                     if count > 0 {
                         warn!(
                             "Polling fallback recovered {} unprocessed events (total recovered: {})",
@@ -149,15 +167,51 @@ impl PollingFallback {
                     } else {
                         debug!("Polling fallback: no unprocessed events found");
                     }
+
+                    // Normal sleep interval on success
+                    tokio::time::sleep(Duration::from_secs(POLL_INTERVAL_SECS)).await;
                 }
                 Err(e) => {
-                    error!("Polling fallback error: {}", e);
-                    // Continue polling even after errors
+                    // Increment consecutive error count
+                    let mut errors = self.consecutive_errors.write().await;
+                    *errors += 1;
+                    let error_count = *errors;
+                    drop(errors);
+
+                    // Log with reduced frequency after threshold
+                    if error_count <= ERROR_LOG_THRESHOLD || error_count % 10 == 0 {
+                        error!(
+                            consecutive_errors = error_count,
+                            error = %e,
+                            error_id = "POLLING_FALLBACK_QUERY_ERROR",
+                            "Polling fallback error (will retry with backoff)"
+                        );
+                    }
+
+                    // Calculate backoff: min(60 * 2^errors, MAX_BACKOFF_SECS)
+                    let backoff_secs = std::cmp::min(
+                        POLL_INTERVAL_SECS.saturating_mul(1 << std::cmp::min(error_count, 4)),
+                        MAX_BACKOFF_SECS,
+                    );
+
+                    debug!(
+                        backoff_secs = backoff_secs,
+                        consecutive_errors = error_count,
+                        "Applying exponential backoff before retry"
+                    );
+
+                    // Emit metric for monitoring
+                    #[cfg(feature = "metrics")]
+                    {
+                        metrics::counter!("event_processor.polling_fallback.query_errors")
+                            .increment(1);
+                        metrics::gauge!("event_processor.polling_fallback.consecutive_errors")
+                            .set(error_count as f64);
+                    }
+
+                    tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
                 }
             }
-
-            // Sleep until next poll
-            tokio::time::sleep(Duration::from_secs(POLL_INTERVAL_SECS)).await;
         }
     }
 
