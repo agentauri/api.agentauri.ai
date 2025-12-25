@@ -3,8 +3,8 @@
 //! These handlers implement the OAuth 2.0 authorization code flow for social login.
 //! They support both login/registration and account linking flows.
 
-use actix_web::{http::header, web, HttpResponse, Responder};
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use actix_web::{http::header, web, HttpRequest, HttpResponse, Responder};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use shared::{Config, DbPool};
 use uuid::Uuid;
 
@@ -100,6 +100,158 @@ pub async fn github_auth(
     }
 }
 
+// ============================================================================
+// Account Linking Endpoints
+// ============================================================================
+
+/// Link Google account to existing user
+///
+/// Requires authentication. Redirects to Google OAuth to link the provider
+/// to the currently authenticated user's account.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/link/google",
+    tag = "Authentication",
+    security(
+        ("bearer_auth" = []),
+        ("cookie_auth" = [])
+    ),
+    params(
+        ("redirect_after" = Option<String>, Query, description = "URL to redirect after linking")
+    ),
+    responses(
+        (status = 302, description = "Redirect to Google OAuth"),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 500, description = "Failed to initialize OAuth", body = ErrorResponse)
+    )
+)]
+pub async fn link_google(
+    req: HttpRequest,
+    config: web::Data<Config>,
+    social_auth: web::Data<SocialAuthService>,
+    query: web::Query<OAuthInitQuery>,
+) -> impl Responder {
+    // Extract and validate JWT to get user_id
+    let user_id = match extract_user_id_from_request(&req, &config) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    match social_auth.google_auth_url(Some(user_id), query.redirect_after.clone()) {
+        Ok(url) => HttpResponse::Found()
+            .insert_header((header::LOCATION, url))
+            .finish(),
+        Err(e) => {
+            tracing::error!("Failed to generate Google auth URL for linking: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "oauth_error",
+                "Failed to initialize account linking",
+            ))
+        }
+    }
+}
+
+/// Link GitHub account to existing user
+///
+/// Requires authentication. Redirects to GitHub OAuth to link the provider
+/// to the currently authenticated user's account.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/link/github",
+    tag = "Authentication",
+    security(
+        ("bearer_auth" = []),
+        ("cookie_auth" = [])
+    ),
+    params(
+        ("redirect_after" = Option<String>, Query, description = "URL to redirect after linking")
+    ),
+    responses(
+        (status = 302, description = "Redirect to GitHub OAuth"),
+        (status = 401, description = "Authentication required", body = ErrorResponse),
+        (status = 500, description = "Failed to initialize OAuth", body = ErrorResponse)
+    )
+)]
+pub async fn link_github(
+    req: HttpRequest,
+    config: web::Data<Config>,
+    social_auth: web::Data<SocialAuthService>,
+    query: web::Query<OAuthInitQuery>,
+) -> impl Responder {
+    // Extract and validate JWT to get user_id
+    let user_id = match extract_user_id_from_request(&req, &config) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    match social_auth.github_auth_url(Some(user_id), query.redirect_after.clone()) {
+        Ok(url) => HttpResponse::Found()
+            .insert_header((header::LOCATION, url))
+            .finish(),
+        Err(e) => {
+            tracing::error!("Failed to generate GitHub auth URL for linking: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "oauth_error",
+                "Failed to initialize account linking",
+            ))
+        }
+    }
+}
+
+/// Extract user_id from JWT in request (header or cookie)
+fn extract_user_id_from_request(
+    req: &HttpRequest,
+    config: &Config,
+) -> Result<String, HttpResponse> {
+    // Extract token from Authorization header or cookie
+    let token = extract_token_from_request(req);
+
+    let token = match token {
+        Some(t) => t,
+        None => {
+            return Err(HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "unauthorized",
+                "Authentication required to link accounts",
+            )));
+        }
+    };
+
+    // Validate JWT and extract user_id
+    match decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(config.server.jwt_secret.as_bytes()),
+        &Validation::new(Algorithm::HS256),
+    ) {
+        Ok(data) => Ok(data.claims.sub),
+        Err(e) => {
+            tracing::debug!("Invalid JWT token for account linking: {}", e);
+            Err(HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "invalid_token",
+                "Invalid or expired token",
+            )))
+        }
+    }
+}
+
+/// Extract JWT token from Authorization header or auth-token cookie
+fn extract_token_from_request(req: &HttpRequest) -> Option<String> {
+    // First try Authorization header
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                return Some(token.to_string());
+            }
+        }
+    }
+
+    // Then try cookie
+    if let Some(cookie) = req.cookie("auth-token") {
+        return Some(cookie.value().to_string());
+    }
+
+    None
+}
+
 /// Handle Google OAuth callback
 ///
 /// Exchanges the authorization code for tokens, fetches the user profile,
@@ -147,6 +299,7 @@ pub async fn google_callback(
         "google",
         profile,
         state_payload.redirect_after,
+        state_payload.user_id, // Account linking mode
     )
     .await
 }
@@ -198,6 +351,7 @@ pub async fn github_callback(
         "github",
         profile,
         state_payload.redirect_after,
+        state_payload.user_id, // Account linking mode
     )
     .await
 }
@@ -239,10 +393,16 @@ fn map_oauth_error_to_user_message(e: &SocialAuthError) -> (&'static str, &'stat
 
 /// Common handler for OAuth callbacks
 ///
-/// This function:
+/// This function handles both login and account linking flows:
+///
+/// ## Login Flow (link_to_user_id = None):
 /// 1. Checks if identity exists → login existing user
 /// 2. Checks if email matches existing user → link identity to existing user
 /// 3. Otherwise → create new user and identity
+///
+/// ## Account Linking Flow (link_to_user_id = Some):
+/// 1. Checks if identity exists → error (already linked to another account)
+/// 2. Links identity to the specified user
 async fn handle_oauth_callback(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,
@@ -250,7 +410,23 @@ async fn handle_oauth_callback(
     provider: &str,
     profile: crate::services::OAuthUserProfile,
     redirect_after: Option<String>,
+    link_to_user_id: Option<String>,
 ) -> HttpResponse {
+    // Account linking mode - user is already authenticated
+    if let Some(user_id) = link_to_user_id {
+        return handle_account_linking(
+            pool,
+            config,
+            social_auth,
+            &user_id,
+            provider,
+            &profile,
+            redirect_after,
+        )
+        .await;
+    }
+
+    // Normal login flow
     // 1. Check if identity already exists - handle errors explicitly to prevent duplicates
     match UserIdentityRepository::find_by_provider(&pool, provider, &profile.provider_user_id).await
     {
@@ -439,6 +615,113 @@ async fn link_and_login(
     login_existing_user(pool, config, social_auth, user_id, redirect_after).await
 }
 
+/// Handle explicit account linking (user is already authenticated)
+///
+/// This is called when a user explicitly links a new provider to their account.
+/// Unlike auto-linking by email, this requires the user to be authenticated first.
+async fn handle_account_linking(
+    pool: web::Data<DbPool>,
+    config: web::Data<Config>,
+    social_auth: web::Data<SocialAuthService>,
+    user_id: &str,
+    provider: &str,
+    profile: &crate::services::OAuthUserProfile,
+    redirect_after: Option<String>,
+) -> HttpResponse {
+    // Check if this provider identity is already linked to ANY user
+    match UserIdentityRepository::find_by_provider(&pool, provider, &profile.provider_user_id).await
+    {
+        Ok(Some(existing_identity)) => {
+            if existing_identity.user_id == user_id {
+                // Already linked to this user - just log in
+                tracing::info!(
+                    "Provider {} already linked to user {}, proceeding with login",
+                    provider,
+                    user_id
+                );
+                return login_existing_user(pool, config, social_auth, user_id, redirect_after)
+                    .await;
+            }
+            // Linked to a different user - error
+            tracing::warn!(
+                "Attempted to link {} identity to user {} but already linked to {}",
+                provider,
+                user_id,
+                existing_identity.user_id
+            );
+            return redirect_with_error(
+                &social_auth,
+                "already_linked",
+                "This account is already linked to a different user.",
+            );
+        }
+        Ok(None) => {
+            // Not linked to anyone, proceed with linking
+        }
+        Err(e) => {
+            tracing::error!("Failed to check identity: {}", e);
+            return redirect_with_error(
+                &social_auth,
+                "internal_error",
+                "Failed to check account linking.",
+            );
+        }
+    }
+
+    // Verify the target user exists
+    let user = match UserRepository::find_by_id(&pool, user_id).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            tracing::error!("Link target user {} not found", user_id);
+            return redirect_with_error(&social_auth, "user_not_found", "User account not found.");
+        }
+        Err(e) => {
+            tracing::error!("Failed to fetch user: {}", e);
+            return redirect_with_error(&social_auth, "internal_error", "Failed to link account.");
+        }
+    };
+
+    // Start transaction
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("Failed to start transaction: {}", e);
+            return redirect_with_error(&social_auth, "internal_error", "Database error.");
+        }
+    };
+
+    // Create the identity link
+    if let Err(e) = UserIdentityRepository::create(
+        &mut *tx,
+        user_id,
+        provider,
+        &profile.provider_user_id,
+        profile.email.as_deref(),
+        profile.display_name.as_deref(),
+        profile.avatar_url.as_deref(),
+    )
+    .await
+    {
+        tracing::error!("Failed to create identity: {}", e);
+        return redirect_with_error(&social_auth, "internal_error", "Failed to link account.");
+    }
+
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        tracing::error!("Failed to commit transaction: {}", e);
+        return redirect_with_error(&social_auth, "internal_error", "Failed to link account.");
+    }
+
+    tracing::info!(
+        "Successfully linked {} identity to user {} via explicit linking",
+        provider,
+        user_id
+    );
+
+    // Generate JWT and redirect
+    generate_jwt_and_redirect(config, social_auth, user, redirect_after)
+}
+
 /// Create a new user and identity
 async fn create_new_user(
     pool: web::Data<DbPool>,
@@ -475,6 +758,7 @@ async fn create_new_user(
         email,
         provider,
         profile.avatar_url.as_deref(),
+        profile.display_name.as_deref(),
     )
     .await
     {
@@ -596,7 +880,7 @@ fn validate_redirect_path(path: &str) -> Result<String, &'static str> {
     Ok(path.to_string())
 }
 
-/// Generate JWT token and redirect to frontend
+/// Generate JWT token and redirect to frontend with auth-token cookie
 fn generate_jwt_and_redirect(
     config: web::Data<Config>,
     social_auth: web::Data<SocialAuthService>,
@@ -630,12 +914,27 @@ fn generate_jwt_and_redirect(
         None => "/".to_string(),
     };
 
-    // Build redirect URL with validated path
+    // Build redirect URL with validated path (no token in URL for security)
     let frontend_url = social_auth.frontend_url();
-    let redirect_url = format!("{}{}?token={}", frontend_url, redirect_path, token);
+    let redirect_url = format!("{}{}", frontend_url, redirect_path);
+
+    // Build auth-token cookie with security flags
+    // Cookie is set on the API domain but with SameSite=None to work cross-domain
+    let is_production = std::env::var("ENVIRONMENT")
+        .map(|e| e.to_lowercase() == "production")
+        .unwrap_or(false);
+
+    let cookie = actix_web::cookie::Cookie::build("auth-token", &token)
+        .path("/")
+        .http_only(true)
+        .secure(is_production) // Only Secure in production (HTTPS)
+        .same_site(actix_web::cookie::SameSite::Lax) // Lax for OAuth redirects
+        .max_age(actix_web::cookie::time::Duration::hours(1))
+        .finish();
 
     HttpResponse::Found()
         .insert_header((header::LOCATION, redirect_url))
+        .cookie(cookie)
         .finish()
 }
 

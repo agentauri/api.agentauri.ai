@@ -592,4 +592,17 @@ impl MemberRepository {
 
         Ok(member)
     }
+
+    /// Find all memberships for a user (across all organizations)
+    pub async fn find_by_user(pool: &DbPool, user_id: &str) -> Result<Vec<OrganizationMember>> {
+        let members = sqlx::query_as::<_, OrganizationMember>(
+            r#"SELECT * FROM organization_members WHERE user_id = $1 ORDER BY created_at ASC"#,
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await
+        .context("Failed to find user memberships")?;
+
+        Ok(members)
+    }
 }

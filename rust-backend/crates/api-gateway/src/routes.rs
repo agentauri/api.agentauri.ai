@@ -35,11 +35,20 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                 web::scope("/auth")
                     .route("/register", web::post().to(handlers::register))
                     .route("/login", web::post().to(handlers::login))
+                    // SIWE wallet login
+                    .route("/wallet", web::post().to(handlers::wallet_login))
+                    // Session management
+                    .route("/nonce", web::post().to(handlers::generate_nonce))
+                    .route("/me", web::get().to(handlers::get_me))
+                    .route("/logout", web::post().to(handlers::logout))
                     // Social login endpoints (OAuth 2.0)
                     .route("/google", web::get().to(handlers::google_auth))
                     .route("/google/callback", web::get().to(handlers::google_callback))
                     .route("/github", web::get().to(handlers::github_auth))
-                    .route("/github/callback", web::get().to(handlers::github_callback)),
+                    .route("/github/callback", web::get().to(handlers::github_callback))
+                    // Account linking endpoints (requires auth)
+                    .route("/link/google", web::get().to(handlers::link_google))
+                    .route("/link/github", web::get().to(handlers::link_github)),
             )
             // OAuth token endpoints (public - client credentials auth)
             .route("/oauth/token", web::post().to(handlers::token_endpoint))

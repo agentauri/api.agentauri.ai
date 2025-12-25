@@ -19,6 +19,7 @@ pub struct User {
     pub is_active: bool,
     pub primary_auth_provider: Option<String>, // 'email', 'google', 'github', 'wallet'
     pub avatar_url: Option<String>,
+    pub display_name: Option<String>, // Human-friendly name from OAuth or user-set
     // Account lockout fields for brute-force protection
     pub failed_login_attempts: i32,
     #[serde(skip_serializing)] // Don't expose lockout info to client

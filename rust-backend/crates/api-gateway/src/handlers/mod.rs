@@ -61,7 +61,8 @@ pub use oauth::{
 // Explicitly re-export social auth handlers
 pub use social_auth::{
     __path_github_auth, __path_github_callback, __path_google_auth, __path_google_callback,
-    github_auth, github_callback, google_auth, google_callback,
+    __path_link_github, __path_link_google, github_auth, github_callback, google_auth,
+    google_callback, link_github, link_google,
 };
 
 // Explicitly re-export Ponder handlers

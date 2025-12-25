@@ -126,6 +126,8 @@ pub struct UserResponse {
     pub id: String,
     pub username: String,
     pub email: String,
+    pub name: Option<String>,
+    pub avatar: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub last_login_at: Option<chrono::DateTime<chrono::Utc>>,
     pub is_active: bool,
@@ -137,11 +139,72 @@ impl From<shared::models::User> for UserResponse {
             id: user.id,
             username: user.username,
             email: user.email,
+            name: user.display_name,
+            avatar: user.avatar_url,
             created_at: user.created_at,
             last_login_at: user.last_login_at,
             is_active: user.is_active,
         }
     }
+}
+
+/// Extended user response for /auth/me endpoint with linked accounts
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MeResponse {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub name: Option<String>,
+    pub avatar: Option<String>,
+    pub wallets: Vec<WalletInfo>,
+    pub providers: Vec<String>,
+    pub organizations: Vec<OrganizationInfo>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Linked wallet information
+#[derive(Debug, Serialize, ToSchema)]
+pub struct WalletInfo {
+    pub address: String,
+    pub chain_id: Option<i32>,
+}
+
+/// Organization summary for user profile
+#[derive(Debug, Serialize, ToSchema)]
+pub struct OrganizationInfo {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub role: String,
+}
+
+/// Nonce response for SIWE wallet authentication
+#[derive(Debug, Serialize, ToSchema)]
+pub struct NonceResponse {
+    pub nonce: String,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    pub message: String,
+}
+
+/// SIWE wallet login request
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct WalletLoginRequest {
+    /// Wallet address (checksummed)
+    #[validate(length(min = 42, max = 42))]
+    pub address: String,
+
+    /// EIP-191 signed message
+    pub signature: String,
+
+    /// The message that was signed (includes nonce)
+    pub message: String,
+}
+
+/// Logout response
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LogoutResponse {
+    pub success: bool,
+    pub message: String,
 }
 
 /// JWT claims
@@ -383,6 +446,8 @@ mod tests {
                 id: "user-123".to_string(),
                 username: "testuser".to_string(),
                 email: "test@example.com".to_string(),
+                name: Some("Test User".to_string()),
+                avatar: None,
                 created_at: chrono::Utc::now(),
                 last_login_at: None,
                 is_active: true,
@@ -401,6 +466,8 @@ mod tests {
             id: "user-123".to_string(),
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
+            name: Some("Test User".to_string()),
+            avatar: Some("https://example.com/avatar.png".to_string()),
             created_at: chrono::Utc::now(),
             last_login_at: Some(chrono::Utc::now()),
             is_active: true,

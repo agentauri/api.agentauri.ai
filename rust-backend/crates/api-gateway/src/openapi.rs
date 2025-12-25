@@ -68,6 +68,14 @@ use crate::models;
         handlers::google_callback,
         handlers::github_auth,
         handlers::github_callback,
+        // Account Linking
+        handlers::link_google,
+        handlers::link_github,
+        // Session Management
+        handlers::generate_nonce,
+        handlers::get_me,
+        handlers::logout,
+        handlers::wallet_login,
         // Organizations
         handlers::create_organization,
         handlers::list_organizations,
@@ -145,6 +153,12 @@ use crate::models;
             models::LoginRequest,
             models::AuthResponse,
             models::UserResponse,
+            models::WalletLoginRequest,
+            models::NonceResponse,
+            models::MeResponse,
+            models::WalletInfo,
+            models::OrganizationInfo,
+            models::LogoutResponse,
             // Organizations
             models::CreateOrganizationRequest,
             models::UpdateOrganizationRequest,

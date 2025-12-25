@@ -162,6 +162,7 @@ impl UserRepository {
         email: &str,
         primary_auth_provider: &str,
         avatar_url: Option<&str>,
+        display_name: Option<&str>,
     ) -> Result<User>
     where
         E: Executor<'e, Database = Postgres>,
@@ -174,9 +175,9 @@ impl UserRepository {
             INSERT INTO users (
                 id, username, email, password_hash,
                 created_at, updated_at, is_active,
-                primary_auth_provider, avatar_url
+                primary_auth_provider, avatar_url, display_name
             )
-            VALUES ($1, $2, $3, NULL, $4, $5, true, $6, $7)
+            VALUES ($1, $2, $3, NULL, $4, $5, true, $6, $7, $8)
             RETURNING *
             "#,
         )
@@ -187,6 +188,7 @@ impl UserRepository {
         .bind(now)
         .bind(primary_auth_provider)
         .bind(avatar_url)
+        .bind(display_name)
         .fetch_one(executor)
         .await
         .context("Failed to create social user")?;
