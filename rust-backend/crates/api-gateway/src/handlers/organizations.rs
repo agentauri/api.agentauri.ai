@@ -120,17 +120,15 @@ pub async fn create_organization(
                 .unwrap_or(false);
 
             if is_unique_violation {
-                // SECURITY: Return a generic error to prevent slug enumeration attacks
-                // An attacker could probe for existing organization slugs to gather
-                // business intelligence about competitors or targets
+                // Slug is unique per user, so this means the user already has an org with this slug
                 tracing::info!(
                     slug = %req.slug,
                     user_id = %user_id,
-                    "Organization creation failed - slug conflict"
+                    "Organization creation failed - user already has org with this slug"
                 );
                 return HttpResponse::BadRequest().json(ErrorResponse::new(
-                    "invalid_slug",
-                    "Unable to create organization with this slug. Please choose a different slug.",
+                    "slug_exists",
+                    "You already have an organization with this slug. Please choose a different one.",
                 ));
             }
             tracing::error!("Failed to create organization: {}", e);

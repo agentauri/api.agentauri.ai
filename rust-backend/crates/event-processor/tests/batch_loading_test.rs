@@ -490,11 +490,11 @@ async fn test_batch_loading_preserves_ordering() -> Result<()> {
     // Verify ordering: should be sorted by priority DESC
     assert_eq!(actions.len(), 3);
     assert_eq!(actions[0].action_type, "telegram");
-    assert_eq!(actions[0].priority, Some(3));
+    assert_eq!(actions[0].priority, 3);
     assert_eq!(actions[1].action_type, "mcp");
-    assert_eq!(actions[1].priority, Some(2));
+    assert_eq!(actions[1].priority, 2);
     assert_eq!(actions[2].action_type, "rest");
-    assert_eq!(actions[2].priority, Some(1));
+    assert_eq!(actions[2].priority, 1);
 
     cleanup_test_data(&pool).await?;
     Ok(())
