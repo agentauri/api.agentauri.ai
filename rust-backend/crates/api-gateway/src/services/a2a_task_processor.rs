@@ -20,7 +20,7 @@ use metrics::{counter, gauge, histogram};
 use std::time::Duration;
 use tokio::time::interval;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use shared::DbPool;
 use uuid::Uuid;
@@ -127,7 +127,8 @@ impl A2aTaskProcessor {
         let tasks = self.claim_tasks().await?;
 
         if tasks.is_empty() {
-            debug!("No pending A2A tasks");
+            // Use trace! to avoid log spam - this polls every second
+            trace!("No pending A2A tasks");
             return Ok(());
         }
 
