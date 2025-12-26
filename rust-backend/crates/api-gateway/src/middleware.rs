@@ -82,6 +82,33 @@ pub use query_tier::{QueryTier, QueryTierExtractor};
 pub use unified_rate_limiter::UnifiedRateLimiter;
 
 // ============================================================================
+// JWT Token Extraction Helper
+// ============================================================================
+
+/// Extract JWT token from cookie or Authorization header
+///
+/// Checks sources in order of preference:
+/// 1. `auth-token` cookie (preferred for browser clients)
+/// 2. `Authorization: Bearer <token>` header (fallback for API clients)
+fn extract_jwt_from_request(req: &ServiceRequest) -> Option<String> {
+    // 1. Try auth-token cookie first (preferred for browser clients)
+    if let Some(cookie) = req.cookie("auth-token") {
+        return Some(cookie.value().to_string());
+    }
+
+    // 2. Fallback to Authorization header (for API clients)
+    if let Some(auth_header) = req.headers().get(http::header::AUTHORIZATION) {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                return Some(token.to_string());
+            }
+        }
+    }
+
+    None
+}
+
+// ============================================================================
 // JWT Authentication Middleware
 // ============================================================================
 
@@ -143,21 +170,10 @@ where
         let jwt_secret = self.jwt_secret.clone();
 
         Box::pin(async move {
-            // Extract Authorization header
-            let auth_header = req
-                .headers()
-                .get(http::header::AUTHORIZATION)
-                .and_then(|h| h.to_str().ok());
-
-            let token = match auth_header {
-                Some(header) => {
-                    if let Some(token) = header.strip_prefix("Bearer ") {
-                        token
-                    } else {
-                        return Err(ErrorUnauthorized("Invalid authorization header format"));
-                    }
-                }
-                None => return Err(ErrorUnauthorized("Missing authorization header")),
+            // Extract token from cookie or Authorization header
+            let token = match extract_jwt_from_request(&req) {
+                Some(t) => t,
+                None => return Err(ErrorUnauthorized("Missing authentication")),
             };
 
             // Validate JWT token with explicit algorithm restriction
@@ -168,7 +184,7 @@ where
             validation.leeway = 60; // 60 seconds clock skew tolerance
 
             let token_data = decode::<Claims>(
-                token,
+                &token,
                 &DecodingKey::from_secret(jwt_secret.as_bytes()),
                 &validation,
             )
@@ -508,19 +524,17 @@ where
                 }
             }
 
-            // Fall back to JWT authentication
-            let token = match auth_header {
-                Some(header) => {
-                    if let Some(token) = header.strip_prefix("Bearer ") {
-                        token.to_string()
-                    } else if header.starts_with("sk_") {
-                        // API key was provided but we couldn't validate it (no pool?)
+            // Fall back to JWT authentication (cookie or Authorization header)
+            // Note: If an API key was provided but couldn't be validated, we still try JWT
+            let token = match extract_jwt_from_request(&req) {
+                Some(t) => t,
+                None => {
+                    // Check if an API key was provided but we couldn't validate it
+                    if auth_header.as_ref().is_some_and(|h| h.starts_with("sk_")) {
                         return Err(ErrorUnauthorized("API key authentication not available"));
-                    } else {
-                        return Err(ErrorUnauthorized("Invalid authorization header format"));
                     }
+                    return Err(ErrorUnauthorized("Missing authentication"));
                 }
-                None => return Err(ErrorUnauthorized("Missing authorization header")),
             };
 
             // Validate JWT token with explicit algorithm restriction

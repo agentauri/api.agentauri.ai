@@ -33,7 +33,7 @@
 //! Rust guideline compliant 2025-01-29
 
 use actix_cors::Cors;
-use actix_web::http::header;
+use actix_web::http::header::{self, HeaderName};
 use std::env;
 use tracing::{debug, warn};
 
@@ -65,7 +65,7 @@ pub fn cors() -> Cors {
         } else {
             // Development defaults for local frontend development
             debug!("Using default CORS origins for development");
-            "http://localhost:3000,http://localhost:8080".to_string()
+            "http://localhost:3000,http://localhost:8080,http://localhost:8004".to_string()
         }
     });
 
@@ -126,19 +126,20 @@ pub fn cors() -> Cors {
         }
     }
 
-    // Configure allowed methods
+    // Configure allowed methods and headers
     cors = cors
+        .supports_credentials() // Enable credentials for cookie-based auth
         .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
             header::ACCEPT,
+            HeaderName::from_static("x-csrf-token"),
+            HeaderName::from_static("x-organization-id"),
         ])
         .expose_headers(vec![header::CONTENT_TYPE])
         // Max age for preflight requests (1 hour)
         .max_age(3600);
-    // Note: We don't call supports_credentials() which means credentials are disabled by default
-    // This is correct for stateless JWT authentication (no cookies)
 
     cors
 }
