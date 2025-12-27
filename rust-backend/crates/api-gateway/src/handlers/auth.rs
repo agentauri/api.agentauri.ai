@@ -13,8 +13,8 @@ use validator::Validate;
 
 use crate::{
     models::{
-        AuthResponse, Claims, ErrorResponse, LoginRequest, LogoutResponse, MeResponse,
-        NonceResponse, OrganizationInfo, RefreshTokenRequest, RefreshTokenResponse,
+        AuthResponse, Claims, ErrorResponse, ExchangeCodeRequest, LoginRequest, LogoutResponse,
+        MeResponse, NonceResponse, OrganizationInfo, RefreshTokenRequest, RefreshTokenResponse,
         RegisterRequest, UserResponse, WalletInfo, WalletLoginRequest, ROLE_OWNER,
     },
     repositories::{
@@ -813,6 +813,180 @@ pub async fn refresh_token(
             refresh_token: new_refresh_token,
             expires_in: ACCESS_TOKEN_VALIDITY_SECS,
         })
+}
+
+/// Exchange OAuth authorization code for tokens
+///
+/// This endpoint is used by the frontend to exchange a temporary authorization code
+/// (received from OAuth callback) for JWT access and refresh tokens.
+/// The code is single-use and expires after 5 minutes.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/exchange",
+    tag = "Authentication",
+    request_body = ExchangeCodeRequest,
+    responses(
+        (status = 200, description = "Tokens issued successfully", body = AuthResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Invalid or expired authorization code", body = ErrorResponse),
+        (status = 429, description = "Rate limit exceeded (max 10 requests per minute per IP)", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
+pub async fn exchange_code(
+    pool: web::Data<DbPool>,
+    config: web::Data<Config>,
+    rate_limiter: web::Data<crate::services::AuthRateLimiter>,
+    req: HttpRequest,
+    body: web::Json<ExchangeCodeRequest>,
+) -> impl Responder {
+    use crate::services::{OAuthCodeService, UserRefreshTokenService, ACCESS_TOKEN_VALIDITY_SECS};
+
+    // Extract client info for audit logging and rate limiting
+    let ip_address = req
+        .connection_info()
+        .realip_remote_addr()
+        .map(|s| s.to_string());
+
+    // Check rate limit FIRST (before any crypto/DB operations)
+    // This prevents brute-force attacks on authorization codes
+    let ip_for_limit = ip_address.as_deref().unwrap_or("unknown");
+    if let Err(e) = rate_limiter.check(ip_for_limit) {
+        tracing::warn!(ip = ip_for_limit, "OAuth code exchange rate limit exceeded");
+        return HttpResponse::TooManyRequests()
+            .json(ErrorResponse::new("rate_limit_exceeded", e.message));
+    }
+
+    // Validate request
+    if let Err(e) = body.validate() {
+        tracing::warn!(
+            ip = ?ip_address,
+            error = %e,
+            "OAuth code exchange: validation failed"
+        );
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "validation_error",
+            format!("Validation failed: {}", e),
+        ));
+    }
+
+    // Extract code prefix for logging (safe - doesn't expose the full code)
+    let code_prefix = if body.code.len() >= 8 {
+        &body.code[..8]
+    } else {
+        &body.code
+    };
+
+    // Exchange the code for user_id
+    let code_service = OAuthCodeService::new();
+    let user_id = match code_service.exchange_code(&pool, &body.code).await {
+        Ok(uid) => uid,
+        Err(e) => {
+            tracing::warn!(
+                code_prefix = %code_prefix,
+                ip = ?ip_address,
+                error = %e,
+                "OAuth code exchange failed: invalid or expired code"
+            );
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "invalid_code",
+                "Invalid or expired authorization code",
+            ));
+        }
+    };
+
+    // Look up the user
+    let user = match UserRepository::find_by_id(&pool, &user_id).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            tracing::error!("User not found for valid OAuth code: {}", user_id);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "User not found"));
+        }
+        Err(e) => {
+            tracing::error!("Failed to lookup user: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to process request",
+            ));
+        }
+    };
+
+    // Audit log: successful code exchange
+    tracing::info!(
+        user_id = %user.id,
+        username = %user.username,
+        ip = ?ip_address,
+        "OAuth code exchange successful"
+    );
+
+    // Generate JWT
+    let claims = Claims::new(user.id.clone(), user.username.clone(), 1);
+    let token = match encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(config.server.jwt_secret.as_bytes()),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("Failed to generate JWT: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to generate token",
+            ));
+        }
+    };
+
+    // Generate refresh token
+    let user_agent = req
+        .headers()
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let ip_address = req
+        .connection_info()
+        .realip_remote_addr()
+        .map(|s| s.to_string());
+
+    let refresh_service = UserRefreshTokenService::new();
+    let refresh_token = match refresh_service
+        .create_refresh_token(
+            &pool,
+            &user.id,
+            user_agent.as_deref(),
+            ip_address.as_deref(),
+        )
+        .await
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::error!("Failed to generate refresh token: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to generate authentication token",
+            ));
+        }
+    };
+
+    // Set auth-token cookie
+    let is_production = std::env::var("ENVIRONMENT")
+        .map(|e| e.to_lowercase() == "production")
+        .unwrap_or(false);
+
+    let cookie = Cookie::build("auth-token", &token)
+        .path("/")
+        .http_only(true)
+        .secure(is_production)
+        .same_site(actix_web::cookie::SameSite::Lax)
+        .max_age(actix_web::cookie::time::Duration::hours(1))
+        .finish();
+
+    HttpResponse::Ok().cookie(cookie).json(AuthResponse {
+        token,
+        refresh_token,
+        expires_in: ACCESS_TOKEN_VALIDITY_SECS,
+        user: UserResponse::from(user),
+    })
 }
 
 // ============================================================================

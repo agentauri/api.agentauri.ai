@@ -42,6 +42,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route("/me", web::get().to(handlers::get_me))
                     .route("/logout", web::post().to(handlers::logout))
                     .route("/refresh", web::post().to(handlers::refresh_token))
+                    .route("/exchange", web::post().to(handlers::exchange_code))
                     // Social login endpoints (OAuth 2.0)
                     .route("/google", web::get().to(handlers::google_auth))
                     .route("/google/callback", web::get().to(handlers::google_callback))

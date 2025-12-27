@@ -881,6 +881,11 @@ fn validate_redirect_path(path: &str) -> Result<String, &'static str> {
 }
 
 /// Generate JWT token and redirect to frontend with auth-token and refresh-token cookies
+///
+/// In production, tokens are set as HttpOnly cookies for security.
+/// In development, we use Authorization Code Flow - generating a temporary code
+/// that the frontend exchanges for tokens via POST /api/v1/auth/exchange.
+/// This prevents tokens from being exposed in URLs/browser history.
 async fn generate_jwt_and_redirect(
     pool: &DbPool,
     config: web::Data<Config>,
@@ -888,9 +893,60 @@ async fn generate_jwt_and_redirect(
     user: shared::models::User,
     redirect_after: Option<String>,
 ) -> HttpResponse {
-    use crate::services::{UserRefreshTokenService, REFRESH_TOKEN_VALIDITY_DAYS};
+    use crate::services::{OAuthCodeService, UserRefreshTokenService, REFRESH_TOKEN_VALIDITY_DAYS};
 
-    // Generate JWT token
+    // Check environment
+    let is_production = std::env::var("ENVIRONMENT")
+        .map(|e| e.to_lowercase() == "production")
+        .unwrap_or(false);
+
+    // Validate and sanitize redirect path to prevent open redirect attacks
+    let redirect_path = match redirect_after {
+        Some(ref path) => validate_redirect_path(path).unwrap_or_else(|e| {
+            tracing::warn!(
+                path = %path,
+                error = %e,
+                "Invalid redirect path detected, using default"
+            );
+            "/".to_string()
+        }),
+        None => "/".to_string(),
+    };
+
+    let frontend_url = social_auth.frontend_url();
+
+    // In development, use Authorization Code Flow to avoid exposing tokens in URLs
+    if !is_production {
+        let code_service = OAuthCodeService::new();
+        let code = match code_service.create_code(pool, &user.id).await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("Failed to generate OAuth code: {}", e);
+                return redirect_with_error(
+                    &social_auth,
+                    "internal_error",
+                    "Failed to generate authentication code",
+                );
+            }
+        };
+
+        // Redirect with code parameter - frontend will exchange it via POST /api/v1/auth/exchange
+        let separator = if redirect_path.contains('?') {
+            "&"
+        } else {
+            "?"
+        };
+        let redirect_url = format!(
+            "{}{}{}code={}",
+            frontend_url, redirect_path, separator, code
+        );
+
+        return HttpResponse::Found()
+            .insert_header((header::LOCATION, redirect_url))
+            .finish();
+    }
+
+    // Production flow: Generate tokens and set as cookies
     let claims = Claims::new(user.id.clone(), user.username.clone(), 1); // 1 hour
     let token = match encode(
         &Header::new(Algorithm::HS256),
@@ -921,48 +977,14 @@ async fn generate_jwt_and_redirect(
         }
     };
 
-    // Validate and sanitize redirect path to prevent open redirect attacks
-    let redirect_path = match redirect_after {
-        Some(ref path) => validate_redirect_path(path).unwrap_or_else(|e| {
-            tracing::warn!(
-                path = %path,
-                error = %e,
-                "Invalid redirect path detected, using default"
-            );
-            "/".to_string()
-        }),
-        None => "/".to_string(),
-    };
-
     // Build redirect URL with validated path
-    let frontend_url = social_auth.frontend_url();
-    let is_production = std::env::var("ENVIRONMENT")
-        .map(|e| e.to_lowercase() == "production")
-        .unwrap_or(false);
-
-    // In development, cookies don't work cross-port (localhost:8080 -> localhost:8004)
-    // So we pass the token in the URL for the frontend to store
-    let redirect_url = if is_production {
-        format!("{}{}", frontend_url, redirect_path)
-    } else {
-        // Development mode: pass tokens in URL for frontend to store
-        let separator = if redirect_path.contains('?') {
-            "&"
-        } else {
-            "?"
-        };
-        format!(
-            "{}{}{}token={}&refresh_token={}",
-            frontend_url, redirect_path, separator, token, refresh_token
-        )
-    };
+    let redirect_url = format!("{}{}", frontend_url, redirect_path);
 
     // Build auth-token cookie with security flags
-    // In production, the cookie will be used; in dev, the URL token is primary
     let auth_cookie = actix_web::cookie::Cookie::build("auth-token", &token)
         .path("/")
         .http_only(true)
-        .secure(is_production) // Only Secure in production (HTTPS)
+        .secure(true) // Production always uses HTTPS
         .same_site(actix_web::cookie::SameSite::Lax) // Lax for OAuth redirects
         .max_age(actix_web::cookie::time::Duration::hours(1))
         .finish();
@@ -971,7 +993,7 @@ async fn generate_jwt_and_redirect(
     let refresh_cookie = actix_web::cookie::Cookie::build("refresh-token", &refresh_token)
         .path("/")
         .http_only(true)
-        .secure(is_production)
+        .secure(true)
         .same_site(actix_web::cookie::SameSite::Lax)
         .max_age(actix_web::cookie::time::Duration::days(
             REFRESH_TOKEN_VALIDITY_DAYS,

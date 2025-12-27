@@ -16,7 +16,9 @@ use api_gateway::middleware::request_id::RequestId;
 use api_gateway::middleware::security_headers::SecurityHeaders;
 use api_gateway::middleware::unified_rate_limiter::UnifiedRateLimiter;
 use api_gateway::openapi::ApiDoc;
-use api_gateway::services::{start_a2a_task_processor, SocialAuthService, WalletService};
+use api_gateway::services::{
+    start_a2a_task_processor, AuthRateLimiter, SocialAuthService, WalletService,
+};
 use api_gateway::{middleware, routes};
 
 #[actix_web::main]
@@ -91,10 +93,16 @@ async fn main() -> anyhow::Result<()> {
     // Initialize SocialAuthService for OAuth login (Google, GitHub)
     let social_auth_service = SocialAuthService::from_env();
     tracing::info!(
-        "SocialAuthService initialized (Google: {}, GitHub: {})",
+        "SocialAuthService initialized (Google: {}, GitHub: {}, frontend_url: {})",
         social_auth_service.is_google_configured(),
-        social_auth_service.is_github_configured()
+        social_auth_service.is_github_configured(),
+        social_auth_service.frontend_url()
     );
+
+    // Initialize AuthRateLimiter for code exchange (stricter: 10 per minute per IP)
+    // This prevents brute-force attacks on OAuth authorization codes
+    let code_exchange_rate_limiter = AuthRateLimiter::with_rates(500, 10);
+    tracing::info!("Code exchange rate limiter initialized (10 req/min per IP)");
 
     // Initialize Redis client for rate limiting
     let redis_client = shared::redis::create_client(&config.redis.connection_url())
@@ -158,6 +166,8 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(wallet_service.clone()))
             // Store SocialAuthService in app state (shared across all requests)
             .app_data(web::Data::new(social_auth_service.clone()))
+            // Store CodeExchangeRateLimiter in app state (for /auth/exchange endpoint)
+            .app_data(web::Data::new(code_exchange_rate_limiter.clone()))
             // Prometheus metrics endpoint (for scraping)
             .route("/metrics", web::get().to(metrics_handler))
             // Configure routes

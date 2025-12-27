@@ -188,10 +188,13 @@ impl SocialAuthService {
                 secret
             }
             Err(_) if is_development => {
-                tracing::warn!(
-                    "OAUTH_STATE_SECRET not set, using development default. \
-                     DO NOT use this in production!"
-                );
+                // Prominent security warning for missing secret
+                tracing::error!("╔══════════════════════════════════════════════════════════════╗");
+                tracing::error!("║  ⚠️  SECURITY WARNING: OAUTH_STATE_SECRET not set!           ║");
+                tracing::error!("║  Using insecure default - OAuth state tokens are vulnerable  ║");
+                tracing::error!("║  Generate a secret: openssl rand -base64 32                  ║");
+                tracing::error!("║  Set OAUTH_STATE_SECRET env var before deploying!            ║");
+                tracing::error!("╚══════════════════════════════════════════════════════════════╝");
                 "default-dev-secret-not-for-production".to_string()
             }
             Err(_) => {

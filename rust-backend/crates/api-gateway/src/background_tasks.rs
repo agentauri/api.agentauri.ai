@@ -4,6 +4,7 @@
 //!
 //! - **Nonce Cleanup**: Removes expired wallet authentication nonces
 //! - **OAuth Token Cleanup**: Removes expired OAuth access and refresh tokens
+//! - **OAuth Temp Codes Cleanup**: Removes expired/used OAuth authorization codes
 //! - **Payment Nonce Cleanup**: Removes expired payment idempotency keys
 //! - **Auth Failures Cleanup**: Removes old authentication failure records (30 days retention)
 //! - **Session Cleanup**: (Future) Clean up expired sessions
@@ -39,6 +40,7 @@ use tracing::{debug, error, info};
 
 use crate::repositories::oauth::OAuthTokenRepository;
 use crate::repositories::wallet::NonceRepository;
+use crate::repositories::OAuthTempCodeRepository;
 
 /// Default interval for nonce cleanup (1 hour)
 const DEFAULT_NONCE_CLEANUP_INTERVAL_SECS: u64 = 3600;
@@ -163,6 +165,20 @@ impl BackgroundTaskRunner {
                 auth_failures_interval,
                 auth_failures_retention_days,
                 auth_failures_token,
+            )
+            .await;
+        });
+
+        // Start OAuth temp codes cleanup task
+        let oauth_temp_codes_token = cancel_token.clone();
+        let oauth_temp_codes_pool = self.pool.clone();
+        let oauth_temp_codes_interval = self.config.nonce_cleanup_interval; // Same interval as nonces
+
+        tokio::spawn(async move {
+            run_oauth_temp_codes_cleanup(
+                oauth_temp_codes_pool,
+                oauth_temp_codes_interval,
+                oauth_temp_codes_token,
             )
             .await;
         });
@@ -387,6 +403,48 @@ async fn cleanup_old_auth_failures(pool: &DbPool, retention_days: i32) {
         }
         Err(e) => {
             error!(error = %e, "Failed to cleanup old auth failures");
+        }
+    }
+}
+
+/// Run the OAuth temp codes cleanup task
+async fn run_oauth_temp_codes_cleanup(
+    pool: DbPool,
+    cleanup_interval: Duration,
+    cancel_token: CancellationToken,
+) {
+    let mut interval = interval(cleanup_interval);
+
+    // Skip the first tick (which fires immediately)
+    interval.tick().await;
+
+    loop {
+        tokio::select! {
+            _ = cancel_token.cancelled() => {
+                info!("OAuth temp codes cleanup task stopping due to shutdown");
+                break;
+            }
+            _ = interval.tick() => {
+                cleanup_expired_oauth_temp_codes(&pool).await;
+            }
+        }
+    }
+}
+
+/// Perform the actual OAuth temp codes cleanup
+async fn cleanup_expired_oauth_temp_codes(pool: &DbPool) {
+    debug!("Starting OAuth temp codes cleanup");
+
+    match OAuthTempCodeRepository::cleanup_expired(pool).await {
+        Ok(count) => {
+            if count > 0 {
+                info!(deleted_count = count, "Cleaned up expired OAuth temp codes");
+            } else {
+                debug!("No expired OAuth temp codes to clean up");
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to cleanup expired OAuth temp codes");
         }
     }
 }

@@ -8,6 +8,7 @@ pub mod a2a_task_processor;
 pub mod api_key_service;
 pub mod auth_rate_limiter;
 pub mod oauth_client_service;
+pub mod oauth_code_service;
 pub mod oauth_token_service;
 pub mod query_executor;
 pub mod social_auth_service;
@@ -21,6 +22,7 @@ pub use a2a_task_processor::{start_a2a_task_processor, A2aTaskProcessor, A2aTask
 pub use api_key_service::ApiKeyService;
 pub use auth_rate_limiter::AuthRateLimiter;
 pub use oauth_client_service::OAuthClientService;
+pub use oauth_code_service::{OAuthCodeError, OAuthCodeService};
 pub use oauth_token_service::OAuthTokenService;
 pub use query_executor::QueryExecutor;
 pub use social_auth_service::{OAuthUserProfile, SocialAuthError, SocialAuthService};

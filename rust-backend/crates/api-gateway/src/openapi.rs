@@ -77,6 +77,7 @@ use crate::models;
         handlers::logout,
         handlers::wallet_login,
         handlers::refresh_token,
+        handlers::exchange_code,
         // Organizations
         handlers::create_organization,
         handlers::list_organizations,
@@ -162,6 +163,7 @@ use crate::models;
             models::LogoutResponse,
             models::RefreshTokenRequest,
             models::RefreshTokenResponse,
+            models::ExchangeCodeRequest,
             // Organizations
             models::CreateOrganizationRequest,
             models::UpdateOrganizationRequest,

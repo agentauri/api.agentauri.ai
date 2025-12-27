@@ -8,6 +8,7 @@ pub mod api_keys;
 pub mod billing;
 pub mod conditions;
 pub mod oauth;
+pub mod oauth_temp_codes;
 pub mod organizations;
 pub mod refresh_tokens;
 pub mod triggers;
@@ -24,6 +25,7 @@ pub use api_keys::{ApiKeyAuditRepository, ApiKeyRepository, AuthFailureRepositor
 pub use billing::CreditRepository;
 pub use conditions::ConditionRepository;
 pub use oauth::{OAuthClientRepository, OAuthTokenRepository};
+pub use oauth_temp_codes::OAuthTempCodeRepository;
 pub use organizations::{MemberRepository, OrganizationRepository, OrganizationWithRole};
 pub use refresh_tokens::RefreshTokenRepository;
 pub use triggers::TriggerRepository;

@@ -144,6 +144,48 @@ pub struct RefreshTokenResponse {
     pub expires_in: i64,
 }
 
+/// Validate OAuth authorization code format
+///
+/// Expected format: oac_[A-Za-z0-9_-]{43} (47 chars total)
+/// - Prefix: "oac_" (OAuth Auth Code)
+/// - Body: 43 chars of URL-safe base64 (encoding 32 bytes of entropy)
+fn validate_oauth_code(code: &str) -> Result<(), ValidationError> {
+    // Check length first (47 chars = 4 prefix + 43 base64)
+    if code.len() != 47 {
+        let mut err = ValidationError::new("invalid_code_length");
+        err.message = Some("Authorization code must be exactly 47 characters".into());
+        return Err(err);
+    }
+
+    // Check prefix
+    if !code.starts_with("oac_") {
+        let mut err = ValidationError::new("invalid_code_prefix");
+        err.message = Some("Authorization code must start with 'oac_'".into());
+        return Err(err);
+    }
+
+    // Check body is valid URL-safe base64 characters
+    let body = &code[4..];
+    if !body
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        let mut err = ValidationError::new("invalid_code_chars");
+        err.message = Some("Authorization code contains invalid characters".into());
+        return Err(err);
+    }
+
+    Ok(())
+}
+
+/// Request to exchange OAuth authorization code for tokens
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct ExchangeCodeRequest {
+    /// The temporary authorization code from OAuth callback
+    #[validate(custom(function = "validate_oauth_code"))]
+    pub code: String,
+}
+
 /// User response (safe for API, without password)
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
