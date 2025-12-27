@@ -21,6 +21,7 @@ use oauth2::{
     Scope, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 /// OAuth state token expiration in minutes
@@ -643,9 +644,9 @@ impl SocialAuthService {
             .decode(parts[1])
             .map_err(|_| SocialAuthError::InvalidState)?;
 
-        // Verify signature
+        // Verify signature using constant-time comparison to prevent timing attacks
         let expected_signature = self.sign_data(&payload_bytes);
-        if signature_bytes != expected_signature {
+        if signature_bytes.ct_eq(&expected_signature).unwrap_u8() != 1 {
             return Err(SocialAuthError::InvalidState);
         }
 

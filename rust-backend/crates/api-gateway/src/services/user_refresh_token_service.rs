@@ -35,6 +35,9 @@ pub const REFRESH_TOKEN_VALIDITY_DAYS: i64 = 30;
 /// Access token validity in seconds (1 hour)
 pub const ACCESS_TOKEN_VALIDITY_SECS: i64 = 3600;
 
+/// Maximum number of concurrent sessions per user
+const MAX_SESSIONS_PER_USER: i64 = 10;
+
 /// Errors that can occur during refresh token operations
 #[derive(Debug, Error)]
 pub enum RefreshTokenError {
@@ -87,6 +90,8 @@ impl UserRefreshTokenService {
     }
 
     /// Create and store a new refresh token for a user
+    ///
+    /// Also enforces a maximum session limit per user for security.
     pub async fn create_refresh_token(
         &self,
         pool: &DbPool,
@@ -109,6 +114,18 @@ impl UserRefreshTokenService {
         )
         .await
         .map_err(|e| RefreshTokenError::DatabaseError(e.to_string()))?;
+
+        // Enforce session limit: revoke oldest sessions if over limit
+        if let Err(e) =
+            RefreshTokenRepository::enforce_session_limit(pool, user_id, MAX_SESSIONS_PER_USER)
+                .await
+        {
+            tracing::warn!(
+                "Failed to enforce session limit for user {}: {}",
+                user_id,
+                e
+            );
+        }
 
         Ok(token)
     }
@@ -145,7 +162,10 @@ impl UserRefreshTokenService {
 
     /// Validate and rotate a refresh token
     ///
-    /// This validates the token, revokes it, and creates a new one.
+    /// This atomically validates the token, revokes it, and creates a new one.
+    /// Uses database row locking (SELECT ... FOR UPDATE) to prevent race conditions
+    /// where two concurrent requests could both validate the same token.
+    ///
     /// Returns (user_id, new_refresh_token).
     pub async fn validate_and_rotate(
         &self,
@@ -159,31 +179,37 @@ impl UserRefreshTokenService {
             return Err(RefreshTokenError::InvalidToken);
         }
 
-        // Hash the token for lookup
-        let token_hash = Self::hash_token(refresh_token);
+        // Generate new token before the atomic operation
+        let new_token = self.generate_token()?;
+        let old_token_hash = Self::hash_token(refresh_token);
+        let new_token_hash = Self::hash_token(&new_token);
+        let new_expires_at = Utc::now() + Duration::days(REFRESH_TOKEN_VALIDITY_DAYS);
 
-        // Look up the token
-        let record = RefreshTokenRepository::find_valid_by_hash(pool, &token_hash)
-            .await
-            .map_err(|e| RefreshTokenError::DatabaseError(e.to_string()))?
-            .ok_or(RefreshTokenError::InvalidToken)?;
+        // Atomically rotate: validate, revoke old, create new (with row locking)
+        let result = RefreshTokenRepository::atomic_rotate(
+            pool,
+            &old_token_hash,
+            &new_token_hash,
+            new_expires_at,
+            user_agent,
+            ip_address,
+        )
+        .await
+        .map_err(|e| RefreshTokenError::DatabaseError(e.to_string()))?;
 
-        // Check if revoked
-        if record.revoked_at.is_some() {
-            return Err(RefreshTokenError::TokenRevoked);
+        let (user_id, _new_token_id) = result.ok_or(RefreshTokenError::InvalidToken)?;
+
+        // Enforce session limit after creating new token
+        if let Err(e) =
+            RefreshTokenRepository::enforce_session_limit(pool, &user_id, MAX_SESSIONS_PER_USER)
+                .await
+        {
+            tracing::warn!(
+                "Failed to enforce session limit for user {}: {}",
+                user_id,
+                e
+            );
         }
-
-        let user_id = record.user_id.clone();
-
-        // Revoke the old token (token rotation)
-        RefreshTokenRepository::revoke(pool, &record.id)
-            .await
-            .map_err(|e| RefreshTokenError::DatabaseError(e.to_string()))?;
-
-        // Create a new refresh token
-        let new_token = self
-            .create_refresh_token(pool, &user_id, user_agent, ip_address)
-            .await?;
 
         Ok((user_id, new_token))
     }
