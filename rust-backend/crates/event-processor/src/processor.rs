@@ -555,12 +555,15 @@ async fn fetch_event(event_id: &str, db_pool: &DbPool) -> Result<Event> {
 }
 
 /// Fetch enabled triggers matching chain_id and registry
+///
+/// If a trigger has chain_id = NULL, it matches ALL chains (wildcard).
+/// If a trigger has a specific chain_id, it only matches that chain.
 async fn fetch_triggers(chain_id: i32, registry: &str, db_pool: &DbPool) -> Result<Vec<Trigger>> {
     sqlx::query_as::<_, Trigger>(
         r#"
         SELECT id, user_id, organization_id, name, description, chain_id, registry, enabled, is_stateful, created_at, updated_at
         FROM triggers
-        WHERE chain_id = $1 AND registry = $2 AND enabled = true
+        WHERE (chain_id = $1 OR chain_id IS NULL) AND registry = $2 AND enabled = true
         "#,
     )
     .bind(chain_id)
