@@ -104,7 +104,9 @@ Create a new user account.
 **Response** (201 Created):
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  // Valid for 1 hour
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "urt_abc123...",
+  "expires_in": 3600,
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "john_doe",
@@ -115,6 +117,12 @@ Create a new user account.
   }
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `token` | JWT access token (valid for 1 hour) |
+| `refresh_token` | Refresh token for obtaining new access tokens (valid for 30 days) |
+| `expires_in` | Access token validity in seconds |
 
 **Error Responses**:
 - `400 Bad Request`: Validation failed
@@ -139,7 +147,9 @@ Authenticate and receive JWT token.
 **Response** (200 OK):
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  // Valid for 1 hour
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "urt_abc123...",
+  "expires_in": 3600,
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "john_doe",
@@ -151,10 +161,49 @@ Authenticate and receive JWT token.
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `token` | JWT access token (valid for 1 hour) |
+| `refresh_token` | Refresh token for obtaining new access tokens (valid for 30 days) |
+| `expires_in` | Access token validity in seconds |
+
 **Error Responses**:
 - `400 Bad Request`: Validation failed
 - `401 Unauthorized`: Invalid credentials
 - `403 Forbidden`: Account disabled
+
+---
+
+#### Refresh Token
+
+Exchange a refresh token for a new access token. Implements token rotation: the old refresh token is invalidated and a new one is returned.
+
+**Endpoint**: `POST /api/v1/auth/refresh`
+
+**Request Body**:
+```json
+{
+  "refresh_token": "urt_abc123..."
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "urt_xyz789...",
+  "expires_in": 3600
+}
+```
+
+**Security Features**:
+- **Token Rotation**: Old refresh token is invalidated when a new one is issued
+- **30-day Expiry**: Refresh tokens expire after 30 days
+- **Device Tracking**: User agent and IP address are logged for security auditing
+
+**Error Responses**:
+- `400 Bad Request`: Validation failed
+- `401 Unauthorized`: Invalid or expired refresh token
 
 ---
 

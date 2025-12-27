@@ -561,7 +561,7 @@ async fn login_existing_user(
     }
 
     // Generate JWT and redirect
-    generate_jwt_and_redirect(config, social_auth, user, redirect_after)
+    generate_jwt_and_redirect(&pool, config, social_auth, user, redirect_after).await
 }
 
 /// Link identity to existing user and log in
@@ -719,7 +719,7 @@ async fn handle_account_linking(
     );
 
     // Generate JWT and redirect
-    generate_jwt_and_redirect(config, social_auth, user, redirect_after)
+    generate_jwt_and_redirect(&pool, config, social_auth, user, redirect_after).await
 }
 
 /// Create a new user and identity
@@ -822,7 +822,7 @@ async fn create_new_user(
     tracing::info!("Created new user {} via {} social login", user.id, provider);
 
     // Generate JWT and redirect
-    generate_jwt_and_redirect(config, social_auth, user, redirect_after)
+    generate_jwt_and_redirect(&pool, config, social_auth, user, redirect_after).await
 }
 
 /// Validate redirect path to prevent open redirect attacks
@@ -880,13 +880,16 @@ fn validate_redirect_path(path: &str) -> Result<String, &'static str> {
     Ok(path.to_string())
 }
 
-/// Generate JWT token and redirect to frontend with auth-token cookie
-fn generate_jwt_and_redirect(
+/// Generate JWT token and redirect to frontend with auth-token and refresh-token cookies
+async fn generate_jwt_and_redirect(
+    pool: &DbPool,
     config: web::Data<Config>,
     social_auth: web::Data<SocialAuthService>,
     user: shared::models::User,
     redirect_after: Option<String>,
 ) -> HttpResponse {
+    use crate::services::{UserRefreshTokenService, REFRESH_TOKEN_VALIDITY_DAYS};
+
     // Generate JWT token
     let claims = Claims::new(user.id.clone(), user.username.clone(), 1); // 1 hour
     let token = match encode(
@@ -898,6 +901,23 @@ fn generate_jwt_and_redirect(
         Err(e) => {
             tracing::error!("Failed to generate JWT: {}", e);
             return redirect_with_error(&social_auth, "internal_error", "Failed to generate token");
+        }
+    };
+
+    // Generate refresh token
+    let refresh_service = UserRefreshTokenService::new();
+    let refresh_token = match refresh_service
+        .create_refresh_token(pool, &user.id, None, None)
+        .await
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::error!("Failed to generate refresh token: {}", e);
+            return redirect_with_error(
+                &social_auth,
+                "internal_error",
+                "Failed to generate refresh token",
+            );
         }
     };
 
@@ -914,17 +934,32 @@ fn generate_jwt_and_redirect(
         None => "/".to_string(),
     };
 
-    // Build redirect URL with validated path (no token in URL for security)
+    // Build redirect URL with validated path
     let frontend_url = social_auth.frontend_url();
-    let redirect_url = format!("{}{}", frontend_url, redirect_path);
-
-    // Build auth-token cookie with security flags
-    // Cookie is set on the API domain but with SameSite=None to work cross-domain
     let is_production = std::env::var("ENVIRONMENT")
         .map(|e| e.to_lowercase() == "production")
         .unwrap_or(false);
 
-    let cookie = actix_web::cookie::Cookie::build("auth-token", &token)
+    // In development, cookies don't work cross-port (localhost:8080 -> localhost:8004)
+    // So we pass the token in the URL for the frontend to store
+    let redirect_url = if is_production {
+        format!("{}{}", frontend_url, redirect_path)
+    } else {
+        // Development mode: pass tokens in URL for frontend to store
+        let separator = if redirect_path.contains('?') {
+            "&"
+        } else {
+            "?"
+        };
+        format!(
+            "{}{}{}token={}&refresh_token={}",
+            frontend_url, redirect_path, separator, token, refresh_token
+        )
+    };
+
+    // Build auth-token cookie with security flags
+    // In production, the cookie will be used; in dev, the URL token is primary
+    let auth_cookie = actix_web::cookie::Cookie::build("auth-token", &token)
         .path("/")
         .http_only(true)
         .secure(is_production) // Only Secure in production (HTTPS)
@@ -932,9 +967,21 @@ fn generate_jwt_and_redirect(
         .max_age(actix_web::cookie::time::Duration::hours(1))
         .finish();
 
+    // Build refresh-token cookie with longer expiry
+    let refresh_cookie = actix_web::cookie::Cookie::build("refresh-token", &refresh_token)
+        .path("/")
+        .http_only(true)
+        .secure(is_production)
+        .same_site(actix_web::cookie::SameSite::Lax)
+        .max_age(actix_web::cookie::time::Duration::days(
+            REFRESH_TOKEN_VALIDITY_DAYS,
+        ))
+        .finish();
+
     HttpResponse::Found()
         .insert_header((header::LOCATION, redirect_url))
-        .cookie(cookie)
+        .cookie(auth_cookie)
+        .cookie(refresh_cookie)
         .finish()
 }
 

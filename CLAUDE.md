@@ -127,6 +127,7 @@ fn do_work() -> Result<()> {
 ```
 POST /api/v1/auth/register            # Create user
 POST /api/v1/auth/login               # Get JWT
+POST /api/v1/auth/refresh             # Refresh access token
 GET  /api/v1/auth/google              # OAuth start
 GET  /api/v1/auth/github              # OAuth start
 ```

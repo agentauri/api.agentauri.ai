@@ -14,8 +14,8 @@ use validator::Validate;
 use crate::{
     models::{
         AuthResponse, Claims, ErrorResponse, LoginRequest, LogoutResponse, MeResponse,
-        NonceResponse, OrganizationInfo, RegisterRequest, UserResponse, WalletInfo,
-        WalletLoginRequest, ROLE_OWNER,
+        NonceResponse, OrganizationInfo, RefreshTokenRequest, RefreshTokenResponse,
+        RegisterRequest, UserResponse, WalletInfo, WalletLoginRequest, ROLE_OWNER,
     },
     repositories::{
         MemberRepository, OrganizationRepository, UserIdentityRepository, UserRepository,
@@ -225,8 +225,27 @@ pub async fn register(
         }
     };
 
+    // Generate refresh token
+    use crate::services::{UserRefreshTokenService, ACCESS_TOKEN_VALIDITY_SECS};
+    let refresh_service = UserRefreshTokenService::new();
+    let refresh_token = match refresh_service
+        .create_refresh_token(&pool, &user.id, None, None)
+        .await
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::error!("Failed to generate refresh token: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to generate authentication token",
+            ));
+        }
+    };
+
     let response = AuthResponse {
         token,
+        refresh_token,
+        expires_in: ACCESS_TOKEN_VALIDITY_SECS,
         user: UserResponse::from(user),
     };
 
@@ -407,8 +426,27 @@ pub async fn login(
         }
     };
 
+    // Generate refresh token
+    use crate::services::{UserRefreshTokenService, ACCESS_TOKEN_VALIDITY_SECS};
+    let refresh_service = UserRefreshTokenService::new();
+    let refresh_token = match refresh_service
+        .create_refresh_token(&pool, &user.id, None, None)
+        .await
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::error!("Failed to generate refresh token: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to generate authentication token",
+            ));
+        }
+    };
+
     let response = AuthResponse {
         token,
+        refresh_token,
+        expires_in: ACCESS_TOKEN_VALIDITY_SECS,
         user: UserResponse::from(user),
     };
 
@@ -657,6 +695,126 @@ pub async fn logout() -> impl Responder {
     })
 }
 
+/// Refresh access token using a refresh token
+///
+/// Exchanges a valid refresh token for a new access token and refresh token.
+/// Implements token rotation: the old refresh token is invalidated.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/refresh",
+    tag = "Authentication",
+    request_body = RefreshTokenRequest,
+    responses(
+        (status = 200, description = "Token refreshed successfully", body = RefreshTokenResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Invalid or expired refresh token", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
+pub async fn refresh_token(
+    pool: web::Data<DbPool>,
+    config: web::Data<Config>,
+    req: HttpRequest,
+    body: web::Json<RefreshTokenRequest>,
+) -> impl Responder {
+    use crate::services::{UserRefreshTokenService, ACCESS_TOKEN_VALIDITY_SECS};
+
+    // Validate request
+    if let Err(e) = body.validate() {
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "validation_error",
+            format!("Validation failed: {}", e),
+        ));
+    }
+
+    // Extract client info for audit
+    let user_agent = req
+        .headers()
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let ip_address = req
+        .connection_info()
+        .realip_remote_addr()
+        .map(|s| s.to_string());
+
+    // Validate and rotate the refresh token
+    let refresh_service = UserRefreshTokenService::new();
+    let (user_id, new_refresh_token) = match refresh_service
+        .validate_and_rotate(
+            &pool,
+            &body.refresh_token,
+            user_agent.as_deref(),
+            ip_address.as_deref(),
+        )
+        .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            tracing::debug!("Refresh token validation failed: {}", e);
+            return HttpResponse::Unauthorized().json(ErrorResponse::new(
+                "invalid_refresh_token",
+                "Invalid or expired refresh token",
+            ));
+        }
+    };
+
+    // Look up the user to get username for JWT claims
+    let user = match UserRepository::find_by_id(&pool, &user_id).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            tracing::error!("User not found for valid refresh token: {}", user_id);
+            return HttpResponse::InternalServerError()
+                .json(ErrorResponse::new("internal_error", "User not found"));
+        }
+        Err(e) => {
+            tracing::error!("Failed to lookup user: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to process request",
+            ));
+        }
+    };
+
+    // Generate new JWT
+    let claims = Claims::new(user.id.clone(), user.username.clone(), 1);
+    let token = match encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(config.server.jwt_secret.as_bytes()),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("Failed to generate JWT: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to generate token",
+            ));
+        }
+    };
+
+    // Set auth-token cookie
+    let is_production = std::env::var("ENVIRONMENT")
+        .map(|e| e.to_lowercase() == "production")
+        .unwrap_or(false);
+
+    let cookie = Cookie::build("auth-token", &token)
+        .path("/")
+        .http_only(true)
+        .secure(is_production)
+        .same_site(actix_web::cookie::SameSite::Lax)
+        .max_age(actix_web::cookie::time::Duration::hours(1))
+        .finish();
+
+    HttpResponse::Ok()
+        .cookie(cookie)
+        .json(RefreshTokenResponse {
+            token,
+            refresh_token: new_refresh_token,
+            expires_in: ACCESS_TOKEN_VALIDITY_SECS,
+        })
+}
+
 // ============================================================================
 // Wallet authentication (SIWE)
 // ============================================================================
@@ -680,8 +838,11 @@ pub async fn logout() -> impl Responder {
 pub async fn wallet_login(
     pool: web::Data<DbPool>,
     config: web::Data<Config>,
+    http_req: HttpRequest,
     req: web::Json<WalletLoginRequest>,
 ) -> impl Responder {
+    use crate::services::{UserRefreshTokenService, ACCESS_TOKEN_VALIDITY_SECS};
+
     // Validate request
     if let Err(e) = req.validate() {
         return HttpResponse::BadRequest().json(ErrorResponse::new(
@@ -925,8 +1086,34 @@ pub async fn wallet_login(
         }
     };
 
+    // Generate refresh token
+    let refresh_service = UserRefreshTokenService::new();
+    let user_agent = http_req
+        .headers()
+        .get("User-Agent")
+        .and_then(|h| h.to_str().ok());
+    let ip_address = http_req
+        .connection_info()
+        .realip_remote_addr()
+        .map(|s| s.to_string());
+    let refresh_token = match refresh_service
+        .create_refresh_token(&pool, &user.id, user_agent, ip_address.as_deref())
+        .await
+    {
+        Ok(token) => token,
+        Err(e) => {
+            tracing::error!("Failed to generate refresh token: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to generate refresh token",
+            ));
+        }
+    };
+
     HttpResponse::Ok().json(AuthResponse {
         token,
+        refresh_token,
+        expires_in: ACCESS_TOKEN_VALIDITY_SECS,
         user: UserResponse::from(user),
     })
 }

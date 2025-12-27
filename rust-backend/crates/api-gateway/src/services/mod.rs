@@ -13,6 +13,7 @@ pub mod query_executor;
 pub mod social_auth_service;
 pub mod stripe_service;
 pub mod tool_registry;
+pub mod user_refresh_token_service;
 pub mod wallet_service;
 
 pub use a2a_audit::{A2aAuditService, AuditActor, AuditEventType, AuditLogParams};
@@ -25,5 +26,9 @@ pub use query_executor::QueryExecutor;
 pub use social_auth_service::{OAuthUserProfile, SocialAuthError, SocialAuthService};
 pub use stripe_service::{StripeConfig, StripeService, WebhookEvent};
 pub use tool_registry::{ToolDefinition, ToolRegistry, ToolTier};
+pub use user_refresh_token_service::{
+    RefreshTokenError, UserRefreshTokenService, ACCESS_TOKEN_VALIDITY_SECS,
+    REFRESH_TOKEN_VALIDITY_DAYS,
+};
 #[allow(unused_imports)] // ChainConfig used in main.rs
 pub use wallet_service::{ChainConfig, WalletService};

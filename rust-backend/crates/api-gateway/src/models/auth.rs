@@ -113,11 +113,35 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-/// Authentication response with JWT token
+/// Authentication response with JWT and refresh token
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AuthResponse {
+    /// JWT access token (short-lived, 1 hour)
     pub token: String,
+    /// Refresh token (long-lived, 30 days)
+    pub refresh_token: String,
+    /// Token expiration in seconds
+    pub expires_in: i64,
     pub user: UserResponse,
+}
+
+/// Request to refresh an access token
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct RefreshTokenRequest {
+    /// The refresh token obtained during login
+    #[validate(length(min = 1))]
+    pub refresh_token: String,
+}
+
+/// Response from token refresh
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RefreshTokenResponse {
+    /// New JWT access token
+    pub token: String,
+    /// New refresh token (token rotation)
+    pub refresh_token: String,
+    /// Token expiration in seconds
+    pub expires_in: i64,
 }
 
 /// User response (safe for API, without password)
@@ -442,6 +466,8 @@ mod tests {
     fn test_auth_response_serialization() {
         let response = AuthResponse {
             token: "test-token".to_string(),
+            refresh_token: "urt_test-refresh-token".to_string(),
+            expires_in: 3600,
             user: UserResponse {
                 id: "user-123".to_string(),
                 username: "testuser".to_string(),
@@ -456,6 +482,8 @@ mod tests {
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("test-token"));
+        assert!(json.contains("urt_test-refresh-token"));
+        assert!(json.contains("3600"));
         assert!(json.contains("user-123"));
         assert!(json.contains("testuser"));
     }
