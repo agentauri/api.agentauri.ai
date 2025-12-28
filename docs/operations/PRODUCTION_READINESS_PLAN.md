@@ -3,14 +3,16 @@
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
 **Current Status**: DEPLOYED TO PRODUCTION (Phase 4 Complete, v1.0.12)
 **Target**: Production-Ready MVP - ACHIEVED
-**Document Version**: 1.3
-**Last Updated**: 2025-12-25
+**Document Version**: 1.4
+**Last Updated**: 2025-12-28
 
 ---
 
 ## Executive Summary
 
 **UPDATE (December 17, 2025)**: The system has been deployed to production on AWS ECS. This document now serves as a historical record and future enhancement guide.
+
+**UPDATE (December 28, 2025)**: Trigger system verified working in production with wildcard chain matching (NULL = all chains). Telegram notifications firing correctly for new agent registrations.
 
 The api.agentauri.ai backend is now live at `https://api.agentauri.ai` with:
 - Full API Gateway running on AWS ECS
