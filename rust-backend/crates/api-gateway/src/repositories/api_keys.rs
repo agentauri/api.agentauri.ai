@@ -254,6 +254,35 @@ impl ApiKeyRepository {
         Ok(key)
     }
 
+    /// Update an API key's name and/or expiration
+    pub async fn update(
+        pool: &DbPool,
+        key_id: &str,
+        name: Option<&str>,
+        expires_at: Option<DateTime<Utc>>,
+    ) -> Result<ApiKey> {
+        // Build dynamic update query based on provided fields
+        let key = sqlx::query_as::<_, ApiKey>(
+            r#"
+            UPDATE api_keys
+            SET
+                name = COALESCE($1, name),
+                expires_at = CASE WHEN $2 THEN $3 ELSE expires_at END
+            WHERE id = $4 AND revoked_at IS NULL
+            RETURNING *
+            "#,
+        )
+        .bind(name)
+        .bind(expires_at.is_some()) // Flag to indicate if expires_at should be updated
+        .bind(expires_at)
+        .bind(key_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to update API key")?;
+
+        Ok(key)
+    }
+
     /// Update last used timestamp and IP
     pub async fn update_last_used(
         pool: &DbPool,

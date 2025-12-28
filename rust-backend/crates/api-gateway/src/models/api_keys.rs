@@ -115,6 +115,18 @@ pub struct RevokeApiKeyRequest {
     pub reason: Option<String>,
 }
 
+/// Request to update an API key (PATCH)
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(example = json!({"name": "Updated Key Name"}))]
+pub struct UpdateApiKeyRequest {
+    /// New name for the key
+    #[validate(length(min = 1, max = 255))]
+    pub name: Option<String>,
+
+    /// New expiration timestamp
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
 // ============================================================================
 // Response DTOs
 // ============================================================================

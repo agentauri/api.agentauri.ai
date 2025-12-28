@@ -86,16 +86,24 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route(
                                 "/{id}/members/{user_id}",
                                 web::delete().to(handlers::remove_member),
+                            )
+                            // API Keys nested under organization
+                            .route("/{id}/api-keys", web::get().to(handlers::list_org_api_keys))
+                            .route(
+                                "/{id}/api-keys",
+                                web::post().to(handlers::create_org_api_key),
                             ),
                     )
-                    // API Key endpoints
+                    // API Key endpoints (standalone - for backwards compat)
                     .service(
                         web::scope("/api-keys")
                             .route("", web::post().to(handlers::create_api_key))
                             .route("", web::get().to(handlers::list_api_keys))
                             .route("/{id}", web::get().to(handlers::get_api_key))
+                            .route("/{id}", web::patch().to(handlers::update_api_key))
                             .route("/{id}", web::delete().to(handlers::revoke_api_key))
-                            .route("/{id}/rotate", web::post().to(handlers::rotate_api_key)),
+                            .route("/{id}/rotate", web::post().to(handlers::rotate_api_key))
+                            .route("/{id}/regenerate", web::post().to(handlers::rotate_api_key)),
                     )
                     // OAuth client management endpoints (JWT auth required)
                     .service(

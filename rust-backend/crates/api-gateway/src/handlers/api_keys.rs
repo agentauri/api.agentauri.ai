@@ -40,7 +40,7 @@ use crate::{
     models::{
         can_manage_org, ApiKeyCreatedResponse, ApiKeyListResponse, ApiKeyResponse,
         CreateApiKeyRequest, ErrorResponse, PaginationParams, RevokeApiKeyRequest,
-        RotateApiKeyRequest, RotateApiKeyResponse, SuccessResponse,
+        RotateApiKeyRequest, RotateApiKeyResponse, SuccessResponse, UpdateApiKeyRequest,
     },
     repositories::{ApiKeyAuditRepository, ApiKeyRepository, MemberRepository},
     services::ApiKeyService,
@@ -649,6 +649,351 @@ pub async fn rotate_api_key(
 }
 
 // ============================================================================
+// Organization-scoped API Key Handlers
+// ============================================================================
+
+/// List API keys for an organization (nested under /organizations/{id}/api-keys)
+///
+/// GET /api/v1/organizations/{id}/api-keys
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/api-keys",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "Organization ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip"),
+        ("include_revoked" = Option<bool>, Query, description = "Include revoked keys")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of API keys (masked)", body = ApiKeyListResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn list_org_api_keys(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+    query: web::Query<OrgApiKeyListQuery>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Validate pagination
+    let pagination = PaginationParams {
+        limit: query.limit.unwrap_or(20),
+        offset: query.offset.unwrap_or(0),
+    };
+    if let Err(e) = pagination.validate() {
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "validation_error",
+            format!("Invalid pagination: {}", e),
+        ));
+    }
+
+    // Check membership
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
+        }
+        Err(resp) => return resp,
+    };
+
+    // All members can view keys (masked)
+    let _ = role; // Role checked above for membership
+
+    // Get total count
+    let include_revoked = query.include_revoked.unwrap_or(false);
+    let total = match handle_db_error(
+        ApiKeyRepository::count_by_organization(&pool, &org_id, include_revoked).await,
+        "count API keys",
+    ) {
+        Ok(count) => count,
+        Err(resp) => return resp,
+    };
+
+    // Get keys
+    let keys = match handle_db_error(
+        ApiKeyRepository::list_by_organization(
+            &pool,
+            &org_id,
+            include_revoked,
+            pagination.limit,
+            pagination.offset,
+        )
+        .await,
+        "list API keys",
+    ) {
+        Ok(k) => k,
+        Err(resp) => return resp,
+    };
+
+    // Convert to response (masked - no key_hash exposed)
+    let key_responses: Vec<ApiKeyResponse> = keys.into_iter().map(ApiKeyResponse::from).collect();
+
+    let response = ApiKeyListResponse {
+        items: key_responses,
+        total,
+        page: (pagination.offset / pagination.limit) + 1,
+        page_size: pagination.limit,
+        total_pages: (total + pagination.limit - 1) / pagination.limit,
+    };
+
+    HttpResponse::Ok().json(response)
+}
+
+/// Create API key for an organization (nested under /organizations/{id}/api-keys)
+///
+/// POST /api/v1/organizations/{id}/api-keys
+#[utoipa::path(
+    post,
+    path = "/api/v1/organizations/{id}/api-keys",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    request_body = CreateApiKeyRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "API key created - full key shown once", body = SuccessResponse<ApiKeyCreatedResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - admin required", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn create_org_api_key(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+    req: web::Json<CreateApiKeyRequest>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Validate request
+    if let Err(resp) = validate_request(&*req) {
+        return resp;
+    }
+
+    // Check membership and role
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
+        }
+        Err(resp) => return resp,
+    };
+
+    // Check if user can manage org (owner or admin)
+    if !can_manage_org(&role) {
+        return forbidden("Insufficient permissions to create API keys");
+    }
+
+    // Generate the API key
+    let api_key_service = ApiKeyService::new();
+    let generated = match handle_error(
+        api_key_service.generate_key(&req.environment),
+        "generate API key",
+    ) {
+        Ok(g) => g,
+        Err(resp) => return resp,
+    };
+
+    // Store the key in database
+    let key = match ApiKeyRepository::create(
+        &pool,
+        &org_id,
+        &generated.hash,
+        &req.name,
+        &generated.prefix,
+        &req.environment,
+        &req.key_type,
+        &req.permissions,
+        req.rate_limit_override,
+        req.expires_at,
+        &user_id,
+    )
+    .await
+    {
+        Ok(k) => k,
+        Err(e) => {
+            let error_string = e.to_string();
+            if error_string.contains("duplicate key") || error_string.contains("unique constraint")
+            {
+                tracing::error!("API key prefix collision: {}", generated.prefix);
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Key generation failed, please retry",
+                ));
+            }
+            tracing::error!("Failed to store API key: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create API key",
+            ));
+        }
+    };
+
+    // Log the creation event
+    let ctx = extract_request_context(&req_http);
+    if let Err(e) = ApiKeyAuditRepository::log(
+        &pool,
+        Some(&key.id),
+        &org_id,
+        "created",
+        ctx.ip_str(),
+        ctx.user_agent_str(),
+        Some(ctx.endpoint_str()),
+        Some(&user_id),
+        Some(serde_json::json!({
+            "name": req.name,
+            "environment": req.environment,
+            "key_type": req.key_type,
+        })),
+    )
+    .await
+    {
+        tracing::warn!("Failed to log API key creation: {}", e);
+    }
+
+    // Return the full key - THIS IS THE ONLY TIME IT WILL BE SHOWN
+    let response = ApiKeyCreatedResponse {
+        id: key.id,
+        key: generated.key,
+        name: key.name,
+        prefix: key.prefix,
+        environment: key.environment,
+        key_type: key.key_type,
+        permissions: req.permissions.clone(),
+        created_at: key.created_at,
+        expires_at: key.expires_at,
+    };
+
+    HttpResponse::Created().json(SuccessResponse::new(response))
+}
+
+/// Update an API key (name, expiration)
+///
+/// PATCH /api/v1/api-keys/{id}
+#[utoipa::path(
+    patch,
+    path = "/api/v1/api-keys/{id}",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "API Key ID")
+    ),
+    request_body = UpdateApiKeyRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "API key updated", body = SuccessResponse<ApiKeyResponse>),
+        (status = 400, description = "Validation error", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden - admin required", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse)
+    )
+)]
+pub async fn update_api_key(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+    req: web::Json<UpdateApiKeyRequest>,
+) -> impl Responder {
+    let key_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Get the key first to determine org_id
+    let key = match handle_db_error(
+        ApiKeyRepository::find_by_id(&pool, &key_id).await,
+        "fetch API key",
+    ) {
+        Ok(Some(k)) => k,
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
+    };
+
+    // Check if revoked
+    if key.revoked_at.is_some() {
+        return bad_request("Cannot update a revoked API key");
+    }
+
+    // Check membership and role
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &key.organization_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(r)) => r,
+        Ok(None) => return require_found::<()>(None, "API key").unwrap_err(),
+        Err(resp) => return resp,
+    };
+
+    // Check if user can manage org (owner or admin)
+    if !can_manage_org(&role) {
+        return forbidden("Insufficient permissions to update API keys");
+    }
+
+    // Update the key
+    let updated_key = match handle_db_error(
+        ApiKeyRepository::update(&pool, &key_id, req.name.as_deref(), req.expires_at).await,
+        "update API key",
+    ) {
+        Ok(k) => k,
+        Err(resp) => return resp,
+    };
+
+    // Log the update event
+    let ctx = extract_request_context(&req_http);
+    if let Err(e) = ApiKeyAuditRepository::log(
+        &pool,
+        Some(&key_id),
+        &key.organization_id,
+        "updated",
+        ctx.ip_str(),
+        ctx.user_agent_str(),
+        Some(ctx.endpoint_str()),
+        Some(&user_id),
+        Some(serde_json::json!({
+            "name": req.name,
+            "expires_at": req.expires_at,
+        })),
+    )
+    .await
+    {
+        tracing::warn!("Failed to log API key update: {}", e);
+    }
+
+    let response = ApiKeyResponse::from(updated_key);
+    HttpResponse::Ok().json(SuccessResponse::new(response))
+}
+
+// ============================================================================
 // Query Parameter Structs
 // ============================================================================
 
@@ -656,6 +1001,14 @@ pub async fn rotate_api_key(
 #[derive(Debug, serde::Deserialize)]
 pub struct OrgIdQuery {
     pub organization_id: String,
+}
+
+/// Query parameters for listing API keys (org-scoped, org_id from path)
+#[derive(Debug, serde::Deserialize)]
+pub struct OrgApiKeyListQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub include_revoked: Option<bool>,
 }
 
 /// Query parameters for listing API keys
