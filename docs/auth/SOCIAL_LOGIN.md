@@ -1,6 +1,6 @@
 # Social Login (OAuth 2.0)
 
-**Status**: Implemented (December 2, 2025)
+**Status**: Implemented (December 25, 2025 - Account Linking Added)
 
 This document describes the social authentication system for api.agentauri.ai, enabling users to sign in with Google or GitHub accounts.
 
@@ -14,10 +14,10 @@ Social login uses OAuth 2.0 Authorization Code flow with PKCE to authenticate us
 
 ## Supported Providers
 
-| Provider | Status | Login Endpoint | Callback Endpoint |
-|----------|--------|----------------|-------------------|
-| Google | Active | `/api/v1/auth/google` | `/api/v1/auth/google/callback` |
-| GitHub | Active | `/api/v1/auth/github` | `/api/v1/auth/github/callback` |
+| Provider | Status | Login Endpoint | Callback Endpoint | Link Endpoint |
+|----------|--------|----------------|-------------------|---------------|
+| Google | Active | `/api/v1/auth/google` | `/api/v1/auth/google/callback` | `/api/v1/auth/link/google` |
+| GitHub | Active | `/api/v1/auth/github` | `/api/v1/auth/github/callback` | `/api/v1/auth/link/github` |
 
 ## Authentication Flow
 
@@ -89,6 +89,100 @@ Location: https://app.agentauri.ai/auth/callback?token=eyJ...&user_id=usr_xxx
 ```
 302 Found
 Location: https://app.agentauri.ai/auth/callback?error=auth_failed&message=...
+```
+
+### Link Provider to Existing Account (NEW)
+
+For authenticated users who want to add a new provider to their account:
+
+```http
+GET /api/v1/auth/link/{provider}
+Authorization: Bearer <jwt_token>
+```
+
+**Parameters**:
+- `provider`: `google` or `github`
+- `redirect_after` (query, optional): URL to redirect after linking
+
+**Behavior**:
+1. Extracts user ID from JWT token
+2. Initiates OAuth flow with linking mode
+3. On callback, links provider to existing account
+4. Returns success or error redirect
+
+**Example**:
+```bash
+# Link Google to existing account
+curl -v -H "Authorization: Bearer eyJ..." \
+  "http://localhost:8080/api/v1/auth/link/google?redirect_after=/settings"
+```
+
+**Success Response**:
+```
+302 Found
+Location: /settings?linked=google&success=true
+```
+
+**Error Cases**:
+- `already_linked`: Provider already linked to another account
+- `identity_exists`: This Google/GitHub account already linked to different user
+
+### Session Management Endpoints (NEW)
+
+#### Get Current User Profile
+
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <jwt_token>
+```
+
+**Response**:
+```json
+{
+  "id": "usr_abc123",
+  "username": "john-doe",
+  "email": "john@example.com",
+  "name": "John Doe",
+  "avatar": "https://...",
+  "wallets": [
+    { "address": "0x1234...abcd", "chain_id": 1 }
+  ],
+  "providers": ["google", "github"],
+  "organizations": [
+    { "id": "org_123", "name": "My Org", "slug": "my-org", "role": "owner" }
+  ],
+  "created_at": "2025-12-25T00:00:00Z"
+}
+```
+
+#### Generate Nonce (for SIWE)
+
+```http
+POST /api/v1/auth/nonce
+```
+
+**Response**:
+```json
+{
+  "nonce": "abc123-uuid",
+  "expires_at": "2025-12-25T01:00:00Z",
+  "message": "Sign this message to authenticate with AgentAuri..."
+}
+```
+
+#### Logout
+
+```http
+POST /api/v1/auth/logout
+Authorization: Bearer <jwt_token>
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
 ```
 
 ## User Account Behavior
@@ -271,4 +365,4 @@ useEffect(() => {
 
 ---
 
-**Last Updated**: December 2, 2025
+**Last Updated**: December 25, 2025

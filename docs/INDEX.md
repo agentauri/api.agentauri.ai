@@ -1,8 +1,8 @@
 # Documentation Index
 
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
-**Last Updated**: December 24, 2025
-**Phase**: A2A Protocol Complete (Task Processor + Audit Logging + Tool Registry)
+**Last Updated**: December 25, 2025
+**Phase**: OAuth 2.0 + SIWE Complete (Production at 85%+ readiness)
 
 This index provides a comprehensive overview of all project documentation organized by category.
 
@@ -190,8 +190,15 @@ Historical reports and completed work:
 - **Component READMEs**: 7 files
 - **Archived Documents**: 4 files
 
-**Last Comprehensive Audit**: December 24, 2025 (Documentation Cleanup)
+**Last Comprehensive Audit**: December 25, 2025 (Documentation Audit)
 **Recent Improvement Actions**:
+- December 25, 2025:
+  - Added OAuth 2.0 endpoints for frontend integration (Google, GitHub)
+  - Added SIWE wallet authentication with EIP-191 signature verification
+  - Added account linking endpoints (/auth/link/google, /auth/link/github)
+  - Added session management endpoints (/auth/nonce, /auth/me, /auth/logout)
+  - Updated PRODUCTION_READINESS_PLAN.md to reflect A2A Protocol completion
+  - Updated production readiness to 85%+
 - December 24, 2025:
   - Removed outdated DEPLOYMENT.md stub (content in docs/deployment/)
   - Removed superseded FRONTEND_PRD.md and ROADMAP.md from archive
