@@ -78,6 +78,9 @@ pub struct AgentFollow {
 }
 
 /// Trigger configuration
+///
+/// Triggers can have a specific `chain_id` or `None` for wildcard matching
+/// (matches events from any chain).
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Trigger {
     pub id: String,
@@ -85,7 +88,8 @@ pub struct Trigger {
     pub organization_id: String,
     pub name: String,
     pub description: Option<String>,
-    pub chain_id: i32,
+    /// Chain ID to match, or None for wildcard (matches all chains)
+    pub chain_id: Option<i32>,
     pub registry: String,
     pub enabled: bool,
     pub is_stateful: bool,

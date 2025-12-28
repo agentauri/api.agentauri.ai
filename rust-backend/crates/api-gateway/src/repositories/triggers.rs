@@ -10,6 +10,8 @@ pub struct TriggerRepository;
 
 impl TriggerRepository {
     /// Create a new trigger
+    ///
+    /// `chain_id` can be `None` for wildcard triggers (matches all chains).
     #[allow(clippy::too_many_arguments)]
     pub async fn create(
         pool: &DbPool,
@@ -17,7 +19,7 @@ impl TriggerRepository {
         organization_id: &str,
         name: &str,
         description: Option<&str>,
-        chain_id: i32,
+        chain_id: Option<i32>,
         registry: &str,
         enabled: bool,
         is_stateful: bool,
@@ -51,6 +53,8 @@ impl TriggerRepository {
     }
 
     /// Create a new trigger within a transaction
+    ///
+    /// `chain_id` can be `None` for wildcard triggers (matches all chains).
     #[allow(clippy::too_many_arguments)]
     pub async fn create_in_tx<'e, E>(
         executor: E,
@@ -58,7 +62,7 @@ impl TriggerRepository {
         organization_id: &str,
         name: &str,
         description: Option<&str>,
-        chain_id: i32,
+        chain_id: Option<i32>,
         registry: &str,
         enabled: bool,
         is_stateful: bool,

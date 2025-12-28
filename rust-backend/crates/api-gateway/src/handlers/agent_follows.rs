@@ -159,7 +159,7 @@ pub async fn follow_agent(
             &organization_id,
             &trigger_name,
             Some(&trigger_description),
-            req.chain_id,
+            Some(req.chain_id), // specific chain_id (not wildcard)
             registry,
             true,  // enabled
             false, // not stateful

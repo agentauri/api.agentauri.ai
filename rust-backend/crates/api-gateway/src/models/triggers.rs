@@ -15,7 +15,8 @@ pub struct CreateTriggerRequest {
     #[validate(length(max = 1000))]
     pub description: Option<String>,
 
-    pub chain_id: i32,
+    /// Chain ID to match, or null for wildcard (matches all chains)
+    pub chain_id: Option<i32>,
 
     #[validate(custom(function = "validate_registry"))]
     pub registry: String,
@@ -53,7 +54,8 @@ pub struct TriggerResponse {
     pub organization_id: String,
     pub name: String,
     pub description: Option<String>,
-    pub chain_id: i32,
+    /// Chain ID to match, or None for wildcard (matches all chains)
+    pub chain_id: Option<i32>,
     pub registry: String,
     pub enabled: bool,
     pub is_stateful: bool,
@@ -167,7 +169,7 @@ mod tests {
         let req = CreateTriggerRequest {
             name: "Low Score Alert".to_string(),
             description: Some("Alert when score is below 60".to_string()),
-            chain_id: 84532,
+            chain_id: Some(84532),
             registry: "reputation".to_string(),
             enabled: Some(true),
             is_stateful: Some(false),
@@ -180,7 +182,21 @@ mod tests {
         let req = CreateTriggerRequest {
             name: "Alert".to_string(),
             description: None,
-            chain_id: 1,
+            chain_id: Some(1),
+            registry: "identity".to_string(),
+            enabled: None,
+            is_stateful: None,
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_create_trigger_request_wildcard_chain() {
+        // Test wildcard trigger (no chain_id = matches all chains)
+        let req = CreateTriggerRequest {
+            name: "All Chains Alert".to_string(),
+            description: None,
+            chain_id: None, // wildcard
             registry: "identity".to_string(),
             enabled: None,
             is_stateful: None,
@@ -193,7 +209,7 @@ mod tests {
         let req = CreateTriggerRequest {
             name: "".to_string(),
             description: None,
-            chain_id: 84532,
+            chain_id: Some(84532),
             registry: "reputation".to_string(),
             enabled: None,
             is_stateful: None,
@@ -209,7 +225,7 @@ mod tests {
         let req = CreateTriggerRequest {
             name: "a".repeat(256), // max 255
             description: None,
-            chain_id: 84532,
+            chain_id: Some(84532),
             registry: "reputation".to_string(),
             enabled: None,
             is_stateful: None,
@@ -225,7 +241,7 @@ mod tests {
         let req = CreateTriggerRequest {
             name: "Test".to_string(),
             description: Some("a".repeat(1001)), // max 1000
-            chain_id: 84532,
+            chain_id: Some(84532),
             registry: "reputation".to_string(),
             enabled: None,
             is_stateful: None,
@@ -241,7 +257,7 @@ mod tests {
         let req = CreateTriggerRequest {
             name: "Test".to_string(),
             description: None,
-            chain_id: 84532,
+            chain_id: Some(84532),
             registry: "invalid".to_string(),
             enabled: None,
             is_stateful: None,
@@ -258,7 +274,7 @@ mod tests {
             let req = CreateTriggerRequest {
                 name: "Test".to_string(),
                 description: None,
-                chain_id: 1,
+                chain_id: Some(1),
                 registry: registry.to_string(),
                 enabled: None,
                 is_stateful: None,
@@ -327,7 +343,7 @@ mod tests {
             organization_id: "org-789".to_string(),
             name: "Test Trigger".to_string(),
             description: Some("A test trigger".to_string()),
-            chain_id: 84532,
+            chain_id: Some(84532),
             registry: "reputation".to_string(),
             enabled: true,
             is_stateful: false,
@@ -340,6 +356,29 @@ mod tests {
         assert!(json.contains("org-789"));
         assert!(json.contains("Test Trigger"));
         assert!(json.contains("reputation"));
+    }
+
+    #[test]
+    fn test_trigger_response_serialization_wildcard() {
+        // Test wildcard trigger (no chain_id)
+        let response = TriggerResponse {
+            id: "trigger-wildcard".to_string(),
+            user_id: "user-456".to_string(),
+            organization_id: "org-789".to_string(),
+            name: "All Chains Trigger".to_string(),
+            description: None,
+            chain_id: None, // wildcard
+            registry: "identity".to_string(),
+            enabled: true,
+            is_stateful: false,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("trigger-wildcard"));
+        assert!(json.contains("All Chains Trigger"));
+        assert!(json.contains("\"chain_id\":null"));
     }
 
     #[test]
