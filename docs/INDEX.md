@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
-**Last Updated**: December 25, 2025
+**Last Updated**: December 28, 2025
 **Phase**: OAuth 2.0 + SIWE Complete (Production at 85%+ readiness)
 
 This index provides a comprehensive overview of all project documentation organized by category.
@@ -33,6 +33,8 @@ This index provides a comprehensive overview of all project documentation organi
 
 - **[operations/BACKGROUND_TASKS.md](operations/BACKGROUND_TASKS.md)** - Background maintenance tasks (nonce cleanup, token expiry, etc.)
 - **[operations/CIRCUIT_BREAKER_GUIDE.md](operations/CIRCUIT_BREAKER_GUIDE.md)** - Circuit breaker practical guide for trigger reliability
+- **[operations/DISASTER_RECOVERY.md](operations/DISASTER_RECOVERY.md)** - Disaster recovery procedures for production
+- **[operations/ROLLBACK_PROCEDURES.md](operations/ROLLBACK_PROCEDURES.md)** - ECS and database rollback guide
 - **[operations/TROUBLESHOOTING.md](operations/TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide for common issues
 - **[operations/RUNBOOK.md](operations/RUNBOOK.md)** - Operations runbook for system startup/shutdown, health checks, and incident response
 - **[operations/AUDIT_LOGGING.md](operations/AUDIT_LOGGING.md)** - A2A task audit logging for compliance and analytics
@@ -95,6 +97,7 @@ This index provides a comprehensive overview of all project documentation organi
 ## 📡 API Reference
 
 - **[../rust-backend/crates/api-gateway/API_DOCUMENTATION.md](../rust-backend/crates/api-gateway/API_DOCUMENTATION.md)** - Complete REST API reference
+- **[api/ERROR_CODES.md](api/ERROR_CODES.md)** - Comprehensive error codes and HTTP status reference
 - **[examples/trigger-examples.md](examples/trigger-examples.md)** - Trigger configuration examples
 
 ### Ponder Indexer Endpoints
@@ -190,8 +193,15 @@ Historical reports and completed work:
 - **Component READMEs**: 7 files
 - **Archived Documents**: 4 files
 
-**Last Comprehensive Audit**: December 25, 2025 (Documentation Audit)
+**Last Comprehensive Audit**: December 28, 2025 (Documentation Cleanup Phase 3)
 **Recent Improvement Actions**:
+- December 28, 2025:
+  - Added ERROR_CODES.md - comprehensive API error reference
+  - Added DISASTER_RECOVERY.md - production DR procedures
+  - Added ROLLBACK_PROCEDURES.md - ECS and database rollback guide
+  - Archived N+1_QUERY_FIX.md and SECRETS_IMPLEMENTATION_SUMMARY.md
+  - Updated PRODUCTION_DEPLOYMENT_GUIDE.md with AWS ECS note
+  - Verified trigger system working with wildcard chain matching
 - December 25, 2025:
   - Added OAuth 2.0 endpoints for frontend integration (Google, GitHub)
   - Added SIWE wallet authentication with EIP-191 signature verification
