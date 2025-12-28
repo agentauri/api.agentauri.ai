@@ -1,5 +1,9 @@
 # Production Deployment Guide - api.agentauri.ai
 
+> **Note**: As of December 2025, api.agentauri.ai is deployed on **AWS ECS Fargate** in `us-east-1`.
+> See `terraform/` for infrastructure-as-code and `docs/deployment/AWS_DEPLOYMENT.md` for ECS-specific
+> deployment procedures. This guide is maintained for reference and manual deployments.
+
 This guide provides step-by-step instructions for deploying the api.agentauri.ai API Gateway to production.
 
 ## Prerequisites
