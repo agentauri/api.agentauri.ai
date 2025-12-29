@@ -92,6 +92,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route(
                                 "/{id}/api-keys",
                                 web::post().to(handlers::create_org_api_key),
+                            )
+                            .route(
+                                "/{id}/api-keys/stats",
+                                web::get().to(handlers::get_org_api_key_stats),
                             ),
                     )
                     // API Key endpoints (standalone - for backwards compat)

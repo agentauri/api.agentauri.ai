@@ -39,8 +39,9 @@ use crate::{
     },
     models::{
         can_manage_org, ApiKeyCreatedResponse, ApiKeyListResponse, ApiKeyResponse,
-        CreateApiKeyRequest, ErrorResponse, PaginationParams, RevokeApiKeyRequest,
-        RotateApiKeyRequest, RotateApiKeyResponse, SuccessResponse, UpdateApiKeyRequest,
+        ApiKeyStatsResponse, CreateApiKeyRequest, ErrorResponse, KeysByEnvironment, KeysByType,
+        PaginationParams, RevokeApiKeyRequest, RotateApiKeyRequest, RotateApiKeyResponse,
+        SuccessResponse, UpdateApiKeyRequest,
     },
     repositories::{ApiKeyAuditRepository, ApiKeyRepository, MemberRepository},
     services::ApiKeyService,
@@ -990,6 +991,87 @@ pub async fn update_api_key(
     }
 
     let response = ApiKeyResponse::from(updated_key);
+    HttpResponse::Ok().json(SuccessResponse::new(response))
+}
+
+/// Get API key statistics for an organization
+///
+/// GET /api/v1/organizations/{id}/api-keys/stats
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/api-keys/stats",
+    tag = "API Keys",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    security(("bearer_auth" = []), ("api_key" = [])),
+    responses(
+        (status = 200, description = "API key statistics", body = SuccessResponse<ApiKeyStatsResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn get_org_api_key_stats(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Check membership (any role can view stats)
+    let role = match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
+        }
+        Err(resp) => return resp,
+    };
+
+    // Any member can view stats (viewer, member, admin, owner)
+    let _ = role; // Role is validated, any role is allowed
+
+    // Get stats from repository
+    let stats = match handle_db_error(
+        ApiKeyRepository::get_stats_by_organization(&pool, &org_id).await,
+        "get API key stats",
+    ) {
+        Ok(s) => s,
+        Err(resp) => return resp,
+    };
+
+    // Convert to response format
+    let response = ApiKeyStatsResponse {
+        total_keys: stats.total_keys,
+        active_keys: stats.active_keys,
+        expired_keys: stats.expired_keys,
+        revoked_keys: stats.revoked_keys,
+        unused_keys: stats.unused_keys,
+        keys_expiring_soon: stats.keys_expiring_soon,
+        calls_24h: stats.calls_24h,
+        failed_auth_24h: stats.failed_auth_24h,
+        rate_limited_24h: stats.rate_limited_24h,
+        keys_by_environment: KeysByEnvironment {
+            live: stats.live_keys,
+            test: stats.test_keys,
+        },
+        keys_by_type: KeysByType {
+            standard: stats.standard_keys,
+            restricted: stats.restricted_keys,
+            admin: stats.admin_keys,
+        },
+    };
+
     HttpResponse::Ok().json(SuccessResponse::new(response))
 }
 

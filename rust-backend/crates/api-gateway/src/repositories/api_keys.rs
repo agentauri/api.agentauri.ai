@@ -326,6 +326,113 @@ impl ApiKeyRepository {
     pub fn is_active(key: &ApiKey) -> bool {
         !Self::is_revoked(key) && !Self::is_expired(key)
     }
+
+    /// Get statistics for API keys in an organization
+    pub async fn get_stats_by_organization(
+        pool: &DbPool,
+        organization_id: &str,
+    ) -> Result<ApiKeyStats> {
+        // Query key stats from api_keys table
+        let key_stats = sqlx::query_as::<_, KeyStatsRow>(
+            r#"
+            SELECT
+                COUNT(*) as total_keys,
+                COUNT(*) FILTER (WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())) as active_keys,
+                COUNT(*) FILTER (WHERE expires_at IS NOT NULL AND expires_at <= NOW() AND revoked_at IS NULL) as expired_keys,
+                COUNT(*) FILTER (WHERE revoked_at IS NOT NULL) as revoked_keys,
+                COUNT(*) FILTER (WHERE last_used_at IS NULL AND revoked_at IS NULL) as unused_keys,
+                COUNT(*) FILTER (WHERE expires_at BETWEEN NOW() AND NOW() + INTERVAL '7 days' AND revoked_at IS NULL) as keys_expiring_soon,
+                COUNT(*) FILTER (WHERE environment = 'live' AND revoked_at IS NULL) as live_keys,
+                COUNT(*) FILTER (WHERE environment = 'test' AND revoked_at IS NULL) as test_keys,
+                COUNT(*) FILTER (WHERE key_type = 'standard' AND revoked_at IS NULL) as standard_keys,
+                COUNT(*) FILTER (WHERE key_type = 'restricted' AND revoked_at IS NULL) as restricted_keys,
+                COUNT(*) FILTER (WHERE key_type = 'admin' AND revoked_at IS NULL) as admin_keys
+            FROM api_keys
+            WHERE organization_id = $1
+            "#,
+        )
+        .bind(organization_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to get API key stats")?;
+
+        // Query audit stats from api_key_audit_log (last 24h)
+        let audit_stats = sqlx::query_as::<_, AuditStatsRow>(
+            r#"
+            SELECT
+                COUNT(*) FILTER (WHERE event_type = 'used') as calls_24h,
+                COUNT(*) FILTER (WHERE event_type = 'auth_failed') as failed_auth_24h,
+                COUNT(*) FILTER (WHERE event_type = 'rate_limited') as rate_limited_24h
+            FROM api_key_audit_log
+            WHERE organization_id = $1
+              AND created_at > NOW() - INTERVAL '24 hours'
+            "#,
+        )
+        .bind(organization_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to get API key audit stats")?;
+
+        Ok(ApiKeyStats {
+            total_keys: key_stats.total_keys.unwrap_or(0),
+            active_keys: key_stats.active_keys.unwrap_or(0),
+            expired_keys: key_stats.expired_keys.unwrap_or(0),
+            revoked_keys: key_stats.revoked_keys.unwrap_or(0),
+            unused_keys: key_stats.unused_keys.unwrap_or(0),
+            keys_expiring_soon: key_stats.keys_expiring_soon.unwrap_or(0),
+            live_keys: key_stats.live_keys.unwrap_or(0),
+            test_keys: key_stats.test_keys.unwrap_or(0),
+            standard_keys: key_stats.standard_keys.unwrap_or(0),
+            restricted_keys: key_stats.restricted_keys.unwrap_or(0),
+            admin_keys: key_stats.admin_keys.unwrap_or(0),
+            calls_24h: audit_stats.calls_24h.unwrap_or(0),
+            failed_auth_24h: audit_stats.failed_auth_24h.unwrap_or(0),
+            rate_limited_24h: audit_stats.rate_limited_24h.unwrap_or(0),
+        })
+    }
+}
+
+/// Internal struct for key stats query result
+#[derive(Debug, sqlx::FromRow)]
+struct KeyStatsRow {
+    total_keys: Option<i64>,
+    active_keys: Option<i64>,
+    expired_keys: Option<i64>,
+    revoked_keys: Option<i64>,
+    unused_keys: Option<i64>,
+    keys_expiring_soon: Option<i64>,
+    live_keys: Option<i64>,
+    test_keys: Option<i64>,
+    standard_keys: Option<i64>,
+    restricted_keys: Option<i64>,
+    admin_keys: Option<i64>,
+}
+
+/// Internal struct for audit stats query result
+#[derive(Debug, sqlx::FromRow)]
+struct AuditStatsRow {
+    calls_24h: Option<i64>,
+    failed_auth_24h: Option<i64>,
+    rate_limited_24h: Option<i64>,
+}
+
+/// API key statistics result
+#[derive(Debug)]
+pub struct ApiKeyStats {
+    pub total_keys: i64,
+    pub active_keys: i64,
+    pub expired_keys: i64,
+    pub revoked_keys: i64,
+    pub unused_keys: i64,
+    pub keys_expiring_soon: i64,
+    pub live_keys: i64,
+    pub test_keys: i64,
+    pub standard_keys: i64,
+    pub restricted_keys: i64,
+    pub admin_keys: i64,
+    pub calls_24h: i64,
+    pub failed_auth_24h: i64,
+    pub rate_limited_24h: i64,
 }
 
 // ============================================================================

@@ -235,6 +235,48 @@ pub struct ApiKeyListResponse {
     pub total_pages: i64,
 }
 
+/// Statistics for API keys in an organization
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ApiKeyStatsResponse {
+    /// Total number of keys (including revoked)
+    pub total_keys: i64,
+    /// Active keys (not revoked, not expired)
+    pub active_keys: i64,
+    /// Expired keys (past expiration date, not revoked)
+    pub expired_keys: i64,
+    /// Revoked keys
+    pub revoked_keys: i64,
+    /// Keys that have never been used
+    pub unused_keys: i64,
+    /// Keys expiring within 7 days
+    pub keys_expiring_soon: i64,
+    /// API calls in the last 24 hours
+    pub calls_24h: i64,
+    /// Failed authentication attempts in the last 24 hours
+    pub failed_auth_24h: i64,
+    /// Rate limited requests in the last 24 hours
+    pub rate_limited_24h: i64,
+    /// Keys grouped by environment
+    pub keys_by_environment: KeysByEnvironment,
+    /// Keys grouped by type
+    pub keys_by_type: KeysByType,
+}
+
+/// Keys grouped by environment (live/test)
+#[derive(Debug, Serialize, ToSchema)]
+pub struct KeysByEnvironment {
+    pub live: i64,
+    pub test: i64,
+}
+
+/// Keys grouped by type (standard/restricted/admin)
+#[derive(Debug, Serialize, ToSchema)]
+pub struct KeysByType {
+    pub standard: i64,
+    pub restricted: i64,
+    pub admin: i64,
+}
+
 // ============================================================================
 // Validators
 // ============================================================================

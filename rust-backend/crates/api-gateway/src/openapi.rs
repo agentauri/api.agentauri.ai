@@ -100,6 +100,7 @@ use crate::models;
         // API Keys (organization-scoped)
         handlers::list_org_api_keys,
         handlers::create_org_api_key,
+        handlers::get_org_api_key_stats,
         // OAuth Clients
         handlers::create_oauth_client,
         handlers::list_oauth_clients,
@@ -183,6 +184,9 @@ use crate::models;
             models::ApiKeyResponse,
             models::ApiKeyCreatedResponse,
             models::ApiKeyListResponse,
+            models::ApiKeyStatsResponse,
+            models::KeysByEnvironment,
+            models::KeysByType,
             models::RevokeApiKeyRequest,
             models::RotateApiKeyRequest,
             models::RotateApiKeyResponse,
