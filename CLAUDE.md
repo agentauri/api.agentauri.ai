@@ -17,6 +17,17 @@ cargo run -p action-workers           # Start action workers
 cd ponder-indexers && pnpm dev        # Start blockchain indexer
 ```
 
+### MCP Server (Claude Desktop Integration)
+```bash
+# Build MCP server
+cargo build -p mcp-server --release
+
+# Run with API key
+AGENTAURI_API_KEY=sk_live_xxx ./target/release/agentauri-mcp
+```
+
+See `docs/protocols/mcp-server-claude-desktop.md` for Claude Desktop configuration.
+
 ### Testing
 ```bash
 # Pre-push validation (REQUIRED before pushing)
@@ -72,6 +83,7 @@ Blockchain → Ponder Indexers → PostgreSQL → Event Processor → Redis → 
 - **api-gateway**: REST API (Actix-web), authentication, OpenAPI docs
 - **event-processor**: Trigger matching, state management
 - **action-workers**: Telegram, REST webhook, MCP execution
+- **mcp-server**: MCP server for Claude Desktop integration
 - **shared**: Database models, config, utilities
 
 ### TypeScript (ponder-indexers/)

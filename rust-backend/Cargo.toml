@@ -5,6 +5,7 @@ members = [
     "crates/api-gateway",
     "crates/event-processor",
     "crates/action-workers",
+    "crates/mcp-server",
 ]
 
 [workspace.package]
