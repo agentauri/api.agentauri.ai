@@ -356,16 +356,16 @@ impl ApiKeyRepository {
         .await
         .context("Failed to get API key stats")?;
 
-        // Query audit stats from api_key_audit_log (last 24h)
+        // Query audit stats from api_key_audit_log (last 24h + total)
         let audit_stats = sqlx::query_as::<_, AuditStatsRow>(
             r#"
             SELECT
-                COUNT(*) FILTER (WHERE event_type = 'used') as calls_24h,
-                COUNT(*) FILTER (WHERE event_type = 'auth_failed') as failed_auth_24h,
-                COUNT(*) FILTER (WHERE event_type = 'rate_limited') as rate_limited_24h
+                COUNT(*) FILTER (WHERE event_type = 'used') as api_calls_total,
+                COUNT(*) FILTER (WHERE event_type = 'used' AND created_at > NOW() - INTERVAL '24 hours') as calls_24h,
+                COUNT(*) FILTER (WHERE event_type = 'auth_failed' AND created_at > NOW() - INTERVAL '24 hours') as failed_auth_24h,
+                COUNT(*) FILTER (WHERE event_type = 'rate_limited' AND created_at > NOW() - INTERVAL '24 hours') as rate_limited_24h
             FROM api_key_audit_log
             WHERE organization_id = $1
-              AND created_at > NOW() - INTERVAL '24 hours'
             "#,
         )
         .bind(organization_id)
@@ -385,6 +385,7 @@ impl ApiKeyRepository {
             standard_keys: key_stats.standard_keys.unwrap_or(0),
             restricted_keys: key_stats.restricted_keys.unwrap_or(0),
             admin_keys: key_stats.admin_keys.unwrap_or(0),
+            api_calls_total: audit_stats.api_calls_total.unwrap_or(0),
             calls_24h: audit_stats.calls_24h.unwrap_or(0),
             failed_auth_24h: audit_stats.failed_auth_24h.unwrap_or(0),
             rate_limited_24h: audit_stats.rate_limited_24h.unwrap_or(0),
@@ -411,6 +412,7 @@ struct KeyStatsRow {
 /// Internal struct for audit stats query result
 #[derive(Debug, sqlx::FromRow)]
 struct AuditStatsRow {
+    api_calls_total: Option<i64>,
     calls_24h: Option<i64>,
     failed_auth_24h: Option<i64>,
     rate_limited_24h: Option<i64>,
@@ -430,6 +432,7 @@ pub struct ApiKeyStats {
     pub standard_keys: i64,
     pub restricted_keys: i64,
     pub admin_keys: i64,
+    pub api_calls_total: i64,
     pub calls_24h: i64,
     pub failed_auth_24h: i64,
     pub rate_limited_24h: i64,

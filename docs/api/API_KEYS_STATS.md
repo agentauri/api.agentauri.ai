@@ -31,6 +31,7 @@ Any organization member can view stats (viewer, member, admin, owner).
     "revoked_keys": 3,
     "unused_keys": 1,
     "keys_expiring_soon": 2,
+    "api_calls_total": 125432,
     "calls_24h": 1523,
     "failed_auth_24h": 12,
     "rate_limited_24h": 3,
@@ -57,6 +58,7 @@ Any organization member can view stats (viewer, member, admin, owner).
 | `revoked_keys` | integer | Keys that have been revoked |
 | `unused_keys` | integer | Active keys that have never been used |
 | `keys_expiring_soon` | integer | Active keys expiring within 7 days |
+| `api_calls_total` | integer | Total API calls (all time) |
 | `calls_24h` | integer | Successful API calls in the last 24 hours |
 | `failed_auth_24h` | integer | Failed authentication attempts in the last 24 hours |
 | `rate_limited_24h` | integer | Rate-limited requests in the last 24 hours |
@@ -106,6 +108,7 @@ interface ApiKeyStats {
   revoked_keys: number;
   unused_keys: number;
   keys_expiring_soon: number;
+  api_calls_total: number;
   calls_24h: number;
   failed_auth_24h: number;
   rate_limited_24h: number;
@@ -140,6 +143,7 @@ Display key metrics as cards:
 - **Active Keys**: `active_keys` (green)
 - **Expired**: `expired_keys` (yellow warning)
 - **Revoked**: `revoked_keys` (gray)
+- **Total Calls**: `api_calls_total` (all time usage)
 - **Usage 24h**: `calls_24h`
 
 ### Alerts

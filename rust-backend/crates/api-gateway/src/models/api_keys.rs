@@ -250,6 +250,8 @@ pub struct ApiKeyStatsResponse {
     pub unused_keys: i64,
     /// Keys expiring within 7 days
     pub keys_expiring_soon: i64,
+    /// Total API calls (all time)
+    pub api_calls_total: i64,
     /// API calls in the last 24 hours
     pub calls_24h: i64,
     /// Failed authentication attempts in the last 24 hours

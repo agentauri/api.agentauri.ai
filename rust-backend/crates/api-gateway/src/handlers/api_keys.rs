@@ -1058,6 +1058,7 @@ pub async fn get_org_api_key_stats(
         revoked_keys: stats.revoked_keys,
         unused_keys: stats.unused_keys,
         keys_expiring_soon: stats.keys_expiring_soon,
+        api_calls_total: stats.api_calls_total,
         calls_24h: stats.calls_24h,
         failed_auth_24h: stats.failed_auth_24h,
         rate_limited_24h: stats.rate_limited_24h,
