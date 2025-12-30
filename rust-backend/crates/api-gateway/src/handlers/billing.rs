@@ -193,6 +193,151 @@ pub async fn list_transactions(
     HttpResponse::Ok().json(responses)
 }
 
+// =============================================================================
+// Organization-scoped endpoints (path parameter for org_id)
+// =============================================================================
+
+/// Get credit balance for organization (path-based)
+///
+/// Returns the credit balance for the specified organization.
+/// Organization ID is taken from the URL path.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/credits/balance",
+    tag = "Billing",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Credit balance", body = CreditBalanceResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn get_org_credits(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Check organization membership
+    match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(_)) => {} // Any member can view balance
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new(
+                "not_found",
+                "Organization not found or you are not a member",
+            ))
+        }
+        Err(resp) => return resp,
+    }
+
+    // Get credit balance
+    let credit = match handle_db_error(
+        CreditRepository::get_balance(&pool, &org_id).await,
+        "get credit balance",
+    ) {
+        Ok(Some(c)) => c,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new(
+                "not_found",
+                "Credits not initialized for this organization",
+            ))
+        }
+        Err(resp) => return resp,
+    };
+
+    HttpResponse::Ok().json(CreditBalanceResponse::new(credit.balance))
+}
+
+/// List transactions for organization (path-based)
+///
+/// Returns paginated list of credit transactions for the specified organization.
+/// Organization ID is taken from the URL path.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/credits/transactions",
+    tag = "Billing",
+    params(
+        ("id" = String, Path, description = "Organization ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip"),
+        ("transaction_type" = Option<String>, Query, description = "Filter by transaction type")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of transactions", body = Vec<CreditTransactionResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn list_org_transactions(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+    list_query: web::Query<TransactionListQuery>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Validate query parameters
+    if let Err(resp) = validate_request(&*list_query) {
+        return resp;
+    }
+
+    // Check organization membership
+    match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(_)) => {} // Any member can view transactions
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new(
+                "not_found",
+                "Organization not found or you are not a member",
+            ))
+        }
+        Err(resp) => return resp,
+    }
+
+    // Get transactions
+    let transactions = match handle_db_error(
+        TransactionRepository::list(
+            &pool,
+            &org_id,
+            list_query.limit,
+            list_query.offset,
+            list_query.transaction_type.as_deref(),
+        )
+        .await,
+        "list transactions",
+    ) {
+        Ok(txs) => txs,
+        Err(resp) => return resp,
+    };
+
+    let responses: Vec<CreditTransactionResponse> =
+        transactions.into_iter().map(|tx| tx.into()).collect();
+
+    HttpResponse::Ok().json(responses)
+}
+
 // ============================================================================
 // Purchase Credits Handler
 // ============================================================================

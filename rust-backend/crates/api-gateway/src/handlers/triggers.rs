@@ -13,7 +13,7 @@ use crate::{
         PaginatedResponse, PaginationMeta, PaginationParams, SuccessResponse,
         TriggerDetailResponse, TriggerResponse, UpdateTriggerRequest,
     },
-    repositories::{ActionRepository, ConditionRepository, TriggerRepository},
+    repositories::{ActionRepository, ConditionRepository, MemberRepository, TriggerRepository},
 };
 
 /// Create a new trigger
@@ -401,4 +401,89 @@ pub async fn delete_trigger(
     }
 
     HttpResponse::NoContent().finish()
+}
+
+// =============================================================================
+// Organization-scoped endpoints (path parameter for org_id)
+// =============================================================================
+
+/// List triggers for organization (path-based)
+///
+/// Returns paginated list of triggers for the specified organization.
+/// Organization ID is taken from the URL path.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/triggers",
+    tag = "Triggers",
+    params(
+        ("id" = String, Path, description = "Organization ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum items per page"),
+        ("offset" = Option<i64>, Query, description = "Number of items to skip")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of triggers", body = PaginatedResponse<TriggerResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn list_org_triggers(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+    query: web::Query<PaginationParams>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Validate pagination
+    if let Err(e) = query.validate() {
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "validation_error",
+            format!("Invalid pagination: {}", e),
+        ));
+    }
+
+    // Check membership (any role can list)
+    match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(_)) => {} // User is a member
+        Ok(None) => {
+            return HttpResponse::NotFound()
+                .json(ErrorResponse::new("not_found", "Organization not found"))
+        }
+        Err(resp) => return resp,
+    };
+
+    // Execute count and list in parallel for better performance
+    let (total_result, triggers_result) = tokio::join!(
+        TriggerRepository::count_by_organization(&pool, &org_id),
+        TriggerRepository::list_by_organization(&pool, &org_id, query.limit, query.offset)
+    );
+
+    // Handle count result
+    let total = match handle_db_error(total_result, "count triggers") {
+        Ok(count) => count,
+        Err(resp) => return resp,
+    };
+
+    // Handle list result
+    let triggers = match handle_db_error(triggers_result, "list triggers") {
+        Ok(triggers) => triggers,
+        Err(resp) => return resp,
+    };
+
+    let response = PaginatedResponse {
+        data: triggers.into_iter().map(TriggerResponse::from).collect(),
+        pagination: PaginationMeta::new(total, query.limit, query.offset),
+    };
+
+    HttpResponse::Ok().json(response)
 }

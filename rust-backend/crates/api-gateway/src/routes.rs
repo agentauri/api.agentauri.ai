@@ -96,6 +96,19 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route(
                                 "/{id}/api-keys/stats",
                                 web::get().to(handlers::get_org_api_key_stats),
+                            )
+                            // Triggers nested under organization
+                            .route("/{id}/triggers", web::get().to(handlers::list_org_triggers))
+                            // Agents nested under organization
+                            .route("/{id}/agents", web::get().to(handlers::list_org_agents))
+                            // Credits nested under organization
+                            .route(
+                                "/{id}/credits/balance",
+                                web::get().to(handlers::get_org_credits),
+                            )
+                            .route(
+                                "/{id}/credits/transactions",
+                                web::get().to(handlers::list_org_transactions),
                             ),
                     )
                     // API Key endpoints (standalone - for backwards compat)

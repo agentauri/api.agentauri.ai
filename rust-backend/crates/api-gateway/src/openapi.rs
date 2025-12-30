@@ -112,6 +112,8 @@ use crate::models;
         handlers::get_trigger,
         handlers::update_trigger,
         handlers::delete_trigger,
+        // Triggers (organization-scoped)
+        handlers::list_org_triggers,
         // Conditions
         handlers::create_condition,
         handlers::list_conditions,
@@ -130,6 +132,8 @@ use crate::models;
         handlers::link_agent,
         handlers::list_linked_agents,
         handlers::unlink_agent,
+        // Agents (organization-scoped)
+        handlers::list_org_agents,
         // Agent Follows
         handlers::follow_agent,
         handlers::list_following,
@@ -141,6 +145,9 @@ use crate::models;
         handlers::list_transactions,
         handlers::get_subscription,
         handlers::handle_stripe_webhook,
+        // Billing (organization-scoped)
+        handlers::get_org_credits,
+        handlers::list_org_transactions,
         // Ponder
         handlers::get_ponder_status,
         handlers::get_ponder_events,

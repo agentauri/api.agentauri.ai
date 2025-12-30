@@ -34,8 +34,8 @@ pub use triggers::*;
 
 // Explicitly re-export agent handlers (avoid OrgIdQuery conflict with billing)
 pub use agents::{
-    __path_link_agent, __path_list_linked_agents, __path_unlink_agent, link_agent,
-    list_linked_agents, unlink_agent,
+    __path_link_agent, __path_list_linked_agents, __path_list_org_agents, __path_unlink_agent,
+    link_agent, list_linked_agents, list_org_agents, unlink_agent,
 };
 
 // Explicitly re-export agent follow handlers
@@ -46,9 +46,10 @@ pub use agent_follows::{
 
 // Explicitly re-export billing handlers
 pub use billing::{
-    __path_get_credits, __path_get_subscription, __path_handle_stripe_webhook,
-    __path_list_transactions, __path_purchase_credits, get_credits, get_subscription,
-    handle_stripe_webhook, list_transactions, purchase_credits,
+    __path_get_credits, __path_get_org_credits, __path_get_subscription,
+    __path_handle_stripe_webhook, __path_list_org_transactions, __path_list_transactions,
+    __path_purchase_credits, get_credits, get_org_credits, get_subscription, handle_stripe_webhook,
+    list_org_transactions, list_transactions, purchase_credits,
 };
 
 // Explicitly re-export OAuth handlers

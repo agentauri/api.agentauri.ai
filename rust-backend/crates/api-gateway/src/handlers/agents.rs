@@ -489,3 +489,78 @@ fn extract_expiration_from_challenge(challenge: &str) -> Result<DateTime<Utc>, &
     }
     Err("Expiration not found in challenge message")
 }
+
+// =============================================================================
+// Organization-scoped endpoints (path parameter for org_id)
+// =============================================================================
+
+/// List linked agents for organization (path-based)
+///
+/// Returns list of agents linked to the specified organization.
+/// Organization ID is taken from the URL path.
+#[utoipa::path(
+    get,
+    path = "/api/v1/organizations/{id}/agents",
+    tag = "Agents",
+    params(
+        ("id" = String, Path, description = "Organization ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of linked agents", body = Vec<AgentLinkResponse>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Organization not found", body = ErrorResponse)
+    )
+)]
+pub async fn list_org_agents(
+    pool: web::Data<DbPool>,
+    req_http: HttpRequest,
+    path: web::Path<String>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    // Get authenticated user_id
+    let user_id = match extract_user_id_or_unauthorized(&req_http) {
+        Ok(id) => id,
+        Err(resp) => return resp,
+    };
+
+    // Check organization membership
+    match handle_db_error(
+        MemberRepository::get_role(&pool, &org_id, &user_id).await,
+        "check membership",
+    ) {
+        Ok(Some(_)) => {} // Any member can view
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ErrorResponse::new(
+                "not_found",
+                "Organization not found or you are not a member",
+            ))
+        }
+        Err(resp) => return resp,
+    }
+
+    // Get linked agents
+    let links = match handle_db_error(
+        AgentLinkRepository::find_by_organization(&pool, &org_id).await,
+        "list agent links",
+    ) {
+        Ok(l) => l,
+        Err(resp) => return resp,
+    };
+
+    let responses: Vec<AgentLinkResponse> = links
+        .into_iter()
+        .map(|l| AgentLinkResponse {
+            id: l.id,
+            agent_id: l.agent_id,
+            chain_id: l.chain_id,
+            organization_id: l.organization_id,
+            wallet_address: l.wallet_address,
+            status: l.status,
+            created_at: l.created_at.to_rfc3339(),
+        })
+        .collect();
+
+    HttpResponse::Ok().json(responses)
+}
