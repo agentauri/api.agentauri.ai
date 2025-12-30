@@ -244,11 +244,18 @@ pub struct OrganizationInfo {
     pub role: String,
 }
 
+/// Nonce request for SIWE wallet authentication
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct NonceRequest {
+    /// Wallet address (checksummed, e.g., 0x1234...abcd)
+    #[validate(length(min = 42, max = 42))]
+    pub address: String,
+}
+
 /// Nonce response for SIWE wallet authentication
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NonceResponse {
     pub nonce: String,
-    pub expires_at: chrono::DateTime<chrono::Utc>,
     pub message: String,
 }
 

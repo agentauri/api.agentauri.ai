@@ -10,6 +10,7 @@ pub mod billing;
 pub mod circuit_breaker;
 pub mod conditions;
 pub mod discovery;
+pub mod events;
 pub mod health;
 pub mod helpers;
 pub mod oauth;
@@ -76,6 +77,9 @@ pub use a2a::{
     __path_a2a_rpc, __path_get_task_status, __path_stream_task_progress, a2a_rpc, get_task_status,
     stream_task_progress,
 };
+
+// Explicitly re-export Events handlers
+pub use events::{__path_list_events, list_events};
 
 // Note: helpers module is not re-exported to avoid polluting the namespace
 // Import helpers directly: use crate::handlers::helpers::{...}

@@ -495,28 +495,44 @@ fn generate_personal_slug(username: &str) -> String {
 /// Generate a nonce for SIWE wallet authentication
 ///
 /// Returns a nonce and challenge message for wallet signature verification.
+/// The wallet address is required to generate a proper SIWE message.
 #[utoipa::path(
     post,
     path = "/api/v1/auth/nonce",
     tag = "Authentication",
+    request_body = crate::models::NonceRequest,
     responses(
         (status = 200, description = "Nonce generated", body = NonceResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 500, description = "Failed to generate nonce", body = ErrorResponse)
     )
 )]
-pub async fn generate_nonce(pool: web::Data<DbPool>) -> impl Responder {
+pub async fn generate_nonce(
+    pool: web::Data<DbPool>,
+    req: web::Json<crate::models::NonceRequest>,
+) -> impl Responder {
+    // Validate request
+    if let Err(e) = req.validate() {
+        return HttpResponse::BadRequest().json(ErrorResponse::new(
+            "validation_error",
+            format!("Validation failed: {}", e),
+        ));
+    }
+
     let nonce = Uuid::new_v4().to_string();
     let expires_at = chrono::Utc::now() + chrono::Duration::minutes(10);
+    let issued_at = chrono::Utc::now();
 
     // Store nonce in database for verification
     let result = sqlx::query(
         r#"
-        INSERT INTO used_nonces (nonce, expires_at)
-        VALUES ($1, $2)
+        INSERT INTO used_nonces (nonce, wallet_address, expires_at, used_at)
+        VALUES ($1, $2, $3, NULL)
         ON CONFLICT (nonce) DO NOTHING
         "#,
     )
     .bind(&nonce)
+    .bind(&req.address)
     .bind(expires_at)
     .execute(pool.get_ref())
     .await;
@@ -529,18 +545,16 @@ pub async fn generate_nonce(pool: web::Data<DbPool>) -> impl Responder {
         ));
     }
 
-    // Build SIWE message format
+    // Build SIWE (Sign-In With Ethereum) message format
+    // https://eips.ethereum.org/EIPS/eip-4361
     let message = format!(
-        "Sign this message to authenticate with AgentAuri.\n\nNonce: {}\nExpires: {}",
+        "agentauri.ai wants you to sign in with your Ethereum account:\n{}\n\nSign in to AgentAuri\n\nURI: https://agentauri.ai\nVersion: 1\nChain ID: 1\nNonce: {}\nIssued At: {}",
+        req.address,
         nonce,
-        expires_at.to_rfc3339()
+        issued_at.to_rfc3339()
     );
 
-    HttpResponse::Ok().json(NonceResponse {
-        nonce,
-        expires_at,
-        message,
-    })
+    HttpResponse::Ok().json(crate::models::NonceResponse { nonce, message })
 }
 
 /// Get current authenticated user's session info

@@ -50,6 +50,7 @@ use crate::models;
         (name = "Billing", description = "Credit balance and transactions"),
         (name = "Discovery", description = "API discovery and metadata"),
         (name = "Ponder", description = "Blockchain indexer status and metrics"),
+        (name = "Events", description = "Blockchain event queries"),
         (name = "A2A Protocol", description = "Agent-to-Agent JSON-RPC 2.0 protocol for async task queries")
     ),
     modifiers(&SecurityAddon),
@@ -151,6 +152,8 @@ use crate::models;
         // Ponder
         handlers::get_ponder_status,
         handlers::get_ponder_events,
+        // Events
+        handlers::list_events,
         // A2A Protocol
         handlers::a2a_rpc,
         handlers::get_task_status,
@@ -168,6 +171,7 @@ use crate::models;
             models::AuthResponse,
             models::UserResponse,
             models::WalletLoginRequest,
+            models::NonceRequest,
             models::NonceResponse,
             models::MeResponse,
             models::WalletInfo,
@@ -246,6 +250,9 @@ use crate::models;
             PonderStatusResponse,
             PonderStatusError,
             ChainSyncStatus,
+            // Events
+            handlers::events::EventResponse,
+            handlers::events::PaginatedEventsResponse,
             // A2A Protocol
             models::a2a::JsonRpcRequest,
             models::a2a::JsonRpcResponse<serde_json::Value>,

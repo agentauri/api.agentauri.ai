@@ -156,6 +156,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                             .route("/transactions", web::get().to(handlers::list_transactions))
                             .route("/subscription", web::get().to(handlers::get_subscription)),
                     )
+                    // Events endpoint (blockchain events from Ponder)
+                    .route("/events", web::get().to(handlers::list_events))
                     // A2A Protocol endpoints (JSON-RPC 2.0)
                     .service(
                         web::scope("/a2a")
