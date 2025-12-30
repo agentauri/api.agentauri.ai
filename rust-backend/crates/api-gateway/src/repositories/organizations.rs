@@ -472,6 +472,75 @@ impl MemberRepository {
         Ok(exists)
     }
 
+    /// Check if user is a member of organization (with caching)
+    ///
+    /// This version uses Redis cache to avoid hitting the database on every request.
+    /// Cache is automatically populated on miss and has 5 minute TTL.
+    pub async fn is_member_cached(
+        pool: &DbPool,
+        cache: &shared::redis::cache::EntityCache,
+        org_id: &str,
+        user_id: &str,
+    ) -> Result<bool> {
+        let cache_key = shared::redis::cache::membership_key(org_id, user_id);
+
+        // Try cache first
+        if let Some(is_member) = cache.get::<bool>(&cache_key).await {
+            return Ok(is_member);
+        }
+
+        // Cache miss - fetch from database
+        let exists = Self::is_member(pool, org_id, user_id).await?;
+
+        // Cache the result
+        cache.set(&cache_key, &exists).await;
+
+        Ok(exists)
+    }
+
+    /// Get a member's role in an organization (with caching)
+    ///
+    /// This version uses Redis cache to avoid hitting the database on every request.
+    /// Cache is automatically populated on miss and has 5 minute TTL.
+    pub async fn get_role_cached(
+        pool: &DbPool,
+        cache: &shared::redis::cache::EntityCache,
+        org_id: &str,
+        user_id: &str,
+    ) -> Result<Option<String>> {
+        // Use a separate cache key for role to store the actual role string
+        let cache_key = format!("org:role:{}:{}", org_id, user_id);
+
+        // Try cache first
+        if let Some(role) = cache.get::<String>(&cache_key).await {
+            return Ok(Some(role));
+        }
+
+        // Cache miss - fetch from database
+        let role = Self::get_role(pool, org_id, user_id).await?;
+
+        // Cache the result if found
+        if let Some(ref r) = role {
+            cache.set(&cache_key, r).await;
+        }
+
+        Ok(role)
+    }
+
+    /// Invalidate membership cache for a user in an organization
+    ///
+    /// Call this when membership is added, removed, or role is updated.
+    pub async fn invalidate_membership_cache(
+        cache: &shared::redis::cache::EntityCache,
+        org_id: &str,
+        user_id: &str,
+    ) {
+        let membership_key = shared::redis::cache::membership_key(org_id, user_id);
+        let role_key = format!("org:role:{}:{}", org_id, user_id);
+        cache.delete(&membership_key).await;
+        cache.delete(&role_key).await;
+    }
+
     /// List members of an organization with pagination
     #[allow(dead_code)]
     pub async fn list(

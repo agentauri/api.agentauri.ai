@@ -40,6 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_follows_user
     ON agent_follows(user_id);
 
 -- Auto-update updated_at timestamp
+DROP TRIGGER IF EXISTS update_agent_follows_updated_at ON agent_follows;
 CREATE TRIGGER update_agent_follows_updated_at
     BEFORE UPDATE ON agent_follows
     FOR EACH ROW

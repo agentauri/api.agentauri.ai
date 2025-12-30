@@ -216,6 +216,9 @@ pub fn get_user_id(req: &actix_web::HttpRequest) -> Result<String, Error> {
 /// verifies that the authenticated user is a member of that organization.
 /// This prevents horizontal privilege escalation via header spoofing.
 ///
+/// Uses Redis caching when EntityCache is available in app state to avoid
+/// database lookups on every request. Cache TTL is 5 minutes.
+///
 /// # Arguments
 /// * `req` - The HTTP request containing the X-Organization-ID header
 /// * `pool` - Database connection pool
@@ -243,15 +246,31 @@ pub async fn get_verified_organization_id(
         })?;
 
     // CRITICAL: Verify user belongs to the organization
-    let is_member = MemberRepository::is_member(pool, &org_id, user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to verify organization membership: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to verify organization access",
-            ))
-        })?;
+    // Try to use cached version if EntityCache is available
+    let is_member = if let Some(cache) =
+        req.app_data::<actix_web::web::Data<shared::redis::cache::EntityCache>>()
+    {
+        MemberRepository::is_member_cached(pool, cache.get_ref(), &org_id, user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to verify organization membership: {}", e);
+                HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to verify organization access",
+                ))
+            })?
+    } else {
+        // Fallback to non-cached version if cache not available
+        MemberRepository::is_member(pool, &org_id, user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to verify organization membership: {}", e);
+                HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to verify organization access",
+                ))
+            })?
+    };
 
     if !is_member {
         return Err(HttpResponse::Forbidden().json(ErrorResponse::new(
@@ -267,6 +286,8 @@ pub async fn get_verified_organization_id(
 ///
 /// Same as `get_verified_organization_id` but also returns the user's role
 /// in the organization for permission checks.
+///
+/// Uses Redis caching when EntityCache is available in app state.
 ///
 /// # Returns
 /// * `Ok((String, String))` - Tuple of (organization_id, user_role)
@@ -289,21 +310,43 @@ pub async fn get_verified_organization_id_with_role(
         })?;
 
     // Get user's role in the organization (also verifies membership)
-    let role = MemberRepository::get_role(pool, &org_id, user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to get organization role: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "internal_error",
-                "Failed to verify organization access",
-            ))
-        })?
-        .ok_or_else(|| {
-            HttpResponse::Forbidden().json(ErrorResponse::new(
-                "forbidden",
-                "Not a member of the specified organization",
-            ))
-        })?;
+    // Try to use cached version if EntityCache is available
+    let role = if let Some(cache) =
+        req.app_data::<actix_web::web::Data<shared::redis::cache::EntityCache>>()
+    {
+        MemberRepository::get_role_cached(pool, cache.get_ref(), &org_id, user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get organization role: {}", e);
+                HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to verify organization access",
+                ))
+            })?
+            .ok_or_else(|| {
+                HttpResponse::Forbidden().json(ErrorResponse::new(
+                    "forbidden",
+                    "Not a member of the specified organization",
+                ))
+            })?
+    } else {
+        // Fallback to non-cached version if cache not available
+        MemberRepository::get_role(pool, &org_id, user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get organization role: {}", e);
+                HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to verify organization access",
+                ))
+            })?
+            .ok_or_else(|| {
+                HttpResponse::Forbidden().json(ErrorResponse::new(
+                    "forbidden",
+                    "Not a member of the specified organization",
+                ))
+            })?
+    };
 
     Ok((org_id, role))
 }

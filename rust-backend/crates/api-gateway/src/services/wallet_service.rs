@@ -120,8 +120,9 @@ impl WalletService {
     /// The service should be created once at startup and shared via app state.
     pub fn new(chain_configs: Vec<ChainConfig>) -> Self {
         let http_client = reqwest::Client::builder()
-            .pool_max_idle_per_host(10)
-            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .pool_max_idle_per_host(3) // Reduced from 10 for memory efficiency
+            .pool_idle_timeout(std::time::Duration::from_secs(30)) // Reduced from 90s for faster recycling
+            .connect_timeout(std::time::Duration::from_secs(5)) // Fail fast on connection
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");

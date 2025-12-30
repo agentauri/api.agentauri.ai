@@ -47,6 +47,18 @@ pub struct DatabaseConfig {
     /// Maximum number of connections in the pool
     pub max_connections: u32,
 
+    /// Minimum number of connections to keep warm (pre-warmed on startup)
+    pub min_connections: u32,
+
+    /// Connection acquire timeout in seconds (fail fast if pool exhausted)
+    pub acquire_timeout_secs: u64,
+
+    /// Idle connection timeout in seconds (recycle unused connections)
+    pub idle_timeout_secs: u64,
+
+    /// Maximum connection lifetime in seconds (prevent stale connections)
+    pub max_lifetime_secs: u64,
+
     /// SSL mode for database connection
     /// Options: disable, allow, prefer, require, verify-ca, verify-full
     /// Default: prefer (development), verify-full (production)
@@ -135,9 +147,25 @@ impl Config {
                 password: env::var("DB_PASSWORD")
                     .map_err(|_| Error::config("DB_PASSWORD must be set"))?,
                 max_connections: env::var("DB_MAX_CONNECTIONS")
-                    .unwrap_or_else(|_| "100".to_string())
+                    .unwrap_or_else(|_| "50".to_string()) // Reduced from 100 for better scaling
                     .parse()
                     .map_err(|e| Error::config(format!("Invalid DB_MAX_CONNECTIONS: {}", e)))?,
+                min_connections: env::var("DB_MIN_CONNECTIONS")
+                    .unwrap_or_else(|_| "5".to_string()) // Pre-warm connections
+                    .parse()
+                    .map_err(|e| Error::config(format!("Invalid DB_MIN_CONNECTIONS: {}", e)))?,
+                acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT")
+                    .unwrap_or_else(|_| "5".to_string()) // Fail fast (was 30s)
+                    .parse()
+                    .map_err(|e| Error::config(format!("Invalid DB_ACQUIRE_TIMEOUT: {}", e)))?,
+                idle_timeout_secs: env::var("DB_IDLE_TIMEOUT")
+                    .unwrap_or_else(|_| "180".to_string()) // 3 min (was 10 min)
+                    .parse()
+                    .map_err(|e| Error::config(format!("Invalid DB_IDLE_TIMEOUT: {}", e)))?,
+                max_lifetime_secs: env::var("DB_MAX_LIFETIME")
+                    .unwrap_or_else(|_| "900".to_string()) // 15 min (was 30 min)
+                    .parse()
+                    .map_err(|e| Error::config(format!("Invalid DB_MAX_LIFETIME: {}", e)))?,
                 ssl_mode: env::var("DB_SSL_MODE").unwrap_or_else(|_| {
                     if cfg!(debug_assertions) {
                         "prefer".to_string() // Development: prefer TLS but don't require
@@ -272,6 +300,10 @@ mod tests {
             user: "testuser".to_string(),
             password: "testpass".to_string(),
             max_connections: 10,
+            min_connections: 2,
+            acquire_timeout_secs: 5,
+            idle_timeout_secs: 180,
+            max_lifetime_secs: 900,
             ssl_mode: "prefer".to_string(),
         };
 
@@ -290,6 +322,10 @@ mod tests {
             user: "appuser".to_string(),
             password: "secure_password".to_string(),
             max_connections: 50,
+            min_connections: 5,
+            acquire_timeout_secs: 5,
+            idle_timeout_secs: 180,
+            max_lifetime_secs: 900,
             ssl_mode: "verify-full".to_string(),
         };
 

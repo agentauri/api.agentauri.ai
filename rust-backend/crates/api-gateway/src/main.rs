@@ -4,6 +4,7 @@
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use anyhow::Context;
+use shared::redis::cache::EntityCache;
 use shared::{db, secrets, Config, RateLimiter};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -104,11 +105,23 @@ async fn main() -> anyhow::Result<()> {
     let code_exchange_rate_limiter = AuthRateLimiter::with_rates(500, 10);
     tracing::info!("Code exchange rate limiter initialized (10 req/min per IP)");
 
-    // Initialize Redis client for rate limiting
+    // Initialize Redis client for rate limiting and caching
     let redis_client = shared::redis::create_client(&config.redis.connection_url())
         .await
         .context("Failed to create Redis client")?;
     tracing::info!("Redis client connected for rate limiting");
+
+    // Create EntityCache for caching frequently accessed data (membership checks, users, orgs)
+    // Uses a separate clone of the connection manager for isolation
+    let redis_client_for_cache = shared::redis::create_client(&config.redis.connection_url())
+        .await
+        .context("Failed to create Redis client for cache")?;
+    let entity_cache = EntityCache::new(redis_client_for_cache, Some(300)); // 5 min TTL
+    tracing::info!(
+        "Entity cache initialized (enabled: {}, TTL: {}s)",
+        entity_cache.is_enabled(),
+        entity_cache.ttl().as_secs()
+    );
 
     // Create RateLimiter instance (shared across all requests)
     let rate_limiter = RateLimiter::new(redis_client)
@@ -162,6 +175,8 @@ async fn main() -> anyhow::Result<()> {
             // Store database pool in app state
             .app_data(web::Data::new(db_pool.clone()))
             .app_data(web::Data::new(config.clone()))
+            // Store EntityCache in app state for caching membership checks
+            .app_data(web::Data::new(entity_cache.clone()))
             // Store WalletService in app state (shared across all requests)
             .app_data(web::Data::new(wallet_service.clone()))
             // Store SocialAuthService in app state (shared across all requests)

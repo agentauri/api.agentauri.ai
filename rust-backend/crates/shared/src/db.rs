@@ -24,15 +24,20 @@ pub type DbPool = PgPool;
 pub async fn create_pool(config: &DatabaseConfig) -> Result<DbPool> {
     let pool = PgPoolOptions::new()
         .max_connections(config.max_connections)
-        .acquire_timeout(Duration::from_secs(30))
-        .idle_timeout(Duration::from_secs(600))
-        .max_lifetime(Duration::from_secs(1800))
+        .min_connections(config.min_connections)
+        .acquire_timeout(Duration::from_secs(config.acquire_timeout_secs))
+        .idle_timeout(Duration::from_secs(config.idle_timeout_secs))
+        .max_lifetime(Duration::from_secs(config.max_lifetime_secs))
         .connect(&config.connection_url())
         .await?;
 
     tracing::info!(
-        "Database connection pool created with {} max connections",
-        config.max_connections
+        "Database pool created: max={}, min={}, acquire_timeout={}s, idle_timeout={}s, max_lifetime={}s",
+        config.max_connections,
+        config.min_connections,
+        config.acquire_timeout_secs,
+        config.idle_timeout_secs,
+        config.max_lifetime_secs
     );
 
     Ok(pool)

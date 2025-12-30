@@ -301,9 +301,9 @@ impl ReqwestHttpClient {
     /// Create a new HTTP client with connection pooling
     pub fn new() -> Result<Self, WorkerError> {
         let client = Client::builder()
-            .pool_max_idle_per_host(10)
-            .pool_idle_timeout(Duration::from_secs(90))
-            .connect_timeout(Duration::from_secs(10))
+            .pool_max_idle_per_host(3) // Reduced from 10 for memory efficiency
+            .pool_idle_timeout(Duration::from_secs(30)) // Reduced from 90s for faster recycling
+            .connect_timeout(Duration::from_secs(5)) // Fail fast
             .user_agent("agentauri-action-worker/1.0")
             .build()
             .map_err(|e| {

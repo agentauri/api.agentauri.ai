@@ -18,7 +18,7 @@ CREATE SCHEMA IF NOT EXISTS ponder;
 
 -- Grant usage on schema to the application user
 -- (The same user used by Ponder and backend services)
-GRANT USAGE ON ponder TO CURRENT_USER;
+GRANT USAGE ON SCHEMA ponder TO CURRENT_USER;
 
 -- Grant all privileges for Ponder to create and manage tables
 GRANT ALL PRIVILEGES ON SCHEMA ponder TO CURRENT_USER;

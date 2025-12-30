@@ -60,6 +60,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_a2a_tasks_updated_at ON a2a_tasks;
 CREATE TRIGGER trigger_a2a_tasks_updated_at
     BEFORE UPDATE ON a2a_tasks
     FOR EACH ROW
