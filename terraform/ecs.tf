@@ -113,7 +113,9 @@ resource "aws_ecs_task_definition" "api_gateway" {
         { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
         { name = "REDIS_PORT", value = "6379" },
         { name = "DB_SSL_MODE", value = "require" }, # TODO: Use verify-full after adding RDS CA cert to image
-        { name = "FRONTEND_URL", value = "https://${var.domain_name}" }
+        { name = "FRONTEND_URL", value = "https://${var.domain_name}" },
+        { name = "GOOGLE_REDIRECT_URI", value = "https://api.${var.domain_name}/api/v1/auth/google/callback" },
+        { name = "GITHUB_REDIRECT_URI", value = "https://api.${var.domain_name}/api/v1/auth/github/callback" }
       ]
 
       secrets = [
@@ -152,6 +154,22 @@ resource "aws_ecs_task_definition" "api_gateway" {
         {
           name      = "MONITORING_TOKEN"
           valueFrom = aws_secretsmanager_secret.monitoring_token.arn
+        },
+        {
+          name      = "GOOGLE_CLIENT_ID"
+          valueFrom = "${aws_secretsmanager_secret.google_oauth.arn}:client_id::"
+        },
+        {
+          name      = "GOOGLE_CLIENT_SECRET"
+          valueFrom = "${aws_secretsmanager_secret.google_oauth.arn}:client_secret::"
+        },
+        {
+          name      = "GITHUB_CLIENT_ID"
+          valueFrom = "${aws_secretsmanager_secret.github_oauth.arn}:client_id::"
+        },
+        {
+          name      = "GITHUB_CLIENT_SECRET"
+          valueFrom = "${aws_secretsmanager_secret.github_oauth.arn}:client_secret::"
         }
       ]
 
