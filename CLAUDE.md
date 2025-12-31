@@ -135,66 +135,155 @@ fn do_work() -> Result<()> {
 
 ## API Endpoints
 
+### Public / Discovery
+```
+GET  /.well-known/agent.json          # A2A Agent Card
+GET  /.well-known/security.txt        # Security contact
+GET  /api/v1/health                   # Health check
+GET  /api/v1/openapi.json             # OpenAPI spec
+```
+
+### Ponder (Indexer Status - No Auth)
+```
+GET  /api/v1/ponder/status            # Indexer sync status
+GET  /api/v1/ponder/events            # Event statistics
+```
+
 ### Authentication
 ```
 POST /api/v1/auth/register            # Create user
 POST /api/v1/auth/login               # Get JWT
 POST /api/v1/auth/refresh             # Refresh access token
-GET  /api/v1/auth/google              # OAuth start
-GET  /api/v1/auth/github              # OAuth start
+POST /api/v1/auth/logout              # Logout / invalidate token
+GET  /api/v1/auth/me                  # Get current user info
+POST /api/v1/auth/nonce               # Generate nonce for SIWE
+POST /api/v1/auth/wallet              # SIWE wallet login
+POST /api/v1/auth/exchange            # Exchange OAuth code for JWT
 ```
 
-### Triggers
+### Social Login (OAuth 2.0)
 ```
-GET    /api/v1/triggers               # List (paginated)
-POST   /api/v1/triggers               # Create
-GET    /api/v1/triggers/{id}          # Get
-PUT    /api/v1/triggers/{id}          # Update
-DELETE /api/v1/triggers/{id}          # Delete
+GET  /api/v1/auth/google              # Start Google OAuth
+GET  /api/v1/auth/google/callback     # Google OAuth callback
+GET  /api/v1/auth/github              # Start GitHub OAuth
+GET  /api/v1/auth/github/callback     # GitHub OAuth callback
+GET  /api/v1/auth/link/google         # Link Google to existing account
+GET  /api/v1/auth/link/github         # Link GitHub to existing account
+```
+
+### OAuth Client Management
+```
+POST   /api/v1/oauth/token            # OAuth 2.0 token endpoint
+POST   /api/v1/oauth/clients          # Create OAuth client
+GET    /api/v1/oauth/clients          # List OAuth clients
+DELETE /api/v1/oauth/clients/{id}     # Delete OAuth client
 ```
 
 ### Organizations
 ```
-POST   /api/v1/organizations          # Create
-GET    /api/v1/organizations          # List
-GET    /api/v1/organizations/:id      # Get
-PUT    /api/v1/organizations/:id      # Update
-DELETE /api/v1/organizations/:id      # Delete
+POST   /api/v1/organizations                    # Create
+GET    /api/v1/organizations                    # List
+GET    /api/v1/organizations/{id}               # Get
+PUT    /api/v1/organizations/{id}               # Update
+DELETE /api/v1/organizations/{id}               # Delete
+POST   /api/v1/organizations/{id}/transfer      # Transfer ownership
+```
+
+### Organization Members
+```
+POST   /api/v1/organizations/{id}/members              # Add member
+GET    /api/v1/organizations/{id}/members              # List members
+PUT    /api/v1/organizations/{id}/members/{user_id}    # Update role
+DELETE /api/v1/organizations/{id}/members/{user_id}    # Remove member
+```
+
+### Organization-Scoped Resources
+```
+GET    /api/v1/organizations/{id}/api-keys             # List org API keys
+POST   /api/v1/organizations/{id}/api-keys             # Create org API key
+GET    /api/v1/organizations/{id}/api-keys/stats       # API key statistics
+GET    /api/v1/organizations/{id}/triggers             # List org triggers
+GET    /api/v1/organizations/{id}/agents               # List org agents
+GET    /api/v1/organizations/{id}/credits/balance      # Get org credits
+GET    /api/v1/organizations/{id}/credits/transactions # List org transactions
 ```
 
 ### API Keys
 ```
 POST   /api/v1/api-keys               # Create
 GET    /api/v1/api-keys               # List
-DELETE /api/v1/api-keys/:id           # Revoke
-POST   /api/v1/api-keys/:id/rotate    # Rotate
+GET    /api/v1/api-keys/{id}          # Get
+PATCH  /api/v1/api-keys/{id}          # Update
+DELETE /api/v1/api-keys/{id}          # Revoke
+POST   /api/v1/api-keys/{id}/rotate   # Rotate key
 ```
 
-### Ponder (Indexer Status)
+### Triggers
 ```
-GET  /api/v1/ponder/status            # Indexer sync status
-GET  /api/v1/ponder/events            # Event statistics
+POST   /api/v1/triggers               # Create
+GET    /api/v1/triggers               # List (paginated)
+GET    /api/v1/triggers/{id}          # Get
+PUT    /api/v1/triggers/{id}          # Update
+DELETE /api/v1/triggers/{id}          # Delete
 ```
 
-### Billing
+### Trigger Conditions
 ```
-GET  /api/v1/billing/credits          # Get credit balance
-POST /api/v1/billing/credits/purchase # Purchase credits
-GET  /api/v1/billing/transactions     # List transactions
-GET  /api/v1/billing/subscription     # Get subscription info
+POST   /api/v1/triggers/{id}/conditions        # Create condition
+GET    /api/v1/triggers/{id}/conditions        # List conditions
+PUT    /api/v1/triggers/{id}/conditions/{cid}  # Update condition
+DELETE /api/v1/triggers/{id}/conditions/{cid}  # Delete condition
+```
+
+### Trigger Actions
+```
+POST   /api/v1/triggers/{id}/actions           # Create action
+GET    /api/v1/triggers/{id}/actions           # List actions
+PUT    /api/v1/triggers/{id}/actions/{aid}     # Update action
+DELETE /api/v1/triggers/{id}/actions/{aid}     # Delete action
+```
+
+### Circuit Breaker
+```
+GET    /api/v1/triggers/{id}/circuit-breaker       # Get state
+PATCH  /api/v1/triggers/{id}/circuit-breaker       # Update config
+POST   /api/v1/triggers/{id}/circuit-breaker/reset # Reset breaker
 ```
 
 ### Agents (Wallet Linking)
 ```
 POST   /api/v1/agents/link            # Link agent to org
 GET    /api/v1/agents/linked          # List linked agents
-DELETE /api/v1/agents/:id/link        # Unlink agent
+DELETE /api/v1/agents/{id}/link       # Unlink agent
 ```
 
-### Discovery
+### Agent Following (Simplified Monitoring)
 ```
-GET  /.well-known/agent.json          # A2A Agent Card
-GET  /.well-known/security.txt        # Security contact
+GET    /api/v1/agents/following       # List followed agents
+POST   /api/v1/agents/{id}/follow     # Start following agent
+PUT    /api/v1/agents/{id}/follow     # Update follow settings
+DELETE /api/v1/agents/{id}/follow     # Stop following agent
+```
+
+### Events (Blockchain)
+```
+GET    /api/v1/events                 # List events (filtered)
+```
+
+### A2A Protocol (Agent-to-Agent)
+```
+POST   /api/v1/a2a/rpc                # JSON-RPC 2.0 endpoint
+GET    /api/v1/a2a/tasks/{id}         # Get task status
+GET    /api/v1/a2a/tasks/{id}/stream  # Stream task progress (SSE)
+```
+
+### Billing
+```
+GET    /api/v1/billing/credits          # Get credit balance
+POST   /api/v1/billing/credits/purchase # Purchase credits
+GET    /api/v1/billing/transactions     # List transactions
+GET    /api/v1/billing/subscription     # Get subscription info
+POST   /api/v1/billing/webhook          # Stripe webhook
 ```
 
 Full API docs: `rust-backend/crates/api-gateway/API_DOCUMENTATION.md`
@@ -208,11 +297,51 @@ Full API docs: `rust-backend/crates/api-gateway/API_DOCUMENTATION.md`
 ## Database Schema
 
 Key tables in `database/migrations/`:
-- `users`, `organizations`, `organization_members`
-- `triggers`, `trigger_conditions`, `trigger_actions`, `trigger_state`
-- `events` (TimescaleDB hypertable)
-- `api_keys`, `api_key_audit_log`
-- `credits`, `credit_transactions`
+
+### Core
+- `users` - User accounts with wallet addresses
+- `organizations` - Multi-tenant organizations
+- `organization_members` - Org membership and roles
+
+### Triggers & Events
+- `triggers` - Trigger definitions with circuit breaker config
+- `trigger_conditions` - Trigger matching conditions
+- `trigger_actions` - Actions to execute (Telegram, webhook, MCP)
+- `trigger_state` - Trigger execution state
+- `events` - Blockchain events (TimescaleDB hypertable)
+- `action_results` - Action execution results
+- `checkpoints` - Ponder indexer checkpoints
+- `processed_events` - Event processing tracking
+
+### Authentication & Security
+- `api_keys` - API key storage (Argon2id hashed)
+- `api_key_audit_log` - API key usage audit trail
+- `auth_failures` - Brute force protection / account lockout
+- `user_identities` - Social login identity mapping
+- `user_refresh_tokens` - JWT refresh token storage
+- `used_nonces` - SIWE nonce tracking
+- `oauth_clients` - OAuth 2.0 client credentials
+- `oauth_tokens` - OAuth access token storage
+- `oauth_temp_codes` - OAuth authorization codes
+
+### Billing
+- `credits` - Credit balances per organization
+- `credit_transactions` - Credit usage history
+- `subscriptions` - Stripe subscription info
+- `payment_nonces` - x402 payment nonce tracking
+
+### Agents
+- `agent_links` - Agent wallet to org linking
+- `agent_mcp_tokens` - MCP authentication tokens
+- `agent_follows` - Agent following for simplified monitoring
+
+### A2A Protocol
+- `a2a_tasks` - Async task tracking
+- `a2a_audit_log` - A2A operation audit trail
+
+### Ponder Integration
+- `ponder_*` schema - Dynamic namespace for Ponder events
+- `ponder_events_view` - Unified view across Ponder namespaces
 
 ## External References
 

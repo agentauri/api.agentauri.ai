@@ -1,8 +1,8 @@
 # Documentation Index
 
 **Project**: api.agentauri.ai - AgentAuri Backend Infrastructure
-**Last Updated**: December 28, 2025
-**Phase**: OAuth 2.0 + SIWE Complete (Production at 85%+ readiness)
+**Last Updated**: December 31, 2025
+**Phase**: Phase 8 Complete - Performance Optimizations (Production at 90%+ readiness)
 
 This index provides a comprehensive overview of all project documentation organized by category.
 
@@ -119,6 +119,7 @@ This index provides a comprehensive overview of all project documentation organi
 
 ## 📝 Project Tracking
 
+- **[ROADMAP.md](ROADMAP.md)** - Development roadmap and upcoming phases (Phase 9-12)
 - **[../CHANGELOG.md](../CHANGELOG.md)** - Weekly changelog with all changes
 - **[deployment/PRODUCTION_DEPLOYMENT_GUIDE.md](deployment/PRODUCTION_DEPLOYMENT_GUIDE.md)** - Deployment guide and environment configuration
 - **[operations/PRODUCTION_READINESS_PLAN.md](operations/PRODUCTION_READINESS_PLAN.md)** - 6-week plan to achieve production readiness
@@ -126,18 +127,6 @@ This index provides a comprehensive overview of all project documentation organi
 ### Phase 6 Design Documents (Production Deployment)
 - **[security/SECRETS_MANAGEMENT.md](security/SECRETS_MANAGEMENT.md)** - Secrets management for production *(Phase 6)*
 - **[security/DATABASE_ENCRYPTION.md](security/DATABASE_ENCRYPTION.md)** - Database encryption guide *(Phase 6)*
-
----
-
-## 📦 Archive
-
-Historical reports and completed work:
-
-### Operations Archive
-- **[operations/archive/2025-12-01-ponder-event-fix.md](operations/archive/2025-12-01-ponder-event-fix.md)** - Ponder event handler fixes (Week 15)
-- **[operations/archive/2025-12-01-quality-plan.md](operations/archive/2025-12-01-quality-plan.md)** - Quality & security remediation plan
-- **[operations/archive/2025-12-01-fixes-completed.md](operations/archive/2025-12-01-fixes-completed.md)** - Fixes completion summary
-- **[operations/archive/2025-12-01-verification.md](operations/archive/2025-12-01-verification.md)** - Final verification report
 
 ---
 
@@ -181,70 +170,34 @@ Historical reports and completed work:
 
 ## 📊 Documentation Statistics
 
-- **Total Documents**: 65+ markdown files (A2A Protocol implemented)
+- **Total Documents**: 120+ markdown files
 - **Root Level**: 7 essential files (CLAUDE.md, README, CHANGELOG, etc.)
-- **Architecture Docs**: 5 files
-- **Authentication Docs**: 6 files (including Social Login)
-- **Security Docs**: 13 files (DATABASE_ENCRYPTION, SECURITY_HEADERS, SECRETS_MANAGER, etc.)
-- **Operations Docs**: 8 files (background tasks, circuit breaker, troubleshooting, runbook, audit logging, metrics, link audit, event-processor integration)
-- **API Documentation**: 3 files (API_DOCUMENTATION.md, TOOL_REGISTRY.md, trigger-examples.md)
-- **Protocol Docs**: 3 files (ERC-8004 + A2A implemented, MCP Phase 5)
-- **Development Guides**: 5 files (setup, testing strategy, adding chains, contributing, CI/CD)
-- **Component READMEs**: 7 files
-- **Archived Documents**: 4 files
+- **Architecture Docs**: 3 files (system-overview, event-store, multi-region)
+- **Authentication Docs**: 7 files (including Social Login, OAuth, SIWE)
+- **Security Docs**: 17 files (encryption, secrets, OWASP, headers, etc.)
+- **Operations Docs**: 10 files (runbook, troubleshooting, circuit breaker, metrics, etc.)
+- **API Documentation**: 4 files (API_DOCUMENTATION.md, TOOL_REGISTRY.md, ERROR_CODES.md, etc.)
+- **Protocol Docs**: 4 files (ERC-8004, A2A, MCP integration, MCP server)
+- **Development Guides**: 5 files (setup, testing, adding chains, contributing, CI/CD)
+- **Component READMEs**: 8 files
 
-**Last Comprehensive Audit**: December 28, 2025 (Documentation Cleanup Phase 3)
+**Last Comprehensive Audit**: December 31, 2025 (Documentation Cleanup)
 **Recent Improvement Actions**:
-- December 28, 2025:
-  - Added ERROR_CODES.md - comprehensive API error reference
-  - Added DISASTER_RECOVERY.md - production DR procedures
-  - Added ROLLBACK_PROCEDURES.md - ECS and database rollback guide
-  - Archived N+1_QUERY_FIX.md and SECRETS_IMPLEMENTATION_SUMMARY.md
-  - Updated PRODUCTION_DEPLOYMENT_GUIDE.md with AWS ECS note
-  - Verified trigger system working with wildcard chain matching
-- December 25, 2025:
-  - Added OAuth 2.0 endpoints for frontend integration (Google, GitHub)
-  - Added SIWE wallet authentication with EIP-191 signature verification
-  - Added account linking endpoints (/auth/link/google, /auth/link/github)
-  - Added session management endpoints (/auth/nonce, /auth/me, /auth/logout)
-  - Updated PRODUCTION_READINESS_PLAN.md to reflect A2A Protocol completion
-  - Updated production readiness to 85%+
-- December 24, 2025:
-  - Removed outdated DEPLOYMENT.md stub (content in docs/deployment/)
-  - Removed superseded FRONTEND_PRD.md and ROADMAP.md from archive
-  - Updated README.md roadmap link to point to PRODUCTION_READINESS_PLAN.md
+- December 31, 2025:
+  - Deleted 8 obsolete archive files (~4,200 lines removed)
+  - Updated CLAUDE.md with 25+ missing API endpoints
+  - Updated CLAUDE.md with 13+ missing database tables
+  - Added ROADMAP.md for next development phases
+  - Removed archive section from INDEX.md
   - Updated documentation statistics
-- December 21, 2024:
-  - A2A Protocol documentation complete in API_DOCUMENTATION.md
-  - Added TOOL_REGISTRY.md for A2A tool catalog
-  - Added AUDIT_LOGGING.md for task audit trail
-  - Added METRICS.md for observability guide
-  - Updated A2A_INTEGRATION.md to "Implemented" status
-  - Updated INDEX.md with new documentation structure
-- December 17, 2025:
-  - Added Ponder indexer status endpoints (`/api/v1/ponder/status`, `/api/v1/ponder/events`)
-  - Fixed Ponder status endpoint snake_case column mapping (v1.0.12)
-  - Added monitoring token bypass for rate limiting
-  - Updated API_DOCUMENTATION.md with Ponder endpoints
-  - Updated CLAUDE.md with Ponder API reference
-- December 4, 2025:
-  - Marked Week 15 as complete in CLAUDE.md (REST Worker, Circuit Breaker, Agent Discovery)
-  - Added Phase 5/6 status markers to design documents
-  - Reorganized INDEX.md with design document sections
-  - Updated production readiness assessment to 65%
-- December 2, 2025:
-  - Added auth/SOCIAL_LOGIN.md for Google and GitHub OAuth 2.0
-  - Added operations/BACKGROUND_TASKS.md for cleanup jobs documentation
-  - Updated auth/AUTHENTICATION.md with brute-force protection and social auth
-  - Updated rate-limiting docs with production mode (shadow vs enforcing)
-  - Updated CLAUDE.md with new features and endpoints
-- December 1, 2025:
-  - 4 temporary reports archived to operations/archive/
-  - PRODUCTION_ROADMAP.md moved to operations/PRODUCTION_READINESS_PLAN.md
-  - RATE_LIMITING.md renamed to RATE_LIMITS_USER_GUIDE.md for clarity
-  - Cross-references added between rate-limiting docs
-  - Security documentation enhanced with comprehensive links
-  - Archive section added to INDEX.md
+- December 30, 2025:
+  - Added Phase 8 performance optimizations
+  - Added performance indexes to database
+  - Updated production readiness to 90%+
+- December 29, 2025:
+  - Fixed nonce endpoint
+  - Added events endpoint for blockchain events
+  - Added organization-scoped endpoints
 
 ---
 
