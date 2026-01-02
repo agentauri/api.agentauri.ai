@@ -40,8 +40,8 @@ db_instance_class    = "db.t3.micro"
 db_allocated_storage = 20
 db_multi_az          = false
 
-# ElastiCache Redis (cost optimized: single node, no failover)
-redis_node_type       = "cache.t3.small"
+# ElastiCache Redis (maximum cost optimization: smallest instance, single node)
+redis_node_type       = "cache.t3.micro"
 redis_num_cache_nodes = 1
 
 # =============================================================================
@@ -64,10 +64,10 @@ ponder_monitoring_enabled = true
 alert_email               = "matteo.scurati@agentauri.ai"
 
 # =============================================================================
-# Grafana (Monitoring Dashboard)
+# Grafana (Monitoring Dashboard) - DISABLED for cost optimization
 # =============================================================================
 
-grafana_enabled = true
+grafana_enabled = false
 grafana_cpu     = 256
 grafana_memory  = 512
 
