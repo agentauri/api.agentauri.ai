@@ -315,6 +315,250 @@ CloudWatch alarms configured for:
 
 ---
 
+## DR Testing Procedures
+
+### Test 1: RDS Snapshot Restore Test (Quarterly)
+
+**Purpose**: Verify that database backups are valid and can be restored.
+
+**Pre-requisites**:
+- AWS CLI configured with appropriate permissions
+- At least one automated snapshot available
+
+**Procedure**:
+
+```bash
+#!/bin/bash
+# dr-test-snapshot-restore.sh
+# Duration: ~20-30 minutes
+
+set -e
+
+DATE=$(date +%Y%m%d)
+TEST_INSTANCE="agentauri-dr-test-${DATE}"
+SNAPSHOT_ID=$(aws rds describe-db-snapshots \
+  --db-instance-identifier agentauri-production \
+  --query 'DBSnapshots | sort_by(@, &SnapshotCreateTime) | [-1].DBSnapshotIdentifier' \
+  --output text)
+
+echo "=== DR Test: Snapshot Restore ==="
+echo "Date: $(date)"
+echo "Snapshot: ${SNAPSHOT_ID}"
+echo ""
+
+# Step 1: Restore snapshot to test instance
+echo "[1/5] Restoring snapshot to test instance..."
+aws rds restore-db-instance-from-db-snapshot \
+  --db-instance-identifier "${TEST_INSTANCE}" \
+  --db-snapshot-identifier "${SNAPSHOT_ID}" \
+  --db-instance-class db.t3.micro \
+  --no-publicly-accessible
+
+# Step 2: Wait for instance to be available
+echo "[2/5] Waiting for instance to be available (this takes ~15 minutes)..."
+aws rds wait db-instance-available \
+  --db-instance-identifier "${TEST_INSTANCE}"
+
+# Step 3: Get endpoint and test connection
+echo "[3/5] Testing database connectivity..."
+ENDPOINT=$(aws rds describe-db-instances \
+  --db-instance-identifier "${TEST_INSTANCE}" \
+  --query 'DBInstances[0].Endpoint.Address' \
+  --output text)
+
+echo "Endpoint: ${ENDPOINT}"
+
+# Step 4: Verify data integrity (example queries)
+echo "[4/5] Verifying data integrity..."
+# Note: Replace with actual password or use IAM auth
+PGPASSWORD="${RDS_PASSWORD}" psql -h "${ENDPOINT}" -U agentauri_admin -d agentauri_backend -c "
+  SELECT 'users' as table_name, COUNT(*) as row_count FROM users
+  UNION ALL
+  SELECT 'organizations', COUNT(*) FROM organizations
+  UNION ALL
+  SELECT 'triggers', COUNT(*) FROM triggers
+  UNION ALL
+  SELECT 'events', COUNT(*) FROM events;
+"
+
+# Step 5: Cleanup test instance
+echo "[5/5] Cleaning up test instance..."
+aws rds delete-db-instance \
+  --db-instance-identifier "${TEST_INSTANCE}" \
+  --skip-final-snapshot \
+  --delete-automated-backups
+
+echo ""
+echo "=== DR Test Complete ==="
+echo "Result: SUCCESS"
+echo "Documented at: docs/operations/dr-tests/${DATE}-snapshot-restore.md"
+```
+
+**Success Criteria**:
+- [ ] Snapshot restored successfully
+- [ ] Database accessible
+- [ ] All tables present with expected row counts
+- [ ] No data corruption detected
+
+**Post-Test**:
+1. Document results in `docs/operations/dr-tests/`
+2. Update "Last Tested" date in this document
+3. Create ticket for any issues found
+
+---
+
+### Test 2: Multi-AZ Failover Test (Quarterly)
+
+**Purpose**: Verify that RDS Multi-AZ failover works correctly.
+
+**Pre-requisites**:
+- RDS Multi-AZ enabled (currently: ✅)
+- Non-production time window (failover takes ~1-2 minutes)
+
+**Procedure**:
+
+```bash
+#!/bin/bash
+# dr-test-failover.sh
+# Duration: ~5 minutes
+
+set -e
+
+echo "=== DR Test: Multi-AZ Failover ==="
+echo "Date: $(date)"
+echo ""
+
+# Step 1: Get current AZ
+echo "[1/4] Current configuration..."
+aws rds describe-db-instances \
+  --db-instance-identifier agentauri-production \
+  --query 'DBInstances[0].{AZ:AvailabilityZone,MultiAZ:MultiAZ,Status:DBInstanceStatus}'
+
+# Step 2: Initiate failover
+echo "[2/4] Initiating failover..."
+aws rds reboot-db-instance \
+  --db-instance-identifier agentauri-production \
+  --force-failover
+
+# Step 3: Wait for instance to be available
+echo "[3/4] Waiting for failover to complete..."
+aws rds wait db-instance-available \
+  --db-instance-identifier agentauri-production
+
+# Step 4: Verify new AZ
+echo "[4/4] New configuration..."
+aws rds describe-db-instances \
+  --db-instance-identifier agentauri-production \
+  --query 'DBInstances[0].{AZ:AvailabilityZone,MultiAZ:MultiAZ,Status:DBInstanceStatus}'
+
+echo ""
+echo "=== Failover Test Complete ==="
+```
+
+**Success Criteria**:
+- [ ] Failover completed within 2 minutes
+- [ ] Application reconnected automatically
+- [ ] No data loss
+- [ ] AZ changed from primary to standby
+
+**Monitoring During Test**:
+- Watch CloudWatch for connection drops
+- Monitor application health endpoint
+- Check ECS service logs for reconnection
+
+---
+
+### Test 3: Secret Rotation Test (Monthly)
+
+**Purpose**: Verify that secrets can be rotated without service disruption.
+
+**Procedure**:
+
+```bash
+#!/bin/bash
+# dr-test-secret-rotation.sh
+
+set -e
+
+echo "=== DR Test: Secret Rotation ==="
+echo "Date: $(date)"
+echo ""
+
+# Rotate JWT secret (forces all users to re-login)
+echo "[1/3] Generating new JWT secret..."
+NEW_JWT=$(openssl rand -base64 32)
+
+echo "[2/3] Updating secret in Secrets Manager..."
+aws secretsmanager update-secret \
+  --secret-id agentauri/production/jwt-secret \
+  --secret-string "${NEW_JWT}"
+
+echo "[3/3] Forcing ECS service restart..."
+aws ecs update-service \
+  --cluster agentauri-production \
+  --service api-gateway \
+  --force-new-deployment
+
+echo ""
+echo "=== Secret Rotation Complete ==="
+echo "Note: All existing JWT tokens are now invalid."
+```
+
+**Success Criteria**:
+- [ ] New secret stored successfully
+- [ ] ECS tasks restarted with new secret
+- [ ] New authentication working
+- [ ] Old tokens correctly rejected
+
+---
+
+### Test 4: Full DR Drill (Annually)
+
+**Purpose**: Complete infrastructure recovery simulation.
+
+**Scenario**: Simulate complete region failure.
+
+**Steps**:
+
+1. **Preparation** (1 week before)
+   - Schedule maintenance window
+   - Notify stakeholders
+   - Prepare backup region (if available)
+
+2. **Drill Execution** (4-6 hours)
+   - Take final snapshot of production
+   - Document current state
+   - "Destroy" infrastructure (terraform destroy --target specific resources)
+   - Time the recovery process
+   - Restore from Terraform + snapshots
+   - Verify all services operational
+
+3. **Documentation**
+   - Record all steps taken
+   - Document any issues encountered
+   - Calculate actual RTO/RPO
+   - Update procedures based on learnings
+
+**Success Criteria**:
+- [ ] RTO met (< 1 hour)
+- [ ] RPO met (< 24 hours data loss)
+- [ ] All services restored
+- [ ] Data integrity verified
+- [ ] External connectivity confirmed
+
+---
+
+## DR Test Results Log
+
+| Date | Test Type | Result | RTO Actual | Notes | Tester |
+|------|-----------|--------|------------|-------|--------|
+| TBD | Snapshot Restore | - | - | - | - |
+| TBD | Multi-AZ Failover | - | - | - | - |
+| TBD | Secret Rotation | - | - | - | - |
+| TBD | Full DR Drill | - | - | - | - |
+
+---
+
 ## Contacts
 
 | Role | Contact | Responsibility |

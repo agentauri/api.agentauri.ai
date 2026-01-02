@@ -18,8 +18,8 @@ pub mod redis;
 pub mod secrets;
 
 // Re-export commonly used types
-pub use config::Config;
-pub use db::DbPool;
+pub use config::{Config, DatabaseReadReplicaConfig};
+pub use db::{DbPool, DbPoolStats, DbPools};
 pub use error::{Error, Result};
 pub use jobs::{ActionJob, ActionType, ACTION_JOBS_DLQ, ACTION_JOBS_QUEUE};
 pub use redis::{RateLimitResult, RateLimitScope, RateLimiter};

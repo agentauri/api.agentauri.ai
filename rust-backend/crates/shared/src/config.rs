@@ -63,15 +63,53 @@ pub struct DatabaseConfig {
     /// Options: disable, allow, prefer, require, verify-ca, verify-full
     /// Default: prefer (development), verify-full (production)
     pub ssl_mode: String,
+
+    /// Optional read replica configuration for read scaling
+    /// When configured, SELECT queries should use the read pool
+    pub read_replica: Option<DatabaseReadReplicaConfig>,
+}
+
+/// Read replica configuration (optional)
+/// Used for scaling read-heavy workloads without affecting write performance
+#[derive(Debug, Clone, Deserialize)]
+pub struct DatabaseReadReplicaConfig {
+    /// Read replica host
+    pub host: String,
+
+    /// Read replica port (defaults to primary port if not set)
+    pub port: Option<u16>,
+
+    /// Maximum connections for read pool (can be higher than write pool)
+    pub max_connections: u32,
+
+    /// Minimum connections for read pool
+    pub min_connections: u32,
 }
 
 impl DatabaseConfig {
-    /// Build a PostgreSQL connection URL with SSL mode
+    /// Build a PostgreSQL connection URL with SSL mode (primary/write)
     pub fn connection_url(&self) -> String {
         format!(
             "postgres://{}:{}@{}:{}/{}?sslmode={}",
             self.user, self.password, self.host, self.port, self.name, self.ssl_mode
         )
+    }
+
+    /// Build a PostgreSQL connection URL for read replica
+    /// Returns None if no read replica is configured
+    pub fn read_replica_url(&self) -> Option<String> {
+        self.read_replica.as_ref().map(|replica| {
+            let port = replica.port.unwrap_or(self.port);
+            format!(
+                "postgres://{}:{}@{}:{}/{}?sslmode={}",
+                self.user, self.password, replica.host, port, self.name, self.ssl_mode
+            )
+        })
+    }
+
+    /// Check if read replica is configured
+    pub fn has_read_replica(&self) -> bool {
+        self.read_replica.is_some()
     }
 }
 
@@ -173,6 +211,7 @@ impl Config {
                         "verify-full".to_string() // Production: require TLS with certificate verification
                     }
                 }),
+                read_replica: Self::load_read_replica_config()?,
             },
             redis: RedisConfig {
                 host: env::var("REDIS_HOST").unwrap_or_else(|_| "localhost".to_string()),
@@ -285,6 +324,59 @@ impl Config {
 
         Ok(secret)
     }
+
+    /// Load optional read replica configuration from environment variables
+    ///
+    /// Environment variables:
+    /// - `DB_READ_HOST`: Read replica host (required to enable read replica)
+    /// - `DB_READ_PORT`: Read replica port (optional, defaults to DB_PORT)
+    /// - `DB_READ_MAX_CONNECTIONS`: Max connections for read pool (optional, defaults to 100)
+    /// - `DB_READ_MIN_CONNECTIONS`: Min connections for read pool (optional, defaults to 10)
+    ///
+    /// Returns `None` if `DB_READ_HOST` is not set.
+    fn load_read_replica_config() -> Result<Option<DatabaseReadReplicaConfig>> {
+        match env::var("DB_READ_HOST") {
+            Ok(host) => {
+                let port = env::var("DB_READ_PORT")
+                    .ok()
+                    .map(|p| {
+                        p.parse::<u16>()
+                            .map_err(|e| Error::config(format!("Invalid DB_READ_PORT: {}", e)))
+                    })
+                    .transpose()?;
+
+                let max_connections = env::var("DB_READ_MAX_CONNECTIONS")
+                    .unwrap_or_else(|_| "100".to_string()) // Higher default for read scaling
+                    .parse()
+                    .map_err(|e| {
+                        Error::config(format!("Invalid DB_READ_MAX_CONNECTIONS: {}", e))
+                    })?;
+
+                let min_connections = env::var("DB_READ_MIN_CONNECTIONS")
+                    .unwrap_or_else(|_| "10".to_string())
+                    .parse()
+                    .map_err(|e| {
+                        Error::config(format!("Invalid DB_READ_MIN_CONNECTIONS: {}", e))
+                    })?;
+
+                tracing::info!(
+                    "Read replica configured: host={}, port={:?}, max_conn={}, min_conn={}",
+                    host,
+                    port,
+                    max_connections,
+                    min_connections
+                );
+
+                Ok(Some(DatabaseReadReplicaConfig {
+                    host,
+                    port,
+                    max_connections,
+                    min_connections,
+                }))
+            }
+            Err(_) => Ok(None), // No read replica configured
+        }
+    }
 }
 
 #[cfg(test)]
@@ -305,6 +397,7 @@ mod tests {
             idle_timeout_secs: 180,
             max_lifetime_secs: 900,
             ssl_mode: "prefer".to_string(),
+            read_replica: None,
         };
 
         assert_eq!(
@@ -327,6 +420,7 @@ mod tests {
             idle_timeout_secs: 180,
             max_lifetime_secs: 900,
             ssl_mode: "verify-full".to_string(),
+            read_replica: None,
         };
 
         assert_eq!(
@@ -389,5 +483,83 @@ mod tests {
             config.connection_url(),
             "rediss://:mytoken@master.cache.amazonaws.com:6379"
         );
+    }
+
+    #[test]
+    fn test_read_replica_url_with_config() {
+        let config = DatabaseConfig {
+            host: "primary.db.example.com".to_string(),
+            port: 5432,
+            name: "mydb".to_string(),
+            user: "appuser".to_string(),
+            password: "secret".to_string(),
+            max_connections: 50,
+            min_connections: 5,
+            acquire_timeout_secs: 5,
+            idle_timeout_secs: 180,
+            max_lifetime_secs: 900,
+            ssl_mode: "verify-full".to_string(),
+            read_replica: Some(DatabaseReadReplicaConfig {
+                host: "replica.db.example.com".to_string(),
+                port: Some(5433),
+                max_connections: 100,
+                min_connections: 10,
+            }),
+        };
+
+        assert!(config.has_read_replica());
+        assert_eq!(
+            config.read_replica_url().unwrap(),
+            "postgres://appuser:secret@replica.db.example.com:5433/mydb?sslmode=verify-full"
+        );
+    }
+
+    #[test]
+    fn test_read_replica_url_default_port() {
+        let config = DatabaseConfig {
+            host: "primary.db.example.com".to_string(),
+            port: 5432,
+            name: "mydb".to_string(),
+            user: "appuser".to_string(),
+            password: "secret".to_string(),
+            max_connections: 50,
+            min_connections: 5,
+            acquire_timeout_secs: 5,
+            idle_timeout_secs: 180,
+            max_lifetime_secs: 900,
+            ssl_mode: "prefer".to_string(),
+            read_replica: Some(DatabaseReadReplicaConfig {
+                host: "replica.db.example.com".to_string(),
+                port: None, // Should default to primary port
+                max_connections: 100,
+                min_connections: 10,
+            }),
+        };
+
+        assert_eq!(
+            config.read_replica_url().unwrap(),
+            "postgres://appuser:secret@replica.db.example.com:5432/mydb?sslmode=prefer"
+        );
+    }
+
+    #[test]
+    fn test_no_read_replica() {
+        let config = DatabaseConfig {
+            host: "primary.db.example.com".to_string(),
+            port: 5432,
+            name: "mydb".to_string(),
+            user: "appuser".to_string(),
+            password: "secret".to_string(),
+            max_connections: 50,
+            min_connections: 5,
+            acquire_timeout_secs: 5,
+            idle_timeout_secs: 180,
+            max_lifetime_secs: 900,
+            ssl_mode: "prefer".to_string(),
+            read_replica: None,
+        };
+
+        assert!(!config.has_read_replica());
+        assert!(config.read_replica_url().is_none());
     }
 }

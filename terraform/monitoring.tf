@@ -295,3 +295,295 @@ resource "aws_cloudwatch_log_metric_filter" "ponder_events_indexed" {
     default_value = "0"
   }
 }
+
+# =============================================================================
+# RDS Monitoring - CloudWatch Alarms for Database Health
+# =============================================================================
+# These alarms monitor the primary RDS instance and prepare for multi-region
+# by establishing baseline metrics and alerting patterns.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# SNS Topic for RDS Alerts (reuses existing or creates new)
+# -----------------------------------------------------------------------------
+
+resource "aws_sns_topic" "rds_alerts" {
+  name = "${local.name_prefix}-rds-alerts"
+
+  tags = {
+    Name        = "${local.name_prefix}-rds-alerts"
+    Service     = "rds"
+    Description = "Alert notifications for RDS database"
+  }
+}
+
+resource "aws_sns_topic_subscription" "rds_email" {
+  count = var.alert_email != "" ? 1 : 0
+
+  topic_arn = aws_sns_topic.rds_alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}
+
+# -----------------------------------------------------------------------------
+# RDS Alarms - CPU Utilization
+# -----------------------------------------------------------------------------
+
+# WARNING: High CPU (>70% for 5 minutes)
+resource "aws_cloudwatch_metric_alarm" "rds_high_cpu" {
+  alarm_name          = "${local.name_prefix}-rds-high-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 70
+  alarm_description   = "WARNING: RDS CPU utilization above 70% for 5 minutes. Consider query optimization or scaling."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-high-cpu"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
+
+# CRITICAL: Very high CPU (>90% for 2 minutes)
+resource "aws_cloudwatch_metric_alarm" "rds_critical_cpu" {
+  alarm_name          = "${local.name_prefix}-rds-critical-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 90
+  alarm_description   = "CRITICAL: RDS CPU utilization above 90%. Database performance severely impacted."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+  ok_actions    = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-critical-cpu"
+    Severity = "critical"
+    Service  = "rds"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# RDS Alarms - Storage
+# -----------------------------------------------------------------------------
+
+# WARNING: Low free storage (<20% of allocated)
+resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
+  alarm_name          = "${local.name_prefix}-rds-low-storage"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "FreeStorageSpace"
+  namespace           = "AWS/RDS"
+  period              = 300
+  statistic           = "Average"
+  # 20% of allocated storage (var.db_allocated_storage in GB, convert to bytes)
+  threshold           = var.db_allocated_storage * 1024 * 1024 * 1024 * 0.2
+  alarm_description   = "WARNING: RDS free storage below 20%. Storage autoscaling should handle this, but monitor closely."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-low-storage"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
+
+# CRITICAL: Very low free storage (<10% of allocated)
+resource "aws_cloudwatch_metric_alarm" "rds_critical_storage" {
+  alarm_name          = "${local.name_prefix}-rds-critical-storage"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "FreeStorageSpace"
+  namespace           = "AWS/RDS"
+  period              = 300
+  statistic           = "Average"
+  threshold           = var.db_allocated_storage * 1024 * 1024 * 1024 * 0.1
+  alarm_description   = "CRITICAL: RDS free storage below 10%. Immediate action required."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+  ok_actions    = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-critical-storage"
+    Severity = "critical"
+    Service  = "rds"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# RDS Alarms - Connections
+# -----------------------------------------------------------------------------
+
+# WARNING: High connection count (>80% of max)
+# db.t3.medium has ~150 max connections
+resource "aws_cloudwatch_metric_alarm" "rds_high_connections" {
+  alarm_name          = "${local.name_prefix}-rds-high-connections"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "DatabaseConnections"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 120 # ~80% of 150
+  alarm_description   = "WARNING: RDS connection count above 80% of max. Check for connection leaks or scale up."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-high-connections"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# RDS Alarms - Memory
+# -----------------------------------------------------------------------------
+
+# WARNING: Low freeable memory (<256MB)
+resource "aws_cloudwatch_metric_alarm" "rds_low_memory" {
+  alarm_name          = "${local.name_prefix}-rds-low-memory"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "FreeableMemory"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 256 * 1024 * 1024 # 256 MB in bytes
+  alarm_description   = "WARNING: RDS freeable memory below 256MB. Consider scaling up instance class."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-low-memory"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# RDS Alarms - Read/Write Latency (Multi-Region Prep)
+# -----------------------------------------------------------------------------
+
+# WARNING: High read latency (>20ms average)
+resource "aws_cloudwatch_metric_alarm" "rds_high_read_latency" {
+  alarm_name          = "${local.name_prefix}-rds-high-read-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  metric_name         = "ReadLatency"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 0.02 # 20ms in seconds
+  alarm_description   = "WARNING: RDS read latency above 20ms. Consider read replica for read-heavy workloads."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-high-read-latency"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
+
+# WARNING: High write latency (>50ms average)
+resource "aws_cloudwatch_metric_alarm" "rds_high_write_latency" {
+  alarm_name          = "${local.name_prefix}-rds-high-write-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  metric_name         = "WriteLatency"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 0.05 # 50ms in seconds
+  alarm_description   = "WARNING: RDS write latency above 50ms. Check for lock contention or I/O bottlenecks."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-high-write-latency"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# RDS Alarms - IOPS (Multi-Region Prep)
+# -----------------------------------------------------------------------------
+
+# WARNING: High read IOPS (>80% of provisioned for gp3)
+# gp3 baseline: 3000 IOPS
+resource "aws_cloudwatch_metric_alarm" "rds_high_read_iops" {
+  alarm_name          = "${local.name_prefix}-rds-high-read-iops"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  metric_name         = "ReadIOPS"
+  namespace           = "AWS/RDS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 2400 # 80% of 3000
+  alarm_description   = "WARNING: RDS read IOPS approaching gp3 baseline limit. Read replica would help."
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.main.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.rds_alerts.arn]
+
+  tags = {
+    Name     = "${local.name_prefix}-rds-high-read-iops"
+    Severity = "warning"
+    Service  = "rds"
+  }
+}
