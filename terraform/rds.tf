@@ -117,9 +117,10 @@ resource "aws_db_instance" "main" {
   performance_insights_enabled          = true
   performance_insights_retention_period = var.environment == "production" ? 7 : 7
 
-  # Monitoring
-  monitoring_interval = 60
-  monitoring_role_arn = aws_iam_role.rds_monitoring.arn
+  # Monitoring - Enhanced Monitoring disabled for cost optimization (~$6/month savings)
+  # Performance Insights (above) still provides detailed query metrics
+  monitoring_interval = 0
+  # monitoring_role_arn only needed when monitoring_interval > 0
 
   tags = {
     Name = local.name_prefix

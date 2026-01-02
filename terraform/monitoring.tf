@@ -396,9 +396,9 @@ resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
   period              = 300
   statistic           = "Average"
   # 20% of allocated storage (var.db_allocated_storage in GB, convert to bytes)
-  threshold           = var.db_allocated_storage * 1024 * 1024 * 1024 * 0.2
-  alarm_description   = "WARNING: RDS free storage below 20%. Storage autoscaling should handle this, but monitor closely."
-  treat_missing_data  = "notBreaching"
+  threshold          = var.db_allocated_storage * 1024 * 1024 * 1024 * 0.2
+  alarm_description  = "WARNING: RDS free storage below 20%. Storage autoscaling should handle this, but monitor closely."
+  treat_missing_data = "notBreaching"
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.main.identifier

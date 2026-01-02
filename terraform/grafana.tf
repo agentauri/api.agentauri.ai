@@ -163,7 +163,7 @@ resource "aws_cloudwatch_log_group" "grafana" {
   count = var.grafana_enabled ? 1 : 0
 
   name              = "/ecs/${local.name_prefix}/grafana"
-  retention_in_days = var.environment == "production" ? 30 : 7
+  retention_in_days = var.environment == "production" ? 7 : 7 # Cost optimization: 7 days sufficient for dashboards
 
   tags = {
     Name = "${local.name_prefix}-grafana-logs"

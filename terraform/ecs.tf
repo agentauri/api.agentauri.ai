@@ -11,7 +11,7 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled" # Cost optimization: saves ~$75/month, CloudWatch alarms provide monitoring
   }
 
   configuration {
@@ -70,7 +70,7 @@ resource "aws_cloudwatch_log_group" "action_workers" {
 
 resource "aws_cloudwatch_log_group" "ponder_indexer" {
   name              = "/ecs/${local.name_prefix}/ponder-indexer"
-  retention_in_days = var.environment == "production" ? 30 : 7
+  retention_in_days = var.environment == "production" ? 14 : 7 # Cost optimization: 14 days sufficient for indexer
 }
 
 # -----------------------------------------------------------------------------
@@ -214,7 +214,7 @@ resource "aws_ecs_task_definition" "event_processor" {
       command   = ["event-processor"]
 
       environment = [
-        { name = "RUST_LOG", value = "debug,sqlx=warn,hyper=warn,tokio=warn" },
+        { name = "RUST_LOG", value = "info,sqlx=warn,hyper=warn,tokio=warn" }, # Cost optimization: reduces log volume ~70%
         { name = "LOG_FORMAT", value = "json" },
         { name = "SECRETS_BACKEND", value = "aws" },
         { name = "SECRETS_PREFIX", value = "agentauri/${var.environment}" },
