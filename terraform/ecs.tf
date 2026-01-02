@@ -573,6 +573,8 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
   }
 }
 
+# Ponder Indexer uses Fargate Spot for ~70% cost savings
+# Indexer is fault-tolerant: missed events are re-indexed on restart
 resource "aws_ecs_service" "ponder_indexer" {
   count = var.ponder_indexer_enabled ? 1 : 0
 
@@ -580,10 +582,16 @@ resource "aws_ecs_service" "ponder_indexer" {
   cluster                            = aws_ecs_cluster.main.id
   task_definition                    = aws_ecs_task_definition.ponder_indexer[0].arn
   desired_count                      = 1
-  launch_type                        = "FARGATE"
   platform_version                   = "LATEST"
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
+
+  # Cost optimization: Fargate Spot saves ~70%
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 100
+    base              = 0
+  }
 
   network_configuration {
     subnets          = aws_subnet.private[*].id

@@ -375,6 +375,8 @@ resource "aws_iam_role_policy" "grafana_cloudwatch" {
 # ECS Service
 # -----------------------------------------------------------------------------
 
+# Grafana uses Fargate Spot for ~70% cost savings
+# Dashboard is non-critical and can tolerate brief interruptions
 resource "aws_ecs_service" "grafana" {
   count = var.grafana_enabled ? 1 : 0
 
@@ -382,11 +384,17 @@ resource "aws_ecs_service" "grafana" {
   cluster                            = aws_ecs_cluster.main.id
   task_definition                    = aws_ecs_task_definition.grafana[0].arn
   desired_count                      = 1
-  launch_type                        = "FARGATE"
   platform_version                   = "1.4.0" # Required for EFS
   health_check_grace_period_seconds  = 120
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
+
+  # Cost optimization: Fargate Spot saves ~70%
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 100
+    base              = 0
+  }
 
   network_configuration {
     subnets          = aws_subnet.private[*].id

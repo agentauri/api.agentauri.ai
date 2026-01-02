@@ -14,19 +14,19 @@ availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
 domain_name     = "api.agentauri.ai"
 certificate_arn = "arn:aws:acm:us-east-1:781863585732:certificate/8f05d65b-bb32-4497-915f-20e757ddd2f1"
 
-# ECS - API Gateway
-api_gateway_cpu           = 512
-api_gateway_memory        = 1024
-api_gateway_desired_count = 2
+# ECS - API Gateway (cost optimized: auto-scaling handles peaks)
+api_gateway_cpu           = 256
+api_gateway_memory        = 512
+api_gateway_desired_count = 1
 
-# ECS - Event Processor
-event_processor_cpu    = 512
-event_processor_memory = 1024
+# ECS - Event Processor (cost optimized)
+event_processor_cpu    = 256
+event_processor_memory = 512
 
-# ECS - Action Workers
-action_workers_cpu           = 512
-action_workers_memory        = 1024
-action_workers_desired_count = 2
+# ECS - Action Workers (cost optimized: auto-scaling handles peaks)
+action_workers_cpu           = 256
+action_workers_memory        = 512
+action_workers_desired_count = 1
 
 # Container Image
 container_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-backend"
@@ -50,8 +50,8 @@ redis_num_cache_nodes = 2
 # Ponder indexes blockchain events from ERC-8004 registries into PostgreSQL
 
 ponder_indexer_enabled   = true
-ponder_indexer_cpu       = 512
-ponder_indexer_memory    = 1024
+ponder_indexer_cpu       = 256  # Cost optimized
+ponder_indexer_memory    = 512  # Cost optimized
 ponder_indexer_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-ponder"
 ponder_indexer_image_tag = "v1.1.0"
 ponder_database_schema   = "ponder"
