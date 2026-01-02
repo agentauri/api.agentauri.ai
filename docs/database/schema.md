@@ -66,7 +66,7 @@ CREATE TRIGGER update_users_updated_at
 
 ### triggers
 
-Stores user-defined trigger configurations. Triggers belong to organizations (multi-tenant model).
+Stores user-defined trigger configurations. Triggers belong to organizations (multi-tenant model). Includes circuit breaker support for reliability.
 
 ```sql
 CREATE TABLE triggers (
@@ -79,6 +79,21 @@ CREATE TABLE triggers (
     registry TEXT NOT NULL CHECK (registry IN ('identity', 'reputation', 'validation')),
     enabled BOOLEAN DEFAULT true,
     is_stateful BOOLEAN DEFAULT false,
+
+    -- Circuit breaker configuration (added 2025-11-30)
+    circuit_breaker_config JSONB DEFAULT '{
+        "failure_threshold": 10,
+        "recovery_timeout_seconds": 3600,
+        "half_open_max_calls": 1
+    }'::jsonb,
+
+    -- Circuit breaker state
+    circuit_breaker_state JSONB DEFAULT '{
+        "state": "Closed",
+        "failure_count": 0,
+        "half_open_calls": 0
+    }'::jsonb,
+
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -92,11 +107,21 @@ CREATE INDEX idx_triggers_org_chain_registry_enabled
     ON triggers(organization_id, chain_id, registry, enabled)
     WHERE enabled = true;
 
+-- Index for monitoring open circuit breakers
+CREATE INDEX idx_triggers_circuit_breaker_state
+    ON triggers ((circuit_breaker_state->>'state'))
+    WHERE (circuit_breaker_state->>'state') IN ('Open', 'HalfOpen');
+
 CREATE TRIGGER update_triggers_updated_at
     BEFORE UPDATE ON triggers
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 ```
+
+**Circuit Breaker States:**
+- `Closed` (normal): Trigger operates normally
+- `Open` (disabled): Trigger auto-disabled after N consecutive failures
+- `HalfOpen` (testing): Testing recovery after timeout
 
 ### trigger_conditions
 
@@ -467,6 +492,39 @@ CREATE INDEX idx_a2a_tasks_tool ON a2a_tasks(tool);
 -- Task lifecycle: submitted → working → completed/failed/cancelled
 ```
 
+### a2a_task_audit_log
+
+Audit trail for A2A task operations (security, debugging, billing).
+
+```sql
+CREATE TABLE a2a_task_audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID NOT NULL REFERENCES a2a_tasks(id) ON DELETE CASCADE,
+    organization_id TEXT NOT NULL,
+
+    -- Event details
+    event_type TEXT NOT NULL,  -- 'created', 'started', 'completed', 'failed', 'cancelled', 'timeout'
+
+    -- Actor information
+    actor_type TEXT NOT NULL,  -- 'user', 'system', 'api_key'
+    actor_id TEXT,             -- user_id, 'processor', or api_key prefix
+
+    -- Event metadata
+    tool TEXT,
+    cost_micro_usdc BIGINT,    -- Cost in micro-USDC (1 USDC = 1,000,000)
+    duration_ms BIGINT,
+    error_message TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_a2a_audit_task_id ON a2a_task_audit_log (task_id, created_at DESC);
+CREATE INDEX idx_a2a_audit_organization ON a2a_task_audit_log (organization_id, created_at DESC);
+CREATE INDEX idx_a2a_audit_event_type ON a2a_task_audit_log (event_type, created_at DESC);
+CREATE INDEX idx_a2a_audit_analytics ON a2a_task_audit_log (organization_id, event_type, created_at)
+    WHERE event_type = 'completed';
+```
+
 ### api_keys
 
 API key authentication for external agents (Layer 1 Authentication).
@@ -627,6 +685,184 @@ CREATE INDEX idx_query_cache_expires ON query_cache(expires_at);
 
 -- Cache key format: t{tier}:{tool}:{agentId}:{params_hash}
 -- Cache durations: Tier 0: 5min, Tier 1: 1h, Tier 2: 6h, Tier 3: 24h
+```
+
+## Social Authentication Tables
+
+### user_identities
+
+Links multiple authentication providers (Google, GitHub, wallet) to a single user account.
+
+```sql
+CREATE TABLE user_identities (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Provider identification
+    provider TEXT NOT NULL,              -- 'email', 'google', 'github', 'wallet'
+    provider_user_id TEXT NOT NULL,      -- Unique ID from the provider
+
+    -- Profile data from provider
+    email TEXT,
+    display_name TEXT,
+    avatar_url TEXT,
+
+    -- Wallet-specific fields (only for provider='wallet')
+    wallet_address TEXT,                 -- Ethereum address (checksummed)
+    chain_id INTEGER,
+
+    -- OAuth tokens (encrypted at rest)
+    access_token_encrypted TEXT,
+    refresh_token_encrypted TEXT,
+    token_expires_at TIMESTAMPTZ,
+
+    -- Metadata
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ,
+
+    CONSTRAINT user_identities_provider_unique UNIQUE (provider, provider_user_id)
+);
+
+CREATE INDEX idx_user_identities_user_id ON user_identities(user_id);
+CREATE INDEX idx_user_identities_provider_lookup ON user_identities(provider, provider_user_id);
+CREATE INDEX idx_user_identities_email ON user_identities(email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX idx_user_identities_wallet_unique
+    ON user_identities(wallet_address, chain_id)
+    WHERE provider = 'wallet' AND wallet_address IS NOT NULL;
+```
+
+### user_refresh_tokens
+
+Stores refresh tokens for JWT authentication (30-day validity).
+
+```sql
+CREATE TABLE user_refresh_tokens (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,     -- SHA-256 hash for fast lookup
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ,
+    user_agent TEXT,
+    ip_address TEXT
+);
+
+CREATE INDEX idx_user_refresh_tokens_user_id ON user_refresh_tokens (user_id);
+CREATE INDEX idx_user_refresh_tokens_expires_at ON user_refresh_tokens (expires_at)
+    WHERE revoked_at IS NULL;
+```
+
+### oauth_temp_codes
+
+Short-lived authorization codes for OAuth Authorization Code Flow (5-minute validity).
+
+```sql
+CREATE TABLE oauth_temp_codes (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    code_hash TEXT NOT NULL UNIQUE,      -- SHA-256 hash
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,                 -- Set when code is exchanged
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_oauth_temp_codes_code_hash ON oauth_temp_codes (code_hash);
+CREATE INDEX idx_oauth_temp_codes_expires ON oauth_temp_codes (expires_at) WHERE used_at IS NULL;
+CREATE INDEX idx_oauth_temp_codes_user_id ON oauth_temp_codes (user_id);
+```
+
+## Agent Following Tables
+
+### agent_follows
+
+Simplified interface for following all activities of an ERC-8004 agent across registries.
+
+```sql
+CREATE TABLE agent_follows (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+
+    -- Target agent
+    agent_id BIGINT NOT NULL,            -- ERC-8004 token ID
+    chain_id INTEGER NOT NULL,
+
+    -- Organization scope
+    organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Auto-managed triggers (system creates 3 triggers per follow)
+    trigger_identity_id TEXT NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
+    trigger_reputation_id TEXT NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
+    trigger_validation_id TEXT NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
+
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT agent_follows_unique UNIQUE (agent_id, chain_id, organization_id)
+);
+
+CREATE INDEX idx_agent_follows_org_enabled ON agent_follows(organization_id) WHERE enabled = true;
+CREATE INDEX idx_agent_follows_agent_chain ON agent_follows(agent_id, chain_id);
+CREATE INDEX idx_agent_follows_user ON agent_follows(user_id);
+```
+
+**How it works:** Following an agent automatically creates 3 triggers (identity, reputation, validation registries). All trigger lifecycle is managed by the system.
+
+## Security & Audit Tables
+
+### api_key_audit_log
+
+Immutable audit trail for API key operations and authentication events.
+
+```sql
+CREATE TABLE api_key_audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    api_key_id TEXT,                     -- NULL for auth failures (key not found)
+    organization_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (event_type IN (
+        'created', 'used', 'rotated', 'revoked', 'auth_failed', 'rate_limited'
+    )),
+    ip_address TEXT,
+    user_agent TEXT,
+    endpoint TEXT,
+    actor_user_id TEXT,
+    details JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_api_key_audit_key ON api_key_audit_log(api_key_id, created_at DESC);
+CREATE INDEX idx_api_key_audit_org ON api_key_audit_log(organization_id, created_at DESC);
+CREATE INDEX idx_api_key_audit_failures ON api_key_audit_log(ip_address, created_at DESC)
+    WHERE event_type = 'auth_failed';
+CREATE INDEX idx_api_key_audit_rate_limited ON api_key_audit_log(ip_address, created_at DESC)
+    WHERE event_type = 'rate_limited';
+```
+
+### auth_failures
+
+Tracks authentication failures for brute-force detection (without organization context).
+
+```sql
+CREATE TABLE auth_failures (
+    id BIGSERIAL PRIMARY KEY,
+    failure_type TEXT NOT NULL CHECK (failure_type IN (
+        'invalid_format',     -- Key format invalid
+        'prefix_not_found',   -- Prefix not in DB
+        'rate_limited',       -- Blocked by rate limiter
+        'invalid_key'         -- Hash verification failed
+    )),
+    key_prefix TEXT,          -- First 16 chars for pattern analysis
+    ip_address TEXT,
+    user_agent TEXT,
+    endpoint TEXT,
+    details JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_auth_failures_ip ON auth_failures(ip_address, created_at DESC);
+CREATE INDEX idx_auth_failures_prefix ON auth_failures(key_prefix, created_at DESC)
+    WHERE key_prefix IS NOT NULL;
+CREATE INDEX idx_auth_failures_time ON auth_failures(created_at DESC);
 ```
 
 ### usage_logs
