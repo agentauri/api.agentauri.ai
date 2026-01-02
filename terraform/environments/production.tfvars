@@ -40,9 +40,9 @@ db_instance_class    = "db.t3.micro"
 db_allocated_storage = 20
 db_multi_az          = false
 
-# ElastiCache Redis
+# ElastiCache Redis (cost optimized: single node, no failover)
 redis_node_type       = "cache.t3.small"
-redis_num_cache_nodes = 2
+redis_num_cache_nodes = 1
 
 # =============================================================================
 # Ponder Indexer

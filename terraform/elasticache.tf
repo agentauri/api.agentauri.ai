@@ -56,6 +56,7 @@ resource "aws_elasticache_replication_group" "main" {
   # Cluster configuration
   num_cache_clusters         = var.redis_num_cache_nodes
   automatic_failover_enabled = var.redis_num_cache_nodes > 1
+  apply_immediately          = true
 
   # Network configuration
   subnet_group_name  = aws_elasticache_subnet_group.main.name
