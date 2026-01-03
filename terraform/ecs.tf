@@ -110,8 +110,6 @@ resource "aws_ecs_task_definition" "api_gateway" {
         { name = "ENVIRONMENT", value = var.environment },
         { name = "SERVER_HOST", value = "0.0.0.0" },
         { name = "SERVER_PORT", value = "8080" },
-        { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
-        { name = "REDIS_PORT", value = "6379" },
         { name = "DB_SSL_MODE", value = "require" }, # TODO: Use verify-full after adding RDS CA cert to image
         { name = "FRONTEND_URL", value = "https://${var.domain_name}" },
         { name = "GOOGLE_REDIRECT_URI", value = "https://api.${var.domain_name}/api/v1/auth/google/callback" },
@@ -148,8 +146,9 @@ resource "aws_ecs_task_definition" "api_gateway" {
           valueFrom = aws_secretsmanager_secret.oauth_state_key.arn
         },
         {
+          # Unified Redis URL - works with both ElastiCache and external Redis (Upstash)
           name      = "REDIS_URL"
-          valueFrom = "${aws_secretsmanager_secret.redis_auth_token.arn}:url::"
+          valueFrom = aws_secretsmanager_secret.redis_url.arn
         },
         {
           name      = "MONITORING_TOKEN"
@@ -220,8 +219,6 @@ resource "aws_ecs_task_definition" "event_processor" {
         { name = "SECRETS_PREFIX", value = "agentauri/${var.environment}" },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "ENVIRONMENT", value = var.environment },
-        { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
-        { name = "REDIS_PORT", value = "6379" },
         { name = "DB_SSL_MODE", value = "require" } # TODO: Use verify-full after adding RDS CA cert to image
       ]
 
@@ -251,8 +248,9 @@ resource "aws_ecs_task_definition" "event_processor" {
           valueFrom = aws_secretsmanager_secret.jwt_secret.arn
         },
         {
+          # Unified Redis URL - works with both ElastiCache and external Redis (Upstash)
           name      = "REDIS_URL"
-          valueFrom = "${aws_secretsmanager_secret.redis_auth_token.arn}:url::"
+          valueFrom = aws_secretsmanager_secret.redis_url.arn
         }
       ]
 
@@ -295,8 +293,6 @@ resource "aws_ecs_task_definition" "action_workers" {
         { name = "SECRETS_PREFIX", value = "agentauri/${var.environment}" },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "ENVIRONMENT", value = var.environment },
-        { name = "REDIS_HOST", value = aws_elasticache_replication_group.main.primary_endpoint_address },
-        { name = "REDIS_PORT", value = "6379" },
         { name = "DB_SSL_MODE", value = "require" } # TODO: Use verify-full after adding RDS CA cert to image
       ]
 
@@ -326,8 +322,9 @@ resource "aws_ecs_task_definition" "action_workers" {
           valueFrom = aws_secretsmanager_secret.jwt_secret.arn
         },
         {
+          # Unified Redis URL - works with both ElastiCache and external Redis (Upstash)
           name      = "REDIS_URL"
-          valueFrom = "${aws_secretsmanager_secret.redis_auth_token.arn}:url::"
+          valueFrom = aws_secretsmanager_secret.redis_url.arn
         },
         {
           name      = "TELEGRAM_BOT_TOKEN"
@@ -355,35 +352,43 @@ resource "aws_ecs_task_definition" "action_workers" {
 # ECS Services
 # -----------------------------------------------------------------------------
 
+# API Gateway: Fargate Spot + Public Subnet (no NAT needed)
+# Uses API Gateway HTTP with VPC Link + Cloud Map for routing (ALB removed for cost savings)
 resource "aws_ecs_service" "api_gateway" {
   name                               = "api-gateway"
   cluster                            = aws_ecs_cluster.main.id
   task_definition                    = aws_ecs_task_definition.api_gateway.arn
   desired_count                      = var.api_gateway_desired_count
-  launch_type                        = "FARGATE"
   platform_version                   = "LATEST"
-  health_check_grace_period_seconds  = 60
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
+  enable_execute_command             = true
 
-  network_configuration {
-    subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+  # Cost optimization: Fargate Spot saves ~70%
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 100
+    base              = 0
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.api.arn
-    container_name   = "api-gateway"
-    container_port   = 8080
+  # Cost optimization: Public subnet eliminates NAT Gateway (~$35/mese)
+  network_configuration {
+    subnets          = aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = true
+  }
+
+  # Service Discovery for API Gateway HTTP routing via Cloud Map (SRV records enabled)
+  service_registries {
+    registry_arn   = aws_service_discovery_service.api_gateway.arn
+    container_name = "api-gateway"
+    container_port = 8080
   }
 
   deployment_circuit_breaker {
     enable   = true
     rollback = true
   }
-
-  depends_on = [aws_lb_listener.https]
 
   tags = {
     Name = "${local.name_prefix}-api-gateway"
@@ -394,20 +399,30 @@ resource "aws_ecs_service" "api_gateway" {
   }
 }
 
+# Event Processor: Fargate Spot + Public Subnet
 resource "aws_ecs_service" "event_processor" {
   name                               = "event-processor"
   cluster                            = aws_ecs_cluster.main.id
   task_definition                    = aws_ecs_task_definition.event_processor.arn
   desired_count                      = 1
-  launch_type                        = "FARGATE"
   platform_version                   = "LATEST"
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
+  # ECS Exec disabled in production for security (only api-gateway allows debug access)
+  enable_execute_command = var.environment != "production"
 
+  # Cost optimization: Fargate Spot saves ~70%
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 100
+    base              = 0
+  }
+
+  # Cost optimization: Public subnet eliminates NAT Gateway
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   tags = {
@@ -415,20 +430,30 @@ resource "aws_ecs_service" "event_processor" {
   }
 }
 
+# Action Workers: Fargate Spot + Public Subnet
 resource "aws_ecs_service" "action_workers" {
   name                               = "action-workers"
   cluster                            = aws_ecs_cluster.main.id
   task_definition                    = aws_ecs_task_definition.action_workers.arn
   desired_count                      = var.action_workers_desired_count
-  launch_type                        = "FARGATE"
   platform_version                   = "LATEST"
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+  # ECS Exec disabled in production for security (only api-gateway allows debug access)
+  enable_execute_command = var.environment != "production"
 
+  # Cost optimization: Fargate Spot saves ~70%
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 100
+    base              = 0
+  }
+
+  # Cost optimization: Public subnet eliminates NAT Gateway
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   tags = {
@@ -489,6 +514,13 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
         { name = "ENVIRONMENT", value = "production" },
         { name = "PONDER_DATABASE_SCHEMA", value = var.ponder_database_schema },
         # TLS validation enabled - RDS CA bundle included in Docker image via NODE_EXTRA_CA_CERTS
+
+        # RPC Rate Limits - reduced for free tier endpoints
+        # Default is 30 req/s but free tiers only support ~5 req/s
+        { name = "RPC_RATE_LIMIT_ANKR", value = "5" },
+        { name = "RPC_RATE_LIMIT_INFURA", value = "5" },
+        { name = "RPC_RATE_LIMIT_ALCHEMY", value = "5" },
+        { name = "RPC_RATE_LIMIT_QUIKNODE", value = "5" },
 
         # ERC-8004 Contract Addresses - Ethereum Sepolia
         { name = "ETHEREUM_SEPOLIA_IDENTITY_ADDRESS", value = "0x8004a6090Cd10A7288092483047B097295Fb8847" },
@@ -585,6 +617,8 @@ resource "aws_ecs_service" "ponder_indexer" {
   platform_version                   = "LATEST"
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
+  # ECS Exec disabled in production for security (only api-gateway allows debug access)
+  enable_execute_command = var.environment != "production"
 
   # Cost optimization: Fargate Spot saves ~70%
   capacity_provider_strategy {
@@ -593,10 +627,11 @@ resource "aws_ecs_service" "ponder_indexer" {
     base              = 0
   }
 
+  # Cost optimization: Public subnet eliminates NAT Gateway
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   tags = {
@@ -642,21 +677,5 @@ resource "aws_appautoscaling_policy" "api_gateway_cpu" {
 }
 
 # Optional: Scale based on ALB request count per target
-resource "aws_appautoscaling_policy" "api_gateway_requests" {
-  name               = "${local.name_prefix}-api-gateway-request-scaling"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.api_gateway.resource_id
-  scalable_dimension = aws_appautoscaling_target.api_gateway.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.api_gateway.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    target_value       = 1000.0 # Requests per target per minute
-    scale_in_cooldown  = 300
-    scale_out_cooldown = 60
-
-    predefined_metric_specification {
-      predefined_metric_type = "ALBRequestCountPerTarget"
-      resource_label         = "${aws_lb.main.arn_suffix}/${aws_lb_target_group.api.arn_suffix}"
-    }
-  }
-}
+# Note: ALBRequestCountPerTarget autoscaling policy removed after ALB migration to API Gateway HTTP
+# CPU-based autoscaling (api_gateway_cpu policy above) is still active

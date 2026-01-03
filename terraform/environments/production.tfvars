@@ -33,16 +33,29 @@ container_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-ba
 container_image_tag = "latest"
 
 # RDS PostgreSQL
-# Note: Using free tier compatible settings. Upgrade later:
-# - db_instance_class = "db.t3.small" (or larger)
-# - db_multi_az = true
-db_instance_class    = "db.t3.micro"
+# Note: Using ARM Graviton2 (t4g) for ~10-15% cost savings vs x86 (t3)
+# - db_instance_class = "db.t3.small" (or larger) for more power
+# - db_multi_az = true for high availability
+db_instance_class    = "db.t4g.micro"
 db_allocated_storage = 20
 db_multi_az          = false
 
-# ElastiCache Redis (maximum cost optimization: smallest instance, single node)
+# =============================================================================
+# Redis Configuration
+# =============================================================================
+# Option 1: ElastiCache (current) - ~$15/month
+# Option 2: Upstash (external) - FREE tier available
+#
+# To migrate to Upstash:
+# 1. Create Upstash Redis at https://console.upstash.com
+# 2. Set redis_enabled = false
+# 3. Set redis_external_url to your Upstash URL (sensitive)
+# 4. Run terraform apply
+
+redis_enabled         = false # Using Upstash external Redis
 redis_node_type       = "cache.t3.micro"
 redis_num_cache_nodes = 1
+redis_external_url    = "rediss://default:***REDACTED***@arriving-egret-12548.upstash.io:6379"
 
 # =============================================================================
 # Ponder Indexer
@@ -50,8 +63,8 @@ redis_num_cache_nodes = 1
 # Ponder indexes blockchain events from ERC-8004 registries into PostgreSQL
 
 ponder_indexer_enabled   = true
-ponder_indexer_cpu       = 256  # Cost optimized
-ponder_indexer_memory    = 512  # Cost optimized
+ponder_indexer_cpu       = 256 # Cost optimized
+ponder_indexer_memory    = 512 # Cost optimized
 ponder_indexer_image     = "781863585732.dkr.ecr.us-east-1.amazonaws.com/agentauri-ponder"
 ponder_indexer_image_tag = "v1.1.0"
 ponder_database_schema   = "ponder"

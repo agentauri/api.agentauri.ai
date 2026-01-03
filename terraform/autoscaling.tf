@@ -263,17 +263,19 @@ resource "aws_cloudwatch_metric_alarm" "action_workers_cpu_high" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudWatch Alarms - ALB Health
+# CloudWatch Alarms - API Gateway HTTP (replaces ALB alarms)
 # -----------------------------------------------------------------------------
+# Note: API Gateway HTTP metrics available under AWS/ApiGateway namespace
+# Metrics: Count, 4XXError, 5XXError, Latency, IntegrationLatency
 
-# ALB - High 5xx Error Rate
-resource "aws_cloudwatch_metric_alarm" "alb_5xx_high" {
-  alarm_name          = "${local.name_prefix}-alb-5xx-high"
-  alarm_description   = "ALB 5xx error rate is high"
+# API Gateway - High 5xx Error Rate
+resource "aws_cloudwatch_metric_alarm" "api_gw_5xx_high" {
+  alarm_name          = "${local.name_prefix}-api-gw-5xx-high"
+  alarm_description   = "API Gateway 5xx error rate is high"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
-  metric_name         = "HTTPCode_Target_5XX_Count"
-  namespace           = "AWS/ApplicationELB"
+  metric_name         = "5XXError"
+  namespace           = "AWS/ApiGateway"
   period              = 60
   statistic           = "Sum"
   threshold           = 10
@@ -282,60 +284,34 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx_high" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    LoadBalancer = aws_lb.main.arn_suffix
-    TargetGroup  = aws_lb_target_group.api.arn_suffix
+    ApiId = aws_apigatewayv2_api.main.id
   }
 
   tags = {
-    Name = "${local.name_prefix}-alb-5xx-high"
+    Name = "${local.name_prefix}-api-gw-5xx-high"
   }
 }
 
-# ALB - High Response Time
-resource "aws_cloudwatch_metric_alarm" "alb_latency_high" {
-  alarm_name          = "${local.name_prefix}-alb-latency-high"
-  alarm_description   = "ALB target response time is high (>2s)"
+# API Gateway - High Latency
+resource "aws_cloudwatch_metric_alarm" "api_gw_latency_high" {
+  alarm_name          = "${local.name_prefix}-api-gw-latency-high"
+  alarm_description   = "API Gateway latency is high (>2s)"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
-  metric_name         = "TargetResponseTime"
-  namespace           = "AWS/ApplicationELB"
+  metric_name         = "Latency"
+  namespace           = "AWS/ApiGateway"
   period              = 60
   statistic           = "Average"
-  threshold           = 2.0
+  threshold           = 2000.0 # milliseconds
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
 
   dimensions = {
-    LoadBalancer = aws_lb.main.arn_suffix
-    TargetGroup  = aws_lb_target_group.api.arn_suffix
+    ApiId = aws_apigatewayv2_api.main.id
   }
 
   tags = {
-    Name = "${local.name_prefix}-alb-latency-high"
-  }
-}
-
-# ALB - Unhealthy Targets
-resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_targets" {
-  alarm_name          = "${local.name_prefix}-alb-unhealthy-targets"
-  alarm_description   = "ALB has unhealthy targets"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "UnHealthyHostCount"
-  namespace           = "AWS/ApplicationELB"
-  period              = 60
-  statistic           = "Average"
-  threshold           = 0
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  ok_actions          = [aws_sns_topic.alerts.arn]
-
-  dimensions = {
-    LoadBalancer = aws_lb.main.arn_suffix
-    TargetGroup  = aws_lb_target_group.api.arn_suffix
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-alb-unhealthy-targets"
+    Name = "${local.name_prefix}-api-gw-latency-high"
   }
 }
 
@@ -438,11 +414,13 @@ resource "aws_cloudwatch_metric_alarm" "rds_memory_low" {
 }
 
 # -----------------------------------------------------------------------------
-# CloudWatch Alarms - Redis Health
+# CloudWatch Alarms - Redis Health (only when using ElastiCache)
 # -----------------------------------------------------------------------------
 
 # Redis - High CPU
 resource "aws_cloudwatch_metric_alarm" "redis_cpu_high" {
+  count = var.redis_enabled ? 1 : 0
+
   alarm_name          = "${local.name_prefix}-redis-cpu-high"
   alarm_description   = "Redis CPU utilization is high"
   comparison_operator = "GreaterThanThreshold"
@@ -456,7 +434,7 @@ resource "aws_cloudwatch_metric_alarm" "redis_cpu_high" {
   ok_actions          = [aws_sns_topic.alerts.arn]
 
   dimensions = {
-    CacheClusterId = aws_elasticache_replication_group.main.id
+    CacheClusterId = aws_elasticache_replication_group.main[0].id
   }
 
   tags = {
@@ -466,6 +444,8 @@ resource "aws_cloudwatch_metric_alarm" "redis_cpu_high" {
 
 # Redis - High Memory
 resource "aws_cloudwatch_metric_alarm" "redis_memory_high" {
+  count = var.redis_enabled ? 1 : 0
+
   alarm_name          = "${local.name_prefix}-redis-memory-high"
   alarm_description   = "Redis memory utilization is high (>80%)"
   comparison_operator = "GreaterThanThreshold"
@@ -479,7 +459,7 @@ resource "aws_cloudwatch_metric_alarm" "redis_memory_high" {
   ok_actions          = [aws_sns_topic.alerts.arn]
 
   dimensions = {
-    CacheClusterId = aws_elasticache_replication_group.main.id
+    CacheClusterId = aws_elasticache_replication_group.main[0].id
   }
 
   tags = {
@@ -492,172 +472,185 @@ resource "aws_cloudwatch_metric_alarm" "redis_memory_high" {
 # CloudWatch Dashboard
 # -----------------------------------------------------------------------------
 
+locals {
+  # Base dashboard widgets (always present)
+  dashboard_base_widgets = [
+    # Row 1: ECS Service Health
+    {
+      type   = "metric"
+      x      = 0
+      y      = 0
+      width  = 8
+      height = 6
+      properties = {
+        title  = "ECS Running Tasks"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["ECS/ContainerInsights", "RunningTaskCount", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", "api-gateway"],
+          ["...", "event-processor"],
+          ["...", "action-workers"]
+        ]
+        period = 60
+      }
+    },
+    {
+      type   = "metric"
+      x      = 8
+      y      = 0
+      width  = 8
+      height = 6
+      properties = {
+        title  = "ECS CPU Utilization"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", "api-gateway"],
+          ["...", "event-processor"],
+          ["...", "action-workers"]
+        ]
+        period = 60
+      }
+    },
+    {
+      type   = "metric"
+      x      = 16
+      y      = 0
+      width  = 8
+      height = 6
+      properties = {
+        title  = "ECS Memory Utilization"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/ECS", "MemoryUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", "api-gateway"],
+          ["...", "event-processor"],
+          ["...", "action-workers"]
+        ]
+        period = 60
+      }
+    },
+    # Row 2: API Gateway Metrics
+    {
+      type   = "metric"
+      x      = 0
+      y      = 6
+      width  = 8
+      height = 6
+      properties = {
+        title  = "API Gateway Request Count"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/ApiGateway", "Count", "ApiId", aws_apigatewayv2_api.main.id]
+        ]
+        period = 60
+        stat   = "Sum"
+      }
+    },
+    {
+      type   = "metric"
+      x      = 8
+      y      = 6
+      width  = 8
+      height = 6
+      properties = {
+        title  = "API Gateway Latency"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/ApiGateway", "Latency", "ApiId", aws_apigatewayv2_api.main.id],
+          [".", "IntegrationLatency", ".", "."]
+        ]
+        period = 60
+        stat   = "Average"
+      }
+    },
+    {
+      type   = "metric"
+      x      = 16
+      y      = 6
+      width  = 8
+      height = 6
+      properties = {
+        title  = "API Gateway Error Rates"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/ApiGateway", "4XXError", "ApiId", aws_apigatewayv2_api.main.id],
+          [".", "5XXError", ".", "."]
+        ]
+        period = 60
+        stat   = "Sum"
+      }
+    },
+    # Row 3: RDS Metrics
+    {
+      type   = "metric"
+      x      = 0
+      y      = 12
+      width  = 8
+      height = 6
+      properties = {
+        title  = "RDS CPU & Connections"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.main.identifier],
+          [".", "DatabaseConnections", ".", ".", { yAxis = "right" }]
+        ]
+        period = 60
+      }
+    },
+    {
+      type   = "metric"
+      x      = 8
+      y      = 12
+      width  = 8
+      height = 6
+      properties = {
+        title  = "RDS Memory & Storage"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/RDS", "FreeableMemory", "DBInstanceIdentifier", aws_db_instance.main.identifier],
+          [".", "FreeStorageSpace", ".", ".", { yAxis = "right" }]
+        ]
+        period = 60
+      }
+    }
+  ]
+
+  # Redis widget (only when using ElastiCache)
+  dashboard_redis_widget = var.redis_enabled ? [
+    {
+      type   = "metric"
+      x      = 16
+      y      = 12
+      width  = 8
+      height = 6
+      properties = {
+        title  = "Redis CPU & Memory"
+        view   = "timeSeries"
+        region = var.aws_region
+        metrics = [
+          ["AWS/ElastiCache", "CPUUtilization", "CacheClusterId", aws_elasticache_replication_group.main[0].id],
+          [".", "DatabaseMemoryUsagePercentage", ".", ".", { yAxis = "right" }]
+        ]
+        period = 60
+      }
+    }
+  ] : []
+
+  # Combined dashboard widgets
+  dashboard_widgets = concat(local.dashboard_base_widgets, local.dashboard_redis_widget)
+}
+
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = "${local.name_prefix}-overview"
 
   dashboard_body = jsonencode({
-    widgets = [
-      # Row 1: ECS Service Health
-      {
-        type   = "metric"
-        x      = 0
-        y      = 0
-        width  = 8
-        height = 6
-        properties = {
-          title  = "ECS Running Tasks"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["ECS/ContainerInsights", "RunningTaskCount", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", "api-gateway"],
-            ["...", "event-processor"],
-            ["...", "action-workers"]
-          ]
-          period = 60
-        }
-      },
-      {
-        type   = "metric"
-        x      = 8
-        y      = 0
-        width  = 8
-        height = 6
-        properties = {
-          title  = "ECS CPU Utilization"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", "api-gateway"],
-            ["...", "event-processor"],
-            ["...", "action-workers"]
-          ]
-          period = 60
-        }
-      },
-      {
-        type   = "metric"
-        x      = 16
-        y      = 0
-        width  = 8
-        height = 6
-        properties = {
-          title  = "ECS Memory Utilization"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/ECS", "MemoryUtilization", "ClusterName", aws_ecs_cluster.main.name, "ServiceName", "api-gateway"],
-            ["...", "event-processor"],
-            ["...", "action-workers"]
-          ]
-          period = 60
-        }
-      },
-      # Row 2: ALB Metrics
-      {
-        type   = "metric"
-        x      = 0
-        y      = 6
-        width  = 8
-        height = 6
-        properties = {
-          title  = "ALB Request Count"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.main.arn_suffix]
-          ]
-          period = 60
-          stat   = "Sum"
-        }
-      },
-      {
-        type   = "metric"
-        x      = 8
-        y      = 6
-        width  = 8
-        height = 6
-        properties = {
-          title  = "ALB Response Time"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", aws_lb.main.arn_suffix, "TargetGroup", aws_lb_target_group.api.arn_suffix]
-          ]
-          period = 60
-          stat   = "Average"
-        }
-      },
-      {
-        type   = "metric"
-        x      = 16
-        y      = 6
-        width  = 8
-        height = 6
-        properties = {
-          title  = "ALB Error Rates"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/ApplicationELB", "HTTPCode_Target_4XX_Count", "LoadBalancer", aws_lb.main.arn_suffix, "TargetGroup", aws_lb_target_group.api.arn_suffix],
-            [".", "HTTPCode_Target_5XX_Count", ".", ".", ".", "."]
-          ]
-          period = 60
-          stat   = "Sum"
-        }
-      },
-      # Row 3: RDS Metrics
-      {
-        type   = "metric"
-        x      = 0
-        y      = 12
-        width  = 8
-        height = 6
-        properties = {
-          title  = "RDS CPU & Connections"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.main.identifier],
-            [".", "DatabaseConnections", ".", ".", { yAxis = "right" }]
-          ]
-          period = 60
-        }
-      },
-      {
-        type   = "metric"
-        x      = 8
-        y      = 12
-        width  = 8
-        height = 6
-        properties = {
-          title  = "RDS Memory & Storage"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/RDS", "FreeableMemory", "DBInstanceIdentifier", aws_db_instance.main.identifier],
-            [".", "FreeStorageSpace", ".", ".", { yAxis = "right" }]
-          ]
-          period = 60
-        }
-      },
-      {
-        type   = "metric"
-        x      = 16
-        y      = 12
-        width  = 8
-        height = 6
-        properties = {
-          title  = "Redis CPU & Memory"
-          view   = "timeSeries"
-          region = var.aws_region
-          metrics = [
-            ["AWS/ElastiCache", "CPUUtilization", "CacheClusterId", aws_elasticache_replication_group.main.id],
-            [".", "DatabaseMemoryUsagePercentage", ".", ".", { yAxis = "right" }]
-          ]
-          period = 60
-        }
-      }
-    ]
+    widgets = local.dashboard_widgets
   })
 }
 

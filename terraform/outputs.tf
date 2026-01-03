@@ -70,23 +70,10 @@ output "ecs_service_ponder_indexer" {
 }
 
 # -----------------------------------------------------------------------------
-# ALB Outputs
+# ALB Outputs (REMOVED - migrated to API Gateway HTTP)
 # -----------------------------------------------------------------------------
-
-output "alb_dns_name" {
-  description = "The DNS name of the Application Load Balancer"
-  value       = aws_lb.main.dns_name
-}
-
-output "alb_zone_id" {
-  description = "The zone ID of the Application Load Balancer (for Route53)"
-  value       = aws_lb.main.zone_id
-}
-
-output "alb_arn" {
-  description = "The ARN of the Application Load Balancer"
-  value       = aws_lb.main.arn
-}
+# ALB was removed for cost optimization (~$15-17/mese savings)
+# See api_gateway.tf for the new API Gateway HTTP configuration
 
 # -----------------------------------------------------------------------------
 # RDS Outputs
@@ -118,17 +105,17 @@ output "rds_password_secret_arn" {
 }
 
 # -----------------------------------------------------------------------------
-# ElastiCache Outputs
+# ElastiCache Outputs (Optional - only when redis_enabled = true)
 # -----------------------------------------------------------------------------
 
 output "redis_primary_endpoint" {
-  description = "The primary endpoint of the Redis cluster"
-  value       = aws_elasticache_replication_group.main.primary_endpoint_address
+  description = "The primary endpoint of the Redis cluster (empty if using external Redis)"
+  value       = var.redis_enabled ? aws_elasticache_replication_group.main[0].primary_endpoint_address : ""
 }
 
 output "redis_reader_endpoint" {
-  description = "The reader endpoint of the Redis cluster"
-  value       = aws_elasticache_replication_group.main.reader_endpoint_address
+  description = "The reader endpoint of the Redis cluster (empty if using external Redis)"
+  value       = var.redis_enabled ? aws_elasticache_replication_group.main[0].reader_endpoint_address : ""
 }
 
 output "redis_port" {
@@ -137,8 +124,14 @@ output "redis_port" {
 }
 
 output "redis_auth_token_secret_arn" {
-  description = "The ARN of the Redis auth token secret in Secrets Manager"
-  value       = aws_secretsmanager_secret.redis_auth_token.arn
+  description = "The ARN of the Redis auth token secret in Secrets Manager (empty if using external Redis)"
+  value       = var.redis_enabled ? aws_secretsmanager_secret.redis_auth_token[0].arn : ""
+}
+
+output "redis_url" {
+  description = "The Redis URL (ElastiCache or external)"
+  value       = local.redis_url
+  sensitive   = true
 }
 
 # -----------------------------------------------------------------------------
@@ -166,18 +159,20 @@ output "ecs_task_role_arn" {
 
 output "secrets_arns" {
   description = "Map of secret names to their ARNs"
-  value = {
-    rds_password     = aws_secretsmanager_secret.rds_password.arn
-    redis_auth_token = aws_secretsmanager_secret.redis_auth_token.arn
-    jwt_secret       = aws_secretsmanager_secret.jwt_secret.arn
-    api_key_salt     = aws_secretsmanager_secret.api_key_salt.arn
-    oauth_state_key  = aws_secretsmanager_secret.oauth_state_key.arn
-    telegram_bot     = aws_secretsmanager_secret.telegram_bot_token.arn
-    stripe_keys      = aws_secretsmanager_secret.stripe_keys.arn
-    google_oauth     = aws_secretsmanager_secret.google_oauth.arn
-    github_oauth     = aws_secretsmanager_secret.github_oauth.arn
-    alchemy_api_key  = aws_secretsmanager_secret.alchemy_api_key.arn
-  }
+  value = merge(
+    {
+      rds_password    = aws_secretsmanager_secret.rds_password.arn
+      jwt_secret      = aws_secretsmanager_secret.jwt_secret.arn
+      api_key_salt    = aws_secretsmanager_secret.api_key_salt.arn
+      oauth_state_key = aws_secretsmanager_secret.oauth_state_key.arn
+      telegram_bot    = aws_secretsmanager_secret.telegram_bot_token.arn
+      stripe_keys     = aws_secretsmanager_secret.stripe_keys.arn
+      google_oauth    = aws_secretsmanager_secret.google_oauth.arn
+      github_oauth    = aws_secretsmanager_secret.github_oauth.arn
+      alchemy_api_key = aws_secretsmanager_secret.alchemy_api_key.arn
+    },
+    var.redis_enabled ? { redis_auth_token = aws_secretsmanager_secret.redis_auth_token[0].arn } : {}
+  )
 }
 
 # -----------------------------------------------------------------------------
@@ -190,8 +185,8 @@ output "api_url" {
 }
 
 output "health_check_url" {
-  description = "The health check URL via ALB DNS"
-  value       = "https://${aws_lb.main.dns_name}/api/v1/health"
+  description = "The health check URL via API Gateway"
+  value       = "https://${var.domain_name}/api/v1/health"
 }
 
 # -----------------------------------------------------------------------------
@@ -201,4 +196,28 @@ output "health_check_url" {
 output "ponder_alerts_sns_topic_arn" {
   description = "The ARN of the Ponder alerts SNS topic"
   value       = var.ponder_indexer_enabled && var.ponder_monitoring_enabled ? aws_sns_topic.ponder_alerts[0].arn : ""
+}
+
+# -----------------------------------------------------------------------------
+# API Gateway HTTP Outputs (new - replaces ALB)
+# -----------------------------------------------------------------------------
+
+output "api_gateway_endpoint" {
+  description = "The endpoint URL of the API Gateway HTTP API"
+  value       = aws_apigatewayv2_api.main.api_endpoint
+}
+
+output "api_gateway_id" {
+  description = "The ID of the API Gateway HTTP API"
+  value       = aws_apigatewayv2_api.main.id
+}
+
+output "api_gateway_custom_domain" {
+  description = "The custom domain configuration for API Gateway"
+  value       = aws_apigatewayv2_domain_name.main.domain_name_configuration[0].target_domain_name
+}
+
+output "api_gateway_health_check_url" {
+  description = "The health check URL via API Gateway"
+  value       = "${aws_apigatewayv2_api.main.api_endpoint}/api/v1/health"
 }

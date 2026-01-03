@@ -402,14 +402,10 @@ resource "aws_ecs_service" "grafana" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.grafana[0].arn
-    container_name   = "grafana"
-    container_port   = 3000
-  }
+  # Note: ALB was removed for cost optimization. Grafana will need API Gateway
+  # integration before re-enabling. See api_gateway.tf for pattern.
 
   depends_on = [
-    aws_lb_listener_rule.grafana,
     aws_efs_mount_target.grafana
   ]
 
@@ -419,56 +415,11 @@ resource "aws_ecs_service" "grafana" {
 }
 
 # -----------------------------------------------------------------------------
-# ALB Target Group and Listener Rule
+# ALB Target Group and Listener Rule (REMOVED)
 # -----------------------------------------------------------------------------
-
-resource "aws_lb_target_group" "grafana" {
-  count = var.grafana_enabled ? 1 : 0
-
-  name        = "${local.name_prefix}-grafana"
-  port        = 3000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    interval            = 30
-    matcher             = "200"
-    path                = "/api/health"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 5
-    unhealthy_threshold = 3
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-grafana"
-  }
-}
-
-resource "aws_lb_listener_rule" "grafana" {
-  count = var.grafana_enabled ? 1 : 0
-
-  listener_arn = aws_lb_listener.https.arn
-  priority     = 10
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.grafana[0].arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/grafana", "/grafana/*"]
-    }
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-grafana-rule"
-  }
-}
+# ALB was removed for cost optimization (~$15-17/mese savings).
+# To re-enable Grafana, add API Gateway integration with a /grafana route.
+# See api_gateway.tf for the pattern used for the main API.
 
 # -----------------------------------------------------------------------------
 # Outputs
