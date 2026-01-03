@@ -55,7 +55,9 @@ db_multi_az          = false
 redis_enabled         = false # Using Upstash external Redis
 redis_node_type       = "cache.t3.micro"
 redis_num_cache_nodes = 1
-redis_external_url    = "rediss://default:***REDACTED***@arriving-egret-12548.upstash.io:6379"
+# IMPORTANT: Redis URL is stored in AWS Secrets Manager (agentauri/production/redis-url)
+# Do NOT put credentials in this file!
+redis_external_url    = "" # Loaded from AWS Secrets Manager
 
 # =============================================================================
 # Ponder Indexer
