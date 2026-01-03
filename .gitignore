@@ -75,3 +75,8 @@ tfplan
 .terraform/
 *.tfstate
 *.tfstate.backup
+# Environment-specific tfvars may contain secrets - use AWS Secrets Manager instead
+terraform/environments/production.tfvars
+terraform/environments/staging.tfvars
+# Keep example files for reference
+!terraform/environments/*.example.tfvars
