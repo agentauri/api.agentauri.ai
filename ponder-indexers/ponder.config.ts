@@ -14,6 +14,12 @@ const ReputationRegistryAbi = _ReputationRegistryAbi as unknown as Abi;
 const ValidationRegistryAbi = _ValidationRegistryAbi as unknown as Abi;
 import { getEnv, getConfiguredChains, type EnvConfig } from "./src/env-validation";
 import {
+  createDatabaseHealthMonitor,
+  stopDatabaseHealthMonitor,
+  createDeadLetterQueue,
+  shutdownDeadLetterQueue,
+} from "./src/database";
+import {
   logRpcConfig,
   logRpcSkipped,
   logConfigValidated,
@@ -544,30 +550,85 @@ for (const networkKey of enabledNetworkKeys) {
 }
 
 // ============================================================================
+// DATABASE RESILIENCE INITIALIZATION
+// ============================================================================
+// Initialize health monitoring and Dead Letter Queue for additional resilience
+
+async function initializeDatabaseResilience(databaseUrl: string): Promise<void> {
+  try {
+    // Start database health monitor (separate connection for health checks)
+    await createDatabaseHealthMonitor(databaseUrl, {
+      checkIntervalMs: 30_000, // Check every 30 seconds
+      latencyWarningThresholdMs: 100,
+      latencyCriticalThresholdMs: 500,
+      maxConnectionRetries: 5,
+      debugLogging: false,
+    });
+
+    // Initialize Dead Letter Queue for failed events
+    // Note: eventProcessor is not provided here - DLQ stores events for manual review
+    // In the future, we can add a retry processor that re-inserts events via Ponder
+    await createDeadLetterQueue(databaseUrl, {
+      retryIntervalMs: 5 * 60 * 1000, // 5 minutes
+      maxRetries: 3,
+      maxQueueSize: 1000,
+      autoRetry: false, // Manual retry only - events need to go through Ponder
+      debugLogging: false,
+    });
+
+    configLogger.info({}, "Database resilience features initialized");
+  } catch (error) {
+    // Don't throw - these are optional features
+    configLogger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      "Failed to initialize database resilience features (non-fatal)"
+    );
+  }
+}
+
+// Initialize database resilience (fire and forget - don't block Ponder startup)
+initializeDatabaseResilience(env.DATABASE_URL).catch((error) => {
+  configLogger.error(
+    { error: error instanceof Error ? error.message : String(error) },
+    "Database resilience initialization failed"
+  );
+});
+
+// ============================================================================
 // GRACEFUL SHUTDOWN
 // ============================================================================
-// Stop the runtime health monitor on process exit
+// Stop all monitors and cleanup on process exit
 
-process.on('SIGINT', () => {
-  configLogger.info({}, 'Received SIGINT, stopping health monitor');
+async function gracefulShutdown(signal: string): Promise<void> {
+  configLogger.info({ signal }, `Received ${signal}, shutting down gracefully`);
+
+  // Stop runtime health monitor
   if (runtimeHealthMonitor) {
     runtimeHealthMonitor.stop();
   }
+
+  // Stop database health monitor
+  await stopDatabaseHealthMonitor();
+
+  // Shutdown DLQ
+  await shutdownDeadLetterQueue();
+
+  configLogger.info({}, "All monitors stopped, exiting");
+}
+
+process.on('SIGINT', () => {
+  gracefulShutdown('SIGINT').catch(console.error);
 });
 
 process.on('SIGTERM', () => {
-  configLogger.info({}, 'Received SIGTERM, stopping health monitor');
-  if (runtimeHealthMonitor) {
-    runtimeHealthMonitor.stop();
-  }
+  gracefulShutdown('SIGTERM').catch(console.error);
 });
 
 // ============================================================================
 // DATABASE SCHEMA CONFIGURATION
 // ============================================================================
 // Ponder uses a dedicated 'ponder' schema to isolate blockchain events from
-// application data. This allows sharing a single Ponder instance across
-// staging and production environments (blockchain events are public and immutable).
+// application data. Blockchain events are public and immutable.
 
 /**
  * Build database connection string with schema configuration

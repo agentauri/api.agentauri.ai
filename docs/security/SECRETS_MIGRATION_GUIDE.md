@@ -459,9 +459,9 @@ curl http://localhost:8080/api/v1/health
 # Should return 200 OK if secrets are loaded correctly
 ```
 
-### Staging Testing
+### Pre-Production Testing
 
-**Step 1: Deploy to Staging Environment**
+**Step 1: Deploy to Production Environment**
 
 ```bash
 # Update production environment variables

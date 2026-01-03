@@ -2,8 +2,7 @@
 -- Migration: Create Ponder Schema for Shared Event Indexing
 -- ============================================================================
 -- This migration creates a dedicated schema for Ponder blockchain indexer.
--- Ponder indexes blockchain events which are public and immutable, so we can
--- share a single Ponder instance across staging and production environments.
+-- Ponder indexes blockchain events which are public and immutable.
 --
 -- Architecture:
 --   - Ponder writes to 'ponder' schema (Event, Checkpoint tables)

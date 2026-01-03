@@ -56,35 +56,11 @@ resource "aws_subnet" "private" {
 }
 
 # -----------------------------------------------------------------------------
-# NAT Gateway (for private subnet internet access)
+# NAT Gateway - DISABLED for cost optimization
 # -----------------------------------------------------------------------------
-
-# Cost optimization: Single NAT Gateway saves ~$33/month
-# Trade-off: AZ failure impacts outbound connectivity, but ECS has circuit breakers
-# and services have retry logic for resilience
-resource "aws_eip" "nat" {
-  count  = 1
-  domain = "vpc"
-
-  tags = {
-    Name = "${local.name_prefix}-nat-eip"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-resource "aws_nat_gateway" "main" {
-  count = 1
-
-  allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id
-
-  tags = {
-    Name = "${local.name_prefix}-nat"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
+# All ECS services now run in public subnets with public IPs.
+# Private subnets are only used for RDS/Redis (no internet access needed).
+# Savings: ~$35/month
 
 # -----------------------------------------------------------------------------
 # Route Tables
@@ -103,15 +79,13 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Single route table for all private subnets (uses single NAT Gateway)
+# Private route table - no internet access (RDS/Redis don't need it)
 resource "aws_route_table" "private" {
   count  = 1
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[0].id
-  }
+  # No routes to internet - private subnets are isolated
+  # RDS and Redis communicate only with ECS tasks via VPC internal routing
 
   tags = {
     Name = "${local.name_prefix}-private-rt"

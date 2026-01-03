@@ -68,6 +68,10 @@ RUN addgroup -g 1001 -S ponder && \
 COPY ponder-indexers/rds-ca-bundle.pem /etc/ssl/certs/rds-ca-bundle.pem
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/rds-ca-bundle.pem
 
+# Also copy to /app/certs for sslrootcert parameter in DATABASE_URL (production)
+RUN mkdir -p /app/certs
+COPY ponder-indexers/rds-ca-bundle.pem /app/certs/aws-rds-ca.pem
+
 WORKDIR /app
 
 # Copy workspace structure for pnpm to work correctly

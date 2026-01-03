@@ -100,15 +100,21 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user for security
 RUN groupadd -r agentauri && useradd -r -g agentauri agentauri
 
+# Add AWS RDS CA certificate bundle for SSL verify-full mode
+# This enables full TLS certificate validation against RDS PostgreSQL
+RUN mkdir -p /app/certs
+COPY rds-ca-bundle.pem /app/certs/aws-rds-ca.pem
+
 # Copy compiled binaries from builder stage
 COPY --from=builder /app/target/release/api-gateway /usr/local/bin/
 COPY --from=builder /app/target/release/event-processor /usr/local/bin/
 COPY --from=builder /app/target/release/action-workers /usr/local/bin/
 
-# Set ownership
+# Set ownership (include certs directory)
 RUN chown -R agentauri:agentauri /usr/local/bin/api-gateway \
     /usr/local/bin/event-processor \
-    /usr/local/bin/action-workers
+    /usr/local/bin/action-workers \
+    /app/certs
 
 # Switch to non-root user
 USER agentauri

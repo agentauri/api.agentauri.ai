@@ -1,12 +1,16 @@
 # =============================================================================
-# Amazon ElastiCache - Redis Cluster
+# Amazon ElastiCache - Redis Cluster (Optional)
 # =============================================================================
+# Set redis_enabled = false to use external Redis (e.g., Upstash)
+# Savings: ~$15-20/month by using Upstash free tier
 
 # -----------------------------------------------------------------------------
 # ElastiCache Subnet Group
 # -----------------------------------------------------------------------------
 
 resource "aws_elasticache_subnet_group" "main" {
+  count = var.redis_enabled ? 1 : 0
+
   name       = local.name_prefix
   subnet_ids = aws_subnet.private[*].id
 
@@ -20,6 +24,8 @@ resource "aws_elasticache_subnet_group" "main" {
 # -----------------------------------------------------------------------------
 
 resource "aws_elasticache_parameter_group" "main" {
+  count = var.redis_enabled ? 1 : 0
+
   family = "redis7"
   name   = local.name_prefix
 
@@ -43,6 +49,8 @@ resource "aws_elasticache_parameter_group" "main" {
 # -----------------------------------------------------------------------------
 
 resource "aws_elasticache_replication_group" "main" {
+  count = var.redis_enabled ? 1 : 0
+
   replication_group_id = local.name_prefix
   description          = "Redis cluster for AgentAuri ${var.environment}"
 
@@ -51,7 +59,7 @@ resource "aws_elasticache_replication_group" "main" {
   engine_version       = "7.1"
   node_type            = var.redis_node_type
   port                 = 6379
-  parameter_group_name = aws_elasticache_parameter_group.main.name
+  parameter_group_name = aws_elasticache_parameter_group.main[0].name
 
   # Cluster configuration
   num_cache_clusters         = var.redis_num_cache_nodes
@@ -59,13 +67,13 @@ resource "aws_elasticache_replication_group" "main" {
   apply_immediately          = true
 
   # Network configuration
-  subnet_group_name  = aws_elasticache_subnet_group.main.name
-  security_group_ids = [aws_security_group.redis.id]
+  subnet_group_name  = aws_elasticache_subnet_group.main[0].name
+  security_group_ids = [aws_security_group.redis[0].id]
 
   # Encryption
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
-  auth_token                 = random_password.redis_auth_token.result
+  auth_token                 = random_password.redis_auth_token[0].result
 
   # Maintenance
   maintenance_window       = "sun:05:00-sun:06:00"
@@ -85,6 +93,8 @@ resource "aws_elasticache_replication_group" "main" {
 # -----------------------------------------------------------------------------
 
 resource "random_password" "redis_auth_token" {
+  count = var.redis_enabled ? 1 : 0
+
   length  = 64
   special = false # Redis auth token only allows alphanumeric
 }
@@ -94,6 +104,8 @@ resource "random_password" "redis_auth_token" {
 # -----------------------------------------------------------------------------
 
 resource "aws_secretsmanager_secret" "redis_auth_token" {
+  count = var.redis_enabled ? 1 : 0
+
   name                    = "agentauri/${var.environment}/redis-auth-token"
   description             = "Redis auth token for AgentAuri ${var.environment}"
   recovery_window_in_days = var.environment == "production" ? 30 : 0
@@ -104,12 +116,24 @@ resource "aws_secretsmanager_secret" "redis_auth_token" {
 }
 
 resource "aws_secretsmanager_secret_version" "redis_auth_token" {
-  secret_id = aws_secretsmanager_secret.redis_auth_token.id
+  count = var.redis_enabled ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.redis_auth_token[0].id
   secret_string = jsonencode({
-    auth_token       = random_password.redis_auth_token.result
-    primary_endpoint = aws_elasticache_replication_group.main.primary_endpoint_address
-    reader_endpoint  = aws_elasticache_replication_group.main.reader_endpoint_address
+    auth_token       = random_password.redis_auth_token[0].result
+    primary_endpoint = aws_elasticache_replication_group.main[0].primary_endpoint_address
+    reader_endpoint  = aws_elasticache_replication_group.main[0].reader_endpoint_address
     port             = 6379
-    url              = "rediss://:${random_password.redis_auth_token.result}@${aws_elasticache_replication_group.main.primary_endpoint_address}:6379"
+    url              = "rediss://:${random_password.redis_auth_token[0].result}@${aws_elasticache_replication_group.main[0].primary_endpoint_address}:6379"
   })
+}
+
+# -----------------------------------------------------------------------------
+# Local value for Redis URL (works for both ElastiCache and external)
+# -----------------------------------------------------------------------------
+
+locals {
+  redis_url = var.redis_enabled ? (
+    "rediss://:${random_password.redis_auth_token[0].result}@${aws_elasticache_replication_group.main[0].primary_endpoint_address}:6379"
+  ) : var.redis_external_url
 }

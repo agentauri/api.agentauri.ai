@@ -25,13 +25,13 @@ This document provides step-by-step rollback procedures for ECS deployments, dat
 ```bash
 # Rollback API Gateway to previous task definition
 aws ecs update-service \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --service api-gateway-v2 \
-  --task-definition agentauri-staging-api-gateway:PREVIOUS_REVISION
+  --task-definition agentauri-production-api-gateway:PREVIOUS_REVISION
 
 # Force new deployment with current (stable) image
 aws ecs update-service \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --service api-gateway-v2 \
   --force-new-deployment
 ```
@@ -40,10 +40,10 @@ aws ecs update-service \
 
 | Service | ECS Service Name | Task Definition Family |
 |---------|------------------|------------------------|
-| API Gateway | api-gateway-v2 | agentauri-staging-api-gateway |
-| Event Processor | event-processor | agentauri-staging-event-processor |
-| Action Workers | action-workers | agentauri-staging-action-workers |
-| Ponder Indexer | ponder-indexer | agentauri-staging-ponder-indexer |
+| API Gateway | api-gateway-v2 | agentauri-production-api-gateway |
+| Event Processor | event-processor | agentauri-production-event-processor |
+| Action Workers | action-workers | agentauri-production-action-workers |
+| Ponder Indexer | ponder-indexer | agentauri-production-ponder-indexer |
 
 ---
 
@@ -54,13 +54,13 @@ aws ecs update-service \
 ```bash
 # List recent task definition revisions
 aws ecs list-task-definitions \
-  --family-prefix agentauri-staging-api-gateway \
+  --family-prefix agentauri-production-api-gateway \
   --sort DESC \
   --max-items 5
 
 # Output example:
-# arn:aws:ecs:us-east-1:xxx:task-definition/agentauri-staging-api-gateway:15  (current)
-# arn:aws:ecs:us-east-1:xxx:task-definition/agentauri-staging-api-gateway:14  (previous)
+# arn:aws:ecs:us-east-1:xxx:task-definition/agentauri-production-api-gateway:15  (current)
+# arn:aws:ecs:us-east-1:xxx:task-definition/agentauri-production-api-gateway:14  (previous)
 ```
 
 ### Step 2: Verify Previous Revision
@@ -68,7 +68,7 @@ aws ecs list-task-definitions \
 ```bash
 # Check what image/config was in previous revision
 aws ecs describe-task-definition \
-  --task-definition agentauri-staging-api-gateway:14 \
+  --task-definition agentauri-production-api-gateway:14 \
   --query 'taskDefinition.containerDefinitions[0].image'
 ```
 
@@ -77,13 +77,13 @@ aws ecs describe-task-definition \
 ```bash
 # Rollback to specific revision
 aws ecs update-service \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --service api-gateway-v2 \
-  --task-definition agentauri-staging-api-gateway:14
+  --task-definition agentauri-production-api-gateway:14
 
 # Wait for deployment to complete
 aws ecs wait services-stable \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --services api-gateway-v2
 ```
 
@@ -92,7 +92,7 @@ aws ecs wait services-stable \
 ```bash
 # Check running task uses correct revision
 aws ecs describe-services \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --services api-gateway-v2 \
   --query 'services[0].deployments'
 
@@ -108,13 +108,13 @@ If you need to rollback all services to a previous known-good state:
 #!/bin/bash
 # rollback-all.sh
 
-CLUSTER="agentauri-staging"
+CLUSTER="agentauri-production"
 PREVIOUS_TAG="abc123"  # Known good commit SHA
 
 services=(
-  "api-gateway-v2:agentauri-staging-api-gateway"
-  "event-processor:agentauri-staging-event-processor"
-  "action-workers:agentauri-staging-action-workers"
+  "api-gateway-v2:agentauri-production-api-gateway"
+  "event-processor:agentauri-production-event-processor"
+  "action-workers:agentauri-production-action-workers"
 )
 
 for svc in "${services[@]}"; do
@@ -155,7 +155,7 @@ Always create a snapshot before applying migrations:
 ```bash
 # Create pre-migration snapshot
 aws rds create-db-snapshot \
-  --db-instance-identifier agentauri-staging \
+  --db-instance-identifier agentauri-production \
   --db-snapshot-identifier pre-migration-$(date +%Y%m%d-%H%M%S)
 ```
 
@@ -177,37 +177,37 @@ ls database/migrations/
 
 ```bash
 # 1. Stop ECS services to prevent new writes
-aws ecs update-service --cluster agentauri-staging --service api-gateway-v2 --desired-count 0
-aws ecs update-service --cluster agentauri-staging --service event-processor --desired-count 0
-aws ecs update-service --cluster agentauri-staging --service action-workers --desired-count 0
+aws ecs update-service --cluster agentauri-production --service api-gateway-v2 --desired-count 0
+aws ecs update-service --cluster agentauri-production --service event-processor --desired-count 0
+aws ecs update-service --cluster agentauri-production --service action-workers --desired-count 0
 
 # 2. Restore from snapshot
 aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier agentauri-staging-rollback \
+  --db-instance-identifier agentauri-production-rollback \
   --db-snapshot-identifier pre-migration-20251228-143000 \
   --db-instance-class db.t3.micro \
   --vpc-security-group-ids sg-xxx \
-  --db-subnet-group-name agentauri-staging
+  --db-subnet-group-name agentauri-production
 
 # 3. Wait for restore
 aws rds wait db-instance-available \
-  --db-instance-identifier agentauri-staging-rollback
+  --db-instance-identifier agentauri-production-rollback
 
 # 4. Get new endpoint
 NEW_ENDPOINT=$(aws rds describe-db-instances \
-  --db-instance-identifier agentauri-staging-rollback \
+  --db-instance-identifier agentauri-production-rollback \
   --query 'DBInstances[0].Endpoint.Address' \
   --output text)
 
 # 5. Update secret with new endpoint
 aws secretsmanager update-secret \
-  --secret-id agentauri/staging/database-url \
+  --secret-id agentauri/production/database-url \
   --secret-string "postgres://user:pass@$NEW_ENDPOINT:5432/agentauri_backend"
 
 # 6. Restart services
-aws ecs update-service --cluster agentauri-staging --service api-gateway-v2 --desired-count 1 --force-new-deployment
-aws ecs update-service --cluster agentauri-staging --service event-processor --desired-count 1 --force-new-deployment
-aws ecs update-service --cluster agentauri-staging --service action-workers --desired-count 1 --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service api-gateway-v2 --desired-count 1 --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service event-processor --desired-count 1 --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service action-workers --desired-count 1 --force-new-deployment
 ```
 
 #### Option 3: Manual SQL Rollback
@@ -237,17 +237,17 @@ DELETE FROM _sqlx_migrations WHERE version = 20251228000001;
 ```bash
 # List secret versions
 aws secretsmanager list-secret-version-ids \
-  --secret-id agentauri/staging/jwt-secret
+  --secret-id agentauri/production/jwt-secret
 
 # Restore previous version
 aws secretsmanager update-secret-version-stage \
-  --secret-id agentauri/staging/jwt-secret \
+  --secret-id agentauri/production/jwt-secret \
   --version-stage AWSCURRENT \
   --move-to-version-id PREVIOUS_VERSION_ID \
   --remove-from-version-id CURRENT_VERSION_ID
 
 # Force service restart to pick up old secret
-aws ecs update-service --cluster agentauri-staging --service api-gateway-v2 --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service api-gateway-v2 --force-new-deployment
 ```
 
 ### Terraform Configuration
@@ -275,23 +275,23 @@ If environment variables were changed in task definition:
 ```bash
 # 1. Find previous task definition revision
 aws ecs list-task-definitions \
-  --family-prefix agentauri-staging-api-gateway \
+  --family-prefix agentauri-production-api-gateway \
   --sort DESC
 
 # 2. Compare environment variables
 aws ecs describe-task-definition \
-  --task-definition agentauri-staging-api-gateway:14 \
+  --task-definition agentauri-production-api-gateway:14 \
   --query 'taskDefinition.containerDefinitions[0].environment'
 
 aws ecs describe-task-definition \
-  --task-definition agentauri-staging-api-gateway:15 \
+  --task-definition agentauri-production-api-gateway:15 \
   --query 'taskDefinition.containerDefinitions[0].environment'
 
 # 3. Rollback to previous revision
 aws ecs update-service \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --service api-gateway-v2 \
-  --task-definition agentauri-staging-api-gateway:14
+  --task-definition agentauri-production-api-gateway:14
 ```
 
 ---
@@ -329,12 +329,12 @@ curl -s https://api.agentauri.ai/health | jq
 
 # Check service status
 aws ecs describe-services \
-  --cluster agentauri-staging \
+  --cluster agentauri-production \
   --services api-gateway-v2 \
   --query 'services[0].{status:status,running:runningCount,desired:desiredCount,deployments:deployments[*].status}'
 
 # Check recent logs for errors
-aws logs tail /ecs/agentauri-staging/api-gateway --since 10m --filter-pattern "ERROR"
+aws logs tail /ecs/agentauri-production/api-gateway --since 10m --filter-pattern "ERROR"
 
 # Check CloudWatch alarm status
 aws cloudwatch describe-alarms \
@@ -348,7 +348,7 @@ aws cloudwatch describe-alarms \
 
 ### Scenario: Bad Deploy - 5xx Errors
 
-1. Check logs: `aws logs tail /ecs/agentauri-staging/api-gateway --since 5m`
+1. Check logs: `aws logs tail /ecs/agentauri-production/api-gateway --since 5m`
 2. Identify last working revision
 3. Rollback ECS service to previous revision
 4. Verify health

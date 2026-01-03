@@ -79,7 +79,7 @@ Create on-demand snapshot before major changes:
 
 ```bash
 aws rds create-db-snapshot \
-  --db-instance-identifier agentauri-staging \
+  --db-instance-identifier agentauri-production \
   --db-snapshot-identifier agentauri-pre-migration-$(date +%Y%m%d)
 ```
 
@@ -87,7 +87,7 @@ aws rds create-db-snapshot \
 
 All deployed images use immutable tags:
 - Format: `{sha}` or `{version}`
-- Location: `{account}.dkr.ecr.us-east-1.amazonaws.com/agentauri-staging-{service}`
+- Location: `{account}.dkr.ecr.us-east-1.amazonaws.com/agentauri-production-{service}`
 
 ---
 
@@ -161,36 +161,36 @@ All deployed images use immutable tags:
 ```bash
 # 1. List available snapshots
 aws rds describe-db-snapshots \
-  --db-instance-identifier agentauri-staging \
+  --db-instance-identifier agentauri-production \
   --query 'DBSnapshots[*].[DBSnapshotIdentifier,SnapshotCreateTime]' \
   --output table
 
 # 2. Restore to new instance
 aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier agentauri-staging-restored \
+  --db-instance-identifier agentauri-production-restored \
   --db-snapshot-identifier <snapshot-id> \
   --db-instance-class db.t3.micro \
   --vpc-security-group-ids sg-xxx \
-  --db-subnet-group-name agentauri-staging
+  --db-subnet-group-name agentauri-production
 
 # 3. Wait for instance to be available
 aws rds wait db-instance-available \
-  --db-instance-identifier agentauri-staging-restored
+  --db-instance-identifier agentauri-production-restored
 
 # 4. Get new endpoint
 aws rds describe-db-instances \
-  --db-instance-identifier agentauri-staging-restored \
+  --db-instance-identifier agentauri-production-restored \
   --query 'DBInstances[0].Endpoint.Address'
 
 # 5. Update secrets with new endpoint
 aws secretsmanager update-secret \
-  --secret-id agentauri/staging/database-url \
+  --secret-id agentauri/production/database-url \
   --secret-string "postgres://user:pass@NEW_ENDPOINT:5432/agentauri_backend"
 
 # 6. Restart ECS services
-aws ecs update-service --cluster agentauri-staging --service api-gateway --force-new-deployment
-aws ecs update-service --cluster agentauri-staging --service event-processor --force-new-deployment
-aws ecs update-service --cluster agentauri-staging --service action-workers --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service api-gateway --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service event-processor --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service action-workers --force-new-deployment
 ```
 
 ### Procedure 2: Point-in-Time Recovery
@@ -198,12 +198,12 @@ aws ecs update-service --cluster agentauri-staging --service action-workers --fo
 ```bash
 # Restore to specific point in time (within backup retention window)
 aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier agentauri-staging \
-  --target-db-instance-identifier agentauri-staging-pit \
+  --source-db-instance-identifier agentauri-production \
+  --target-db-instance-identifier agentauri-production-pit \
   --restore-time 2025-12-28T10:00:00Z \
   --db-instance-class db.t3.micro \
   --vpc-security-group-ids sg-xxx \
-  --db-subnet-group-name agentauri-staging
+  --db-subnet-group-name agentauri-production
 ```
 
 ### Procedure 3: Secret Rotation
@@ -214,11 +214,11 @@ NEW_SECRET=$(openssl rand -base64 32)
 
 # 2. Update in Secrets Manager
 aws secretsmanager update-secret \
-  --secret-id agentauri/staging/jwt-secret \
+  --secret-id agentauri/production/jwt-secret \
   --secret-string "$NEW_SECRET"
 
 # 3. Force ECS service restart to pick up new secret
-aws ecs update-service --cluster agentauri-staging --service api-gateway --force-new-deployment
+aws ecs update-service --cluster agentauri-production --service api-gateway --force-new-deployment
 ```
 
 ### Procedure 4: Full Infrastructure Recovery
@@ -233,7 +233,7 @@ cd terraform
 terraform init
 
 # 3. Select workspace
-terraform workspace select staging
+terraform workspace select production
 
 # 4. Plan and apply
 terraform plan -out=recovery.tfplan

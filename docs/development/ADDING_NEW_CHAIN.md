@@ -624,17 +624,17 @@ SELECT * FROM checkpoints WHERE chain_id = 11155420;
 
 ## Deployment Guide
 
-### Staging Deployment
+### Production Deployment
 
-#### 1. Update Staging Environment Variables
+#### 1. Update Production Environment Variables
 
-**Platform**: Render, Railway, Heroku, AWS, etc.
+**Platform**: AWS ECS
 
 **Add the following environment variables**:
 
 ```bash
-OPTIMISM_SEPOLIA_RPC_ALCHEMY=https://opt-sepolia.g.alchemy.com/v2/STAGING_KEY
-OPTIMISM_SEPOLIA_RPC_INFURA=https://optimism-sepolia.infura.io/v3/STAGING_KEY
+OPTIMISM_SEPOLIA_RPC_ALCHEMY=https://opt-sepolia.g.alchemy.com/v2/YOUR_KEY
+OPTIMISM_SEPOLIA_RPC_INFURA=https://optimism-sepolia.infura.io/v3/YOUR_KEY
 
 OPTIMISM_SEPOLIA_IDENTITY_ADDRESS=0x...
 OPTIMISM_SEPOLIA_REPUTATION_ADDRESS=0x...
@@ -643,9 +643,8 @@ OPTIMISM_SEPOLIA_START_BLOCK=5432100
 ```
 
 **Important**:
-- Use separate API keys for production vs production
-- Deploy to production first to validate configuration
-- Monitor logs for 24 hours before production deployment
+- Test locally first before deploying to production
+- Monitor logs for 24 hours after deployment
 
 #### 2. Deploy Code Changes
 
@@ -667,7 +666,7 @@ render services restart ponder-indexers
 docker-compose restart ponder-indexers
 ```
 
-#### 4. Monitor Staging Logs
+#### 4. Monitor Logs
 
 ```bash
 # Check health check output
@@ -689,8 +688,8 @@ curl https://production.api.agentauri.ai/api/v1/health | jq .
 
 #### Pre-Deployment Checklist
 
-- [ ] Staging deployed and stable for 24+ hours
-- [ ] All tests passing on production
+- [ ] Local testing completed and all tests passing
+- [ ] All tests passing in CI
 - [ ] RPC provider rate limits confirmed sufficient
 - [ ] Monitoring dashboards updated (Grafana, Datadog, etc.)
 - [ ] Rollback plan documented
@@ -766,7 +765,7 @@ WHERE chain_id = 11155420 AND created_at > NOW() - INTERVAL '5 minutes';
 # Remove RPC URLs from environment variables
 # Ponder will automatically skip this chain
 
-# Staging/Production dashboard:
+# AWS ECS dashboard:
 # 1. Navigate to environment variables
 # 2. Delete or comment out OPTIMISM_SEPOLIA_RPC_* variables
 # 3. Restart ponder-indexers service
@@ -1576,20 +1575,15 @@ Use this checklist when adding a new chain:
 - [ ] `.env.example` updated with example values
 - [ ] Documentation updated (this guide, CONTRACTS.md)
 
-**Staging Deployment**:
-- [ ] Environment variables configured in production
-- [ ] Services restarted
+**Production Deployment**:
+- [ ] Production environment variables configured in AWS Secrets Manager
+- [ ] Multiple RPC providers configured (minimum 2)
+- [ ] Services restarted via ECS
 - [ ] Health check endpoint returns success
 - [ ] First event indexed successfully
-- [ ] Monitor for 24 hours
-
-**Production Deployment**:
-- [ ] Staging stable for 24+ hours
-- [ ] Production environment variables configured
-- [ ] Multiple RPC providers configured (minimum 2)
-- [ ] Blue-green deployment prepared
 - [ ] Monitoring dashboards updated
 - [ ] Team notified of deployment
+- [ ] Monitor for 24 hours after deployment
 
 **Post-Deployment**:
 - [ ] Health check successful

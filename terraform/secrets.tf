@@ -202,6 +202,28 @@ resource "aws_secretsmanager_secret" "base_sepolia_rpc_ankr" {
 }
 
 # -----------------------------------------------------------------------------
+# Redis URL (unified - supports both ElastiCache and external Redis)
+# -----------------------------------------------------------------------------
+# When redis_enabled = true: Uses ElastiCache URL
+# When redis_enabled = false: Uses external URL (e.g., Upstash)
+# This provides a single secret reference for all ECS task definitions.
+
+resource "aws_secretsmanager_secret" "redis_url" {
+  name                    = "agentauri/${var.environment}/redis-url"
+  description             = "Redis connection URL (ElastiCache or external like Upstash)"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-redis-url"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "redis_url" {
+  secret_id     = aws_secretsmanager_secret.redis_url.id
+  secret_string = local.redis_url
+}
+
+# -----------------------------------------------------------------------------
 # Monitoring Token (for bypassing rate limits on monitoring endpoints)
 # -----------------------------------------------------------------------------
 # This token allows Grafana, Prometheus, and health checkers to access

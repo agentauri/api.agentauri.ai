@@ -38,17 +38,11 @@ impl DbPools {
         let write_pool = create_pool(config).await?;
         let write = Arc::new(write_pool);
 
-        // Create read pool if replica is configured
+        // Create read pool if replica is configured (with retry)
         let (read, has_read_replica) = if let Some(replica_url) = config.read_replica_url() {
             let replica_config = config.read_replica.as_ref().unwrap();
-            let read_pool = PgPoolOptions::new()
-                .max_connections(replica_config.max_connections)
-                .min_connections(replica_config.min_connections)
-                .acquire_timeout(Duration::from_secs(config.acquire_timeout_secs))
-                .idle_timeout(Duration::from_secs(config.idle_timeout_secs))
-                .max_lifetime(Duration::from_secs(config.max_lifetime_secs))
-                .connect(&replica_url)
-                .await?;
+            let read_pool =
+                create_read_replica_pool_with_retry(&replica_url, replica_config, config).await?;
 
             tracing::info!(
                 "Read replica pool created: max={}, min={}",
@@ -135,11 +129,76 @@ impl std::fmt::Display for DbPoolStats {
     }
 }
 
-/// Create a new database connection pool
+use crate::config::DatabaseReadReplicaConfig;
+
+/// Default retry configuration
+const DEFAULT_MAX_RETRIES: u32 = 5;
+const DEFAULT_BASE_DELAY_MS: u64 = 1000;
+
+/// Create read replica pool with retry logic
+async fn create_read_replica_pool_with_retry(
+    replica_url: &str,
+    replica_config: &DatabaseReadReplicaConfig,
+    config: &DatabaseConfig,
+) -> Result<PgPool> {
+    let base_delay = Duration::from_millis(DEFAULT_BASE_DELAY_MS);
+    let mut last_error = None;
+
+    for attempt in 1..=DEFAULT_MAX_RETRIES {
+        match PgPoolOptions::new()
+            .max_connections(replica_config.max_connections)
+            .min_connections(replica_config.min_connections)
+            .acquire_timeout(Duration::from_secs(config.acquire_timeout_secs))
+            .idle_timeout(Duration::from_secs(config.idle_timeout_secs))
+            .max_lifetime(Duration::from_secs(config.max_lifetime_secs))
+            .connect(replica_url)
+            .await
+        {
+            Ok(pool) => {
+                if attempt > 1 {
+                    tracing::info!(
+                        attempt = attempt,
+                        "Read replica connection succeeded after {} attempts",
+                        attempt
+                    );
+                }
+                return Ok(pool);
+            }
+            Err(e) => {
+                let delay = base_delay * 2_u32.pow(attempt - 1);
+                tracing::warn!(
+                    attempt = attempt,
+                    max_retries = DEFAULT_MAX_RETRIES,
+                    next_retry_ms = delay.as_millis() as u64,
+                    error = %e,
+                    "Read replica connection failed, retrying..."
+                );
+                last_error = Some(e);
+
+                if attempt < DEFAULT_MAX_RETRIES {
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+    }
+
+    tracing::error!(
+        max_retries = DEFAULT_MAX_RETRIES,
+        "Read replica connection failed after all retries"
+    );
+
+    Err(last_error.unwrap().into())
+}
+
+/// Create a new database connection pool with retry logic
+///
+/// Attempts to connect with exponential backoff: 1s, 2s, 4s, 8s, 16s
 ///
 /// # Arguments
 ///
 /// * `config` - Database configuration
+/// * `max_retries` - Maximum number of connection attempts (default: 5)
+/// * `base_delay_ms` - Base delay between retries in ms (default: 1000)
 ///
 /// # Returns
 ///
@@ -147,8 +206,56 @@ impl std::fmt::Display for DbPoolStats {
 ///
 /// # Errors
 ///
-/// Returns an error if the pool cannot be created or if the connection fails
-pub async fn create_pool(config: &DatabaseConfig) -> Result<DbPool> {
+/// Returns an error if all retry attempts fail
+pub async fn create_pool_with_retry(
+    config: &DatabaseConfig,
+    max_retries: Option<u32>,
+    base_delay_ms: Option<u64>,
+) -> Result<DbPool> {
+    let max_retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES);
+    let base_delay = Duration::from_millis(base_delay_ms.unwrap_or(DEFAULT_BASE_DELAY_MS));
+    let mut last_error = None;
+
+    for attempt in 1..=max_retries {
+        match create_pool_internal(config).await {
+            Ok(pool) => {
+                if attempt > 1 {
+                    tracing::info!(
+                        attempt = attempt,
+                        "Database connection succeeded after {} attempts",
+                        attempt
+                    );
+                }
+                return Ok(pool);
+            }
+            Err(e) => {
+                let delay = base_delay * 2_u32.pow(attempt - 1);
+                tracing::warn!(
+                    attempt = attempt,
+                    max_retries = max_retries,
+                    next_retry_ms = delay.as_millis() as u64,
+                    error = %e,
+                    "Database connection failed, retrying..."
+                );
+                last_error = Some(e);
+
+                if attempt < max_retries {
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+    }
+
+    tracing::error!(
+        max_retries = max_retries,
+        "Database connection failed after all retries"
+    );
+
+    Err(last_error.unwrap())
+}
+
+/// Create a new database connection pool (internal, no retry)
+async fn create_pool_internal(config: &DatabaseConfig) -> Result<DbPool> {
     let pool = PgPoolOptions::new()
         .max_connections(config.max_connections)
         .min_connections(config.min_connections)
@@ -168,6 +275,26 @@ pub async fn create_pool(config: &DatabaseConfig) -> Result<DbPool> {
     );
 
     Ok(pool)
+}
+
+/// Create a new database connection pool
+///
+/// This is a convenience wrapper that uses default retry settings.
+/// For explicit retry control, use `create_pool_with_retry`.
+///
+/// # Arguments
+///
+/// * `config` - Database configuration
+///
+/// # Returns
+///
+/// A configured PostgreSQL connection pool
+///
+/// # Errors
+///
+/// Returns an error if the pool cannot be created or if all retries fail
+pub async fn create_pool(config: &DatabaseConfig) -> Result<DbPool> {
+    create_pool_with_retry(config, None, None).await
 }
 
 /// Run database migrations

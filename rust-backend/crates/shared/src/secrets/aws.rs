@@ -137,7 +137,7 @@ pub struct SecretsManager {
     cache: Arc<RwLock<HashMap<String, CachedSecret>>>,
     #[allow(dead_code)]
     cache_ttl: Duration,
-    /// Secret name prefix (e.g., "agentauri/staging" or "agentauri/production")
+    /// Secret name prefix (e.g., "agentauri/production")
     prefix: String,
 }
 
@@ -159,8 +159,8 @@ impl SecretsManager {
     ///
     /// # Environment Variables
     ///
-    /// * `SECRETS_PREFIX` - Secret name prefix (default: "agentauri/staging")
-    ///   Examples: "agentauri/staging", "agentauri/production"
+    /// * `SECRETS_PREFIX` - Secret name prefix (default: "agentauri/production")
+    ///   Example: "agentauri/production"
     ///
     /// # Errors
     ///
@@ -179,7 +179,7 @@ impl SecretsManager {
 
         // Get prefix from environment or use default
         let prefix =
-            std::env::var("SECRETS_PREFIX").unwrap_or_else(|_| "agentauri/staging".to_string());
+            std::env::var("SECRETS_PREFIX").unwrap_or_else(|_| "agentauri/production".to_string());
 
         Ok(Self {
             client,

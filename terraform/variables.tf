@@ -161,17 +161,30 @@ variable "db_backup_retention_period" {
 }
 
 # -----------------------------------------------------------------------------
-# Redis (ElastiCache)
+# Redis (ElastiCache or External)
 # -----------------------------------------------------------------------------
 
+variable "redis_enabled" {
+  description = "Enable ElastiCache Redis. Set to false to use external Redis (e.g., Upstash)"
+  type        = bool
+  default     = true
+}
+
+variable "redis_external_url" {
+  description = "External Redis URL (e.g., Upstash). Used when redis_enabled = false"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "redis_node_type" {
-  description = "ElastiCache node type"
+  description = "ElastiCache node type (only used when redis_enabled = true)"
   type        = string
   default     = "cache.t3.micro"
 }
 
 variable "redis_num_cache_nodes" {
-  description = "Number of cache nodes"
+  description = "Number of cache nodes (only used when redis_enabled = true)"
   type        = number
   default     = 1
 }

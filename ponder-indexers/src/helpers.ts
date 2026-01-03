@@ -8,6 +8,7 @@ import type { Hash, Hex } from "viem";
 import { Event, Checkpoint } from "../ponder.schema";
 import { logEventProcessed, logEventError, logCheckpointUpdated } from "./logger";
 import type { PonderContext, BlockInfo, TransactionInfo, LogInfo } from "./types";
+import { enqueueFailedEvent, getDeadLetterQueue } from "./database";
 
 // ============================================================================
 // CONSTANTS
@@ -136,6 +137,31 @@ export async function processEvent(
     logCheckpointUpdated(chainId, block.number);
   } catch (error) {
     logEventError(registry, eventType, chainId, error as Error);
-    throw error; // Re-throw to let Ponder handle retries
+
+    // Enqueue to DLQ if available, otherwise re-throw for Ponder retry
+    const dlq = getDeadLetterQueue();
+    if (dlq) {
+      const eventId = generateEventId(registry, chainId, transaction.hash as Hash, log.logIndex);
+      await enqueueFailedEvent(
+        eventId,
+        {
+          registry,
+          eventType,
+          chainId: chainId.toString(),
+          agentId: agentId.toString(),
+          blockNumber: block.number.toString(),
+          transactionHash: transaction.hash,
+          logIndex: log.logIndex,
+          timestamp: block.timestamp.toString(),
+          eventValues,
+        },
+        error as Error
+      );
+      // Don't re-throw - let indexer continue with next event
+      // DLQ will handle retry with exponential backoff
+    } else {
+      // Fallback: re-throw to let Ponder handle retries
+      throw error;
+    }
   }
 }
