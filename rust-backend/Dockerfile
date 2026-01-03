@@ -102,8 +102,9 @@ RUN groupadd -r agentauri && useradd -r -g agentauri agentauri
 
 # Add AWS RDS CA certificate bundle for SSL verify-full mode
 # This enables full TLS certificate validation against RDS PostgreSQL
-RUN mkdir -p /app/certs
-COPY rds-ca-bundle.pem /app/certs/aws-rds-ca.pem
+# Downloaded from AWS trust store: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
+RUN mkdir -p /app/certs && \
+    curl -sSL https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o /app/certs/aws-rds-ca.pem
 
 # Copy compiled binaries from builder stage
 COPY --from=builder /app/target/release/api-gateway /usr/local/bin/
