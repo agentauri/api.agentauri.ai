@@ -137,14 +137,14 @@ resource "aws_secretsmanager_secret" "github_oauth" {
 # RPC URLs for Blockchain Networks (Placeholder - populate manually)
 # -----------------------------------------------------------------------------
 
-# Ethereum Sepolia RPC URL
-resource "aws_secretsmanager_secret" "alchemy_api_key" {
-  name                    = "agentauri/${var.environment}/alchemy-api-key"
-  description             = "Ethereum Sepolia RPC URL - POPULATE MANUALLY"
+# Ethereum Sepolia Public RPC URL (fallback)
+resource "aws_secretsmanager_secret" "eth_sepolia_rpc_public" {
+  name                    = "agentauri/${var.environment}/eth-sepolia-rpc-public"
+  description             = "Ethereum Sepolia public RPC URL (PublicNode) - fallback provider"
   recovery_window_in_days = var.environment == "production" ? 30 : 0
 
   tags = {
-    Name = "${local.name_prefix}-alchemy-api-key"
+    Name = "${local.name_prefix}-eth-sepolia-rpc-public"
   }
 }
 

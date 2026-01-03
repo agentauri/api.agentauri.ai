@@ -559,7 +559,7 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
         },
         {
           name      = "ETHEREUM_SEPOLIA_RPC_URL"
-          valueFrom = aws_secretsmanager_secret.alchemy_api_key.arn
+          valueFrom = aws_secretsmanager_secret.eth_sepolia_rpc_public.arn
         },
 
         # Base Sepolia - Primary (Ankr) and Fallback (public)

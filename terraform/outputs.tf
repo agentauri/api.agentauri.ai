@@ -169,7 +169,7 @@ output "secrets_arns" {
       stripe_keys     = aws_secretsmanager_secret.stripe_keys.arn
       google_oauth    = aws_secretsmanager_secret.google_oauth.arn
       github_oauth    = aws_secretsmanager_secret.github_oauth.arn
-      alchemy_api_key = aws_secretsmanager_secret.alchemy_api_key.arn
+      eth_sepolia_rpc_public = aws_secretsmanager_secret.eth_sepolia_rpc_public.arn
     },
     var.redis_enabled ? { redis_auth_token = aws_secretsmanager_secret.redis_auth_token[0].arn } : {}
   )
