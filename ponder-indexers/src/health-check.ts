@@ -41,7 +41,8 @@ const DEFAULT_CONFIG: HealthCheckConfig = {
 /**
  * Sleep utility for retry delays
  */
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Perform health check on a single RPC provider
@@ -97,7 +98,7 @@ export async function healthCheckProvider(
       const latestBlock = await client.getBlock({ blockTag: "latest" });
 
       // Validate that latest block exists and has expected structure
-      if (!latestBlock || !latestBlock.number) {
+      if (!latestBlock?.number) {
         throw new Error("Latest block returned null or invalid structure");
       }
 
@@ -130,7 +131,7 @@ export async function healthCheckProvider(
   }
 
   // All retries exhausted - health check failed
-  const errorMessage = lastError?.message || "Unknown error";
+  const errorMessage = lastError?.message ?? "Unknown error";
 
   return {
     provider,

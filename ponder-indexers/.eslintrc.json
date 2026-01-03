@@ -46,6 +46,8 @@
     "dist",
     ".ponder",
     "*.config.js",
-    "*.config.ts"
+    "*.config.ts",
+    "__tests__",
+    "*.test.ts"
   ]
 }

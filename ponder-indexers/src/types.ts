@@ -226,9 +226,9 @@ export interface ValidationResponseEvent {
  */
 export interface PonderContext {
   db: {
-    insert: (table: any) => {
-      values: (data: any) => {
-        onConflictDoUpdate?: (update: any) => Promise<void>;
+    insert: (table: unknown) => {
+      values: (data: Record<string, unknown>) => {
+        onConflictDoUpdate?: (update: Record<string, unknown>) => Promise<void>;
       } & Promise<void>;
     };
   };

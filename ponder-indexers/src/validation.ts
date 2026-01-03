@@ -55,7 +55,8 @@ export function validateAndNormalizeAddress(
     );
   }
 
-  return normalized as Address;
+  // isAddress is a type guard, so normalized is now Address
+  return normalized;
 }
 
 // ============================================================================
