@@ -125,6 +125,9 @@ export class ReputationStore {
 
       configLogger.info({}, "ReputationStore: Connected to database");
 
+      // Ensure table exists (auto-migration)
+      await this.ensureTableExists();
+
       // Load existing reputation data
       await this.loadFromDatabase();
 
@@ -136,6 +139,65 @@ export class ReputationStore {
         "ReputationStore: Failed to connect to database, running in memory-only mode"
       );
       this.isConnected = false;
+    }
+  }
+
+  /**
+   * Ensure the reputation table exists (auto-migration)
+   */
+  private async ensureTableExists(): Promise<void> {
+    if (!this.pool || !this.isConnected) return;
+
+    try {
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS ponder_provider_reputation (
+          id SERIAL PRIMARY KEY,
+          chain_id INTEGER NOT NULL,
+          chain_name VARCHAR(50) NOT NULL,
+          provider_name VARCHAR(50) NOT NULL,
+          total_requests BIGINT NOT NULL DEFAULT 0,
+          successful_requests BIGINT NOT NULL DEFAULT 0,
+          failed_requests BIGINT NOT NULL DEFAULT 0,
+          avg_latency_ms DOUBLE PRECISION,
+          min_latency_ms DOUBLE PRECISION,
+          max_latency_ms DOUBLE PRECISION,
+          p50_latency_ms DOUBLE PRECISION,
+          p95_latency_ms DOUBLE PRECISION,
+          p99_latency_ms DOUBLE PRECISION,
+          circuit_state VARCHAR(20) NOT NULL DEFAULT 'closed',
+          consecutive_failures INTEGER NOT NULL DEFAULT 0,
+          last_failure_at TIMESTAMPTZ,
+          last_success_at TIMESTAMPTZ,
+          daily_requests INTEGER NOT NULL DEFAULT 0,
+          monthly_requests INTEGER NOT NULL DEFAULT 0,
+          daily_quota_limit INTEGER,
+          monthly_quota_limit INTEGER,
+          last_daily_reset TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          last_monthly_reset TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          rate_limited_until TIMESTAMPTZ,
+          rate_limit_count INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT uq_ponder_provider_reputation_chain_provider UNIQUE (chain_id, provider_name)
+        )
+      `);
+
+      // Create indexes if they don't exist
+      await this.pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_ponder_provider_reputation_chain_id
+          ON ponder_provider_reputation(chain_id)
+      `);
+      await this.pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_ponder_provider_reputation_circuit_state
+          ON ponder_provider_reputation(circuit_state)
+      `);
+
+      configLogger.info({}, "ReputationStore: Table verified/created successfully");
+    } catch (error) {
+      configLogger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "ReputationStore: Failed to ensure table exists (non-fatal)"
+      );
     }
   }
 
