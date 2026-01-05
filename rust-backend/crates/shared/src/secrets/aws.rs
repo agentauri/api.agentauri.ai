@@ -273,7 +273,7 @@ impl SecretsManager {
         let rds_password_name = format!("{}/rds-password", self.prefix);
         let jwt_secret_name = format!("{}/jwt-secret", self.prefix);
         let stripe_keys_name = format!("{}/stripe-keys", self.prefix);
-        let alchemy_api_key_name = format!("{}/alchemy-api-key", self.prefix);
+        let eth_sepolia_rpc_name = format!("{}/eth-sepolia-rpc-public", self.prefix);
         let api_key_salt_name = format!("{}/api-key-salt", self.prefix);
         let telegram_bot_token_name = format!("{}/telegram-bot-token", self.prefix);
 
@@ -281,14 +281,14 @@ impl SecretsManager {
             rds_password_json,
             jwt_secret,
             stripe_keys_json,
-            alchemy_api_key,
+            eth_sepolia_rpc_url,
             api_key_salt,
             telegram_bot_token,
         ) = tokio::try_join!(
             self.get_secret(&rds_password_name),
             self.get_secret(&jwt_secret_name),
             self.get_secret_optional(&stripe_keys_name),
-            self.get_secret(&alchemy_api_key_name),
+            self.get_secret(&eth_sepolia_rpc_name),
             self.get_secret(&api_key_salt_name),
             self.get_secret_optional(&telegram_bot_token_name),
         )?;
@@ -321,15 +321,12 @@ impl SecretsManager {
             (String::new(), String::new())
         };
 
-        // Build RPC URLs from Alchemy API key
-        let ethereum_sepolia_rpc_url =
-            format!("https://eth-sepolia.g.alchemy.com/v2/{}", alchemy_api_key);
-        let base_sepolia_rpc_url =
-            format!("https://base-sepolia.g.alchemy.com/v2/{}", alchemy_api_key);
-        let linea_sepolia_rpc_url = Some(format!(
-            "https://linea-sepolia.g.alchemy.com/v2/{}",
-            alchemy_api_key
-        ));
+        // RPC URLs - use the fetched URL directly
+        // The secret now contains full URLs instead of API keys
+        let ethereum_sepolia_rpc_url = eth_sepolia_rpc_url;
+        // Use public RPC for Base and Linea as well (PublicNode endpoints)
+        let base_sepolia_rpc_url = "https://base-sepolia-rpc.publicnode.com".to_string();
+        let linea_sepolia_rpc_url = Some("https://linea-sepolia-rpc.publicnode.com".to_string());
 
         // API encryption key from api-key-salt
         let api_encryption_key = api_key_salt;
