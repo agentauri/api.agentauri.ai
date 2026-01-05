@@ -201,6 +201,109 @@ resource "aws_secretsmanager_secret" "base_sepolia_rpc_ankr" {
   }
 }
 
+# Linea Sepolia - Ankr RPC
+resource "aws_secretsmanager_secret" "linea_sepolia_rpc_ankr" {
+  name                    = "agentauri/${var.environment}/linea-sepolia-rpc-ankr"
+  description             = "Linea Sepolia Ankr RPC URL for multi-RPC failover"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-linea-sepolia-rpc-ankr"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# PublicNode RPC URLs (Tier 1 - Free, unlimited)
+# -----------------------------------------------------------------------------
+# PublicNode provides free, reliable RPC endpoints with no rate limits.
+# These are our primary Tier 1 providers for cost-effective operation.
+
+# Ethereum Sepolia - PublicNode
+resource "aws_secretsmanager_secret" "eth_sepolia_rpc_publicnode" {
+  name                    = "agentauri/${var.environment}/eth-sepolia-rpc-publicnode"
+  description             = "Ethereum Sepolia PublicNode RPC URL (Tier 1 - free, unlimited)"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-eth-sepolia-rpc-publicnode"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "eth_sepolia_rpc_publicnode" {
+  secret_id     = aws_secretsmanager_secret.eth_sepolia_rpc_publicnode.id
+  secret_string = "https://ethereum-sepolia-rpc.publicnode.com"
+}
+
+# Base Sepolia - PublicNode
+resource "aws_secretsmanager_secret" "base_sepolia_rpc_publicnode" {
+  name                    = "agentauri/${var.environment}/base-sepolia-rpc-publicnode"
+  description             = "Base Sepolia PublicNode RPC URL (Tier 1 - free, unlimited)"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-base-sepolia-rpc-publicnode"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "base_sepolia_rpc_publicnode" {
+  secret_id     = aws_secretsmanager_secret.base_sepolia_rpc_publicnode.id
+  secret_string = "https://base-sepolia-rpc.publicnode.com"
+}
+
+# Linea Sepolia - PublicNode
+resource "aws_secretsmanager_secret" "linea_sepolia_rpc_publicnode" {
+  name                    = "agentauri/${var.environment}/linea-sepolia-rpc-publicnode"
+  description             = "Linea Sepolia PublicNode RPC URL (Tier 1 - free, unlimited)"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-linea-sepolia-rpc-publicnode"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "linea_sepolia_rpc_publicnode" {
+  secret_id     = aws_secretsmanager_secret.linea_sepolia_rpc_publicnode.id
+  secret_string = "https://linea-sepolia-rpc.publicnode.com"
+}
+
+# -----------------------------------------------------------------------------
+# LlamaNodes RPC URLs (Tier 1 - Free, unlimited)
+# -----------------------------------------------------------------------------
+# LlamaNodes provides free, decentralized RPC endpoints.
+# Another reliable Tier 1 provider for redundancy.
+
+# Ethereum Sepolia - LlamaNodes
+resource "aws_secretsmanager_secret" "eth_sepolia_rpc_llamanodes" {
+  name                    = "agentauri/${var.environment}/eth-sepolia-rpc-llamanodes"
+  description             = "Ethereum Sepolia LlamaNodes RPC URL (Tier 1 - free, unlimited)"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-eth-sepolia-rpc-llamanodes"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "eth_sepolia_rpc_llamanodes" {
+  secret_id     = aws_secretsmanager_secret.eth_sepolia_rpc_llamanodes.id
+  secret_string = "https://eth-sepolia.llamarpc.com"
+}
+
+# Base Sepolia - LlamaNodes
+resource "aws_secretsmanager_secret" "base_sepolia_rpc_llamanodes" {
+  name                    = "agentauri/${var.environment}/base-sepolia-rpc-llamanodes"
+  description             = "Base Sepolia LlamaNodes RPC URL (Tier 1 - free, unlimited)"
+  recovery_window_in_days = var.environment == "production" ? 30 : 0
+
+  tags = {
+    Name = "${local.name_prefix}-base-sepolia-rpc-llamanodes"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "base_sepolia_rpc_llamanodes" {
+  secret_id     = aws_secretsmanager_secret.base_sepolia_rpc_llamanodes.id
+  secret_string = "https://base-sepolia.llamarpc.com"
+}
+
 # -----------------------------------------------------------------------------
 # Redis URL (unified - supports both ElastiCache and external Redis)
 # -----------------------------------------------------------------------------

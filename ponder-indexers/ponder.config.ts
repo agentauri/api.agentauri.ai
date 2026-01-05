@@ -38,6 +38,13 @@ import {
   createRuntimeHealthMonitor,
   type RuntimeHealthMonitor,
 } from "./src/runtime-health-monitor";
+import {
+  getQuotaManager,
+} from "./src/quota-tracker";
+import {
+  getReputationStore,
+  type ReputationStore,
+} from "./src/reputation-store";
 
 // ============================================================================
 // GLOBAL ERROR HANDLERS - Prevent crashes from unhandled rejections
@@ -88,6 +95,8 @@ const RATE_LIMITS = {
   infura: env.RPC_RATE_LIMIT_INFURA,
   quiknode: env.RPC_RATE_LIMIT_QUIKNODE,
   ankr: env.RPC_RATE_LIMIT_ANKR,
+  publicnode: env.RPC_RATE_LIMIT_PUBLICNODE,
+  llamanodes: env.RPC_RATE_LIMIT_LLAMANODES,
 };
 
 // Ranking configuration (health checks for smart failover)
@@ -113,6 +122,102 @@ const CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
 // Global circuit breaker manager (shared across all chains)
 const circuitBreakerManager = new CircuitBreakerManager(CIRCUIT_BREAKER_CONFIG);
 
+// Reputation store for persistence (singleton)
+let reputationStore: ReputationStore | null = null;
+
+// Initialize reputation store and connect to circuit breaker
+async function initializeReputationStore(): Promise<void> {
+  if (!env.DATABASE_URL) {
+    configLogger.warn({}, "No DATABASE_URL configured, reputation persistence disabled");
+    return;
+  }
+
+  reputationStore = getReputationStore({
+    databaseUrl: env.DATABASE_URL,
+    flushIntervalMs: 5 * 60 * 1000, // 5 minutes
+    debugLogging: env.PONDER_LOG_LEVEL === "debug",
+  });
+
+  await reputationStore.initialize();
+
+  // Connect circuit breaker to reputation store for persistence
+  circuitBreakerManager.setOnChange((providerName, stats) => {
+    if (reputationStore) {
+      // Extract chain info from provider name (format: "chainId:providerName")
+      let chainId = 0;
+      let chainName = "unknown";
+      let provider = providerName;
+
+      if (providerName.includes(":")) {
+        const parts = providerName.split(":");
+        chainId = parseInt(parts[0] ?? "0", 10) || 0;
+        chainName = parts[0] ?? "unknown";
+        provider = parts[1] ?? providerName;
+      }
+
+      reputationStore.updateFromCircuitBreaker(chainId, chainName, provider, stats);
+    }
+  });
+
+  configLogger.info({}, "ReputationStore initialized and connected to CircuitBreakerManager");
+}
+
+// Start reputation store initialization (non-blocking)
+initializeReputationStore().catch((error) => {
+  configLogger.error(
+    { error: error instanceof Error ? error.message : String(error) },
+    "Failed to initialize ReputationStore"
+  );
+});
+
+// Global quota tracker manager (shared across all chains)
+const quotaTrackerManager = getQuotaManager({
+  alchemy: {
+    dailyLimit: env.RPC_QUOTA_ALCHEMY_DAILY,
+    monthlyLimit: env.RPC_QUOTA_ALCHEMY_MONTHLY,
+    warningThreshold: env.RPC_QUOTA_WARNING_THRESHOLD,
+    criticalThreshold: env.RPC_QUOTA_CRITICAL_THRESHOLD,
+  },
+  infura: {
+    dailyLimit: env.RPC_QUOTA_INFURA_DAILY,
+    monthlyLimit: env.RPC_QUOTA_INFURA_MONTHLY,
+    warningThreshold: env.RPC_QUOTA_WARNING_THRESHOLD,
+    criticalThreshold: env.RPC_QUOTA_CRITICAL_THRESHOLD,
+  },
+  quiknode: {
+    dailyLimit: env.RPC_QUOTA_QUIKNODE_DAILY,
+    monthlyLimit: env.RPC_QUOTA_QUIKNODE_MONTHLY,
+    warningThreshold: env.RPC_QUOTA_WARNING_THRESHOLD,
+    criticalThreshold: env.RPC_QUOTA_CRITICAL_THRESHOLD,
+  },
+  ankr: {
+    dailyLimit: env.RPC_QUOTA_ANKR_DAILY,
+    monthlyLimit: env.RPC_QUOTA_ANKR_MONTHLY,
+    warningThreshold: env.RPC_QUOTA_WARNING_THRESHOLD,
+    criticalThreshold: env.RPC_QUOTA_CRITICAL_THRESHOLD,
+  },
+  publicnode: {
+    dailyLimit: env.RPC_QUOTA_PUBLICNODE_DAILY,
+    monthlyLimit: env.RPC_QUOTA_PUBLICNODE_MONTHLY,
+    warningThreshold: env.RPC_QUOTA_WARNING_THRESHOLD,
+    criticalThreshold: env.RPC_QUOTA_CRITICAL_THRESHOLD,
+  },
+  llamanodes: {
+    dailyLimit: env.RPC_QUOTA_LLAMANODES_DAILY,
+    monthlyLimit: env.RPC_QUOTA_LLAMANODES_MONTHLY,
+    warningThreshold: env.RPC_QUOTA_WARNING_THRESHOLD,
+    criticalThreshold: env.RPC_QUOTA_CRITICAL_THRESHOLD,
+  },
+});
+
+// Log quota tracking status at startup
+if (env.RPC_QUOTA_TRACKING_ENABLED) {
+  configLogger.info(
+    { providers: Object.keys(quotaTrackerManager.getAllStatus()) },
+    "Quota tracking enabled for RPC providers"
+  );
+}
+
 // Runtime health monitor (started after config initialization)
 let runtimeHealthMonitor: RuntimeHealthMonitor | null = null;
 
@@ -124,6 +229,8 @@ function getRpcUrls(chainPrefix: string): {
   infura?: string;
   quiknode?: string;
   ankr?: string;
+  publicnode?: string;
+  llamanodes?: string;
   legacy?: string;
 } {
   const envKey = (suffix: string) => `${chainPrefix}_${suffix}` as keyof EnvConfig;
@@ -133,6 +240,8 @@ function getRpcUrls(chainPrefix: string): {
     infura: env[envKey("RPC_INFURA")] as string | undefined,
     quiknode: env[envKey("RPC_QUIKNODE")] as string | undefined,
     ankr: env[envKey("RPC_ANKR")] as string | undefined,
+    publicnode: env[envKey("RPC_PUBLICNODE")] as string | undefined,
+    llamanodes: env[envKey("RPC_LLAMANODES")] as string | undefined,
     legacy: env[envKey("RPC_URL")] as string | undefined,
   };
 }
@@ -153,6 +262,8 @@ async function getHealthyProviders(chainPrefix: string): Promise<Record<string, 
   if (urls.infura) providerMap["infura"] = urls.infura;
   if (urls.quiknode) providerMap["quiknode"] = urls.quiknode;
   if (urls.ankr) providerMap["ankr"] = urls.ankr;
+  if (urls.publicnode) providerMap["publicnode"] = urls.publicnode;
+  if (urls.llamanodes) providerMap["llamanodes"] = urls.llamanodes;
 
   if (Object.keys(providerMap).length === 0) {
     return {};
@@ -214,6 +325,24 @@ function createResilientTransport(
   // Create rate-limited transports ONLY for healthy providers
   const transports: Transport[] = [];
 
+  // Tier 1: Free/Public providers (preferred - no quota limits)
+  if (urls.publicnode && healthyProviders["publicnode"]) {
+    transports.push(
+      rateLimit(http(urls.publicnode), { requestsPerSecond: RATE_LIMITS.publicnode })
+    );
+  }
+  if (urls.llamanodes && healthyProviders["llamanodes"]) {
+    transports.push(
+      rateLimit(http(urls.llamanodes), { requestsPerSecond: RATE_LIMITS.llamanodes })
+    );
+  }
+  if (urls.ankr && healthyProviders["ankr"]) {
+    transports.push(
+      rateLimit(http(urls.ankr), { requestsPerSecond: RATE_LIMITS.ankr })
+    );
+  }
+
+  // Tier 2: Freemium providers (have quota limits)
   if (urls.alchemy && healthyProviders["alchemy"]) {
     transports.push(
       rateLimit(http(urls.alchemy), { requestsPerSecond: RATE_LIMITS.alchemy })
@@ -227,11 +356,6 @@ function createResilientTransport(
   if (urls.quiknode && healthyProviders["quiknode"]) {
     transports.push(
       rateLimit(http(urls.quiknode), { requestsPerSecond: RATE_LIMITS.quiknode })
-    );
-  }
-  if (urls.ankr && healthyProviders["ankr"]) {
-    transports.push(
-      rateLimit(http(urls.ankr), { requestsPerSecond: RATE_LIMITS.ankr })
     );
   }
 
@@ -612,6 +736,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   // Shutdown DLQ
   await shutdownDeadLetterQueue();
+
+  // Shutdown reputation store (flushes pending data)
+  if (reputationStore) {
+    await reputationStore.shutdown();
+  }
 
   configLogger.info({}, "All monitors stopped, exiting");
 }

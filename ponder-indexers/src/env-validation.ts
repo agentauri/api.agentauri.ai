@@ -40,6 +40,8 @@ const rpcProviderSchema = {
   ETHEREUM_SEPOLIA_RPC_INFURA: httpsUrl.optional(),
   ETHEREUM_SEPOLIA_RPC_QUIKNODE: httpsUrl.optional(),
   ETHEREUM_SEPOLIA_RPC_ANKR: httpsUrl.optional(),
+  ETHEREUM_SEPOLIA_RPC_PUBLICNODE: httpsUrl.optional(),
+  ETHEREUM_SEPOLIA_RPC_LLAMANODES: httpsUrl.optional(),
   ETHEREUM_SEPOLIA_RPC_URL: httpsUrl.optional(), // Legacy fallback
 
   // Base Sepolia
@@ -47,6 +49,8 @@ const rpcProviderSchema = {
   BASE_SEPOLIA_RPC_INFURA: httpsUrl.optional(),
   BASE_SEPOLIA_RPC_QUIKNODE: httpsUrl.optional(),
   BASE_SEPOLIA_RPC_ANKR: httpsUrl.optional(),
+  BASE_SEPOLIA_RPC_PUBLICNODE: httpsUrl.optional(),
+  BASE_SEPOLIA_RPC_LLAMANODES: httpsUrl.optional(),
   BASE_SEPOLIA_RPC_URL: httpsUrl.optional(),
 
   // Linea Sepolia
@@ -54,6 +58,8 @@ const rpcProviderSchema = {
   LINEA_SEPOLIA_RPC_INFURA: httpsUrl.optional(),
   LINEA_SEPOLIA_RPC_QUIKNODE: httpsUrl.optional(),
   LINEA_SEPOLIA_RPC_ANKR: httpsUrl.optional(),
+  LINEA_SEPOLIA_RPC_PUBLICNODE: httpsUrl.optional(),
+  LINEA_SEPOLIA_RPC_LLAMANODES: httpsUrl.optional(),
   LINEA_SEPOLIA_RPC_URL: httpsUrl.optional(),
 
   // Polygon Amoy
@@ -61,6 +67,8 @@ const rpcProviderSchema = {
   POLYGON_AMOY_RPC_INFURA: httpsUrl.optional(),
   POLYGON_AMOY_RPC_QUIKNODE: httpsUrl.optional(),
   POLYGON_AMOY_RPC_ANKR: httpsUrl.optional(),
+  POLYGON_AMOY_RPC_PUBLICNODE: httpsUrl.optional(),
+  POLYGON_AMOY_RPC_LLAMANODES: httpsUrl.optional(),
   POLYGON_AMOY_RPC_URL: httpsUrl.optional(),
 
   // Mainnets
@@ -69,6 +77,8 @@ const rpcProviderSchema = {
   ETHEREUM_MAINNET_RPC_INFURA: httpsUrl.optional(),
   ETHEREUM_MAINNET_RPC_QUIKNODE: httpsUrl.optional(),
   ETHEREUM_MAINNET_RPC_ANKR: httpsUrl.optional(),
+  ETHEREUM_MAINNET_RPC_PUBLICNODE: httpsUrl.optional(),
+  ETHEREUM_MAINNET_RPC_LLAMANODES: httpsUrl.optional(),
   ETHEREUM_MAINNET_RPC_URL: httpsUrl.optional(),
 
   // Base Mainnet
@@ -76,12 +86,16 @@ const rpcProviderSchema = {
   BASE_MAINNET_RPC_INFURA: httpsUrl.optional(),
   BASE_MAINNET_RPC_QUIKNODE: httpsUrl.optional(),
   BASE_MAINNET_RPC_ANKR: httpsUrl.optional(),
+  BASE_MAINNET_RPC_PUBLICNODE: httpsUrl.optional(),
+  BASE_MAINNET_RPC_LLAMANODES: httpsUrl.optional(),
   BASE_MAINNET_RPC_URL: httpsUrl.optional(),
 
   // Linea Mainnet
   LINEA_MAINNET_RPC_ALCHEMY: httpsUrl.optional(),
   LINEA_MAINNET_RPC_INFURA: httpsUrl.optional(),
   LINEA_MAINNET_RPC_QUIKNODE: httpsUrl.optional(),
+  LINEA_MAINNET_RPC_PUBLICNODE: httpsUrl.optional(),
+  LINEA_MAINNET_RPC_LLAMANODES: httpsUrl.optional(),
   LINEA_MAINNET_RPC_URL: httpsUrl.optional(),
 };
 
@@ -142,6 +156,37 @@ const rateLimitSchema = {
   RPC_RATE_LIMIT_INFURA: z.coerce.number().int().min(1).max(100).default(20),
   RPC_RATE_LIMIT_QUIKNODE: z.coerce.number().int().min(1).max(100).default(25),
   RPC_RATE_LIMIT_ANKR: z.coerce.number().int().min(1).max(100).default(30),
+  RPC_RATE_LIMIT_PUBLICNODE: z.coerce.number().int().min(1).max(100).default(5),
+  RPC_RATE_LIMIT_LLAMANODES: z.coerce.number().int().min(1).max(100).default(5),
+};
+
+/**
+ * Quota tracking configuration for RPC providers
+ * Limits are monthly request counts (0 = unlimited)
+ */
+const quotaSchema = {
+  // Daily quotas (0 = unlimited)
+  RPC_QUOTA_ALCHEMY_DAILY: z.coerce.number().int().min(0).default(0), // Unlimited on free tier
+  RPC_QUOTA_INFURA_DAILY: z.coerce.number().int().min(0).default(100000),
+  RPC_QUOTA_QUIKNODE_DAILY: z.coerce.number().int().min(0).default(50000),
+  RPC_QUOTA_ANKR_DAILY: z.coerce.number().int().min(0).default(0), // Unlimited
+  RPC_QUOTA_PUBLICNODE_DAILY: z.coerce.number().int().min(0).default(0), // Unlimited
+  RPC_QUOTA_LLAMANODES_DAILY: z.coerce.number().int().min(0).default(0), // Unlimited
+
+  // Monthly quotas (0 = unlimited)
+  RPC_QUOTA_ALCHEMY_MONTHLY: z.coerce.number().int().min(0).default(300000000), // 300M compute units
+  RPC_QUOTA_INFURA_MONTHLY: z.coerce.number().int().min(0).default(100000),
+  RPC_QUOTA_QUIKNODE_MONTHLY: z.coerce.number().int().min(0).default(1500000),
+  RPC_QUOTA_ANKR_MONTHLY: z.coerce.number().int().min(0).default(0), // Unlimited
+  RPC_QUOTA_PUBLICNODE_MONTHLY: z.coerce.number().int().min(0).default(0), // Unlimited
+  RPC_QUOTA_LLAMANODES_MONTHLY: z.coerce.number().int().min(0).default(0), // Unlimited
+
+  // Thresholds for warnings/rotation
+  RPC_QUOTA_WARNING_THRESHOLD: z.coerce.number().min(0.1).max(1).default(0.8),
+  RPC_QUOTA_CRITICAL_THRESHOLD: z.coerce.number().min(0.1).max(1).default(0.95),
+
+  // Enable/disable quota tracking
+  RPC_QUOTA_TRACKING_ENABLED: z.coerce.boolean().default(true),
 };
 
 /**
@@ -215,6 +260,9 @@ const envSchema = z.object({
   // Rate Limits
   ...rateLimitSchema,
 
+  // Quota Tracking
+  ...quotaSchema,
+
   // Ranking Config
   ...rankingSchema,
 
@@ -244,6 +292,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.ETHEREUM_SEPOLIA_RPC_INFURA ??
         env.ETHEREUM_SEPOLIA_RPC_QUIKNODE ??
         env.ETHEREUM_SEPOLIA_RPC_ANKR ??
+        env.ETHEREUM_SEPOLIA_RPC_PUBLICNODE ??
+        env.ETHEREUM_SEPOLIA_RPC_LLAMANODES ??
         env.ETHEREUM_SEPOLIA_RPC_URL
       ),
     },
@@ -254,6 +304,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.BASE_SEPOLIA_RPC_INFURA ??
         env.BASE_SEPOLIA_RPC_QUIKNODE ??
         env.BASE_SEPOLIA_RPC_ANKR ??
+        env.BASE_SEPOLIA_RPC_PUBLICNODE ??
+        env.BASE_SEPOLIA_RPC_LLAMANODES ??
         env.BASE_SEPOLIA_RPC_URL
       ),
     },
@@ -264,6 +316,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.LINEA_SEPOLIA_RPC_INFURA ??
         env.LINEA_SEPOLIA_RPC_QUIKNODE ??
         env.LINEA_SEPOLIA_RPC_ANKR ??
+        env.LINEA_SEPOLIA_RPC_PUBLICNODE ??
+        env.LINEA_SEPOLIA_RPC_LLAMANODES ??
         env.LINEA_SEPOLIA_RPC_URL
       ),
     },
@@ -274,6 +328,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.POLYGON_AMOY_RPC_INFURA ??
         env.POLYGON_AMOY_RPC_QUIKNODE ??
         env.POLYGON_AMOY_RPC_ANKR ??
+        env.POLYGON_AMOY_RPC_PUBLICNODE ??
+        env.POLYGON_AMOY_RPC_LLAMANODES ??
         env.POLYGON_AMOY_RPC_URL
       ),
     },
@@ -285,6 +341,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.ETHEREUM_MAINNET_RPC_INFURA ??
         env.ETHEREUM_MAINNET_RPC_QUIKNODE ??
         env.ETHEREUM_MAINNET_RPC_ANKR ??
+        env.ETHEREUM_MAINNET_RPC_PUBLICNODE ??
+        env.ETHEREUM_MAINNET_RPC_LLAMANODES ??
         env.ETHEREUM_MAINNET_RPC_URL
       ),
     },
@@ -295,6 +353,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.BASE_MAINNET_RPC_INFURA ??
         env.BASE_MAINNET_RPC_QUIKNODE ??
         env.BASE_MAINNET_RPC_ANKR ??
+        env.BASE_MAINNET_RPC_PUBLICNODE ??
+        env.BASE_MAINNET_RPC_LLAMANODES ??
         env.BASE_MAINNET_RPC_URL
       ),
     },
@@ -304,6 +364,8 @@ function hasAtLeastOneChainConfigured(env: EnvConfig): boolean {
         env.LINEA_MAINNET_RPC_ALCHEMY ??
         env.LINEA_MAINNET_RPC_INFURA ??
         env.LINEA_MAINNET_RPC_QUIKNODE ??
+        env.LINEA_MAINNET_RPC_PUBLICNODE ??
+        env.LINEA_MAINNET_RPC_LLAMANODES ??
         env.LINEA_MAINNET_RPC_URL
       ),
     },
@@ -324,6 +386,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.ETHEREUM_SEPOLIA_RPC_INFURA ??
     env.ETHEREUM_SEPOLIA_RPC_QUIKNODE ??
     env.ETHEREUM_SEPOLIA_RPC_ANKR ??
+    env.ETHEREUM_SEPOLIA_RPC_PUBLICNODE ??
+    env.ETHEREUM_SEPOLIA_RPC_LLAMANODES ??
     env.ETHEREUM_SEPOLIA_RPC_URL
   ) {
     chains.push("ethereumSepolia");
@@ -334,6 +398,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.BASE_SEPOLIA_RPC_INFURA ??
     env.BASE_SEPOLIA_RPC_QUIKNODE ??
     env.BASE_SEPOLIA_RPC_ANKR ??
+    env.BASE_SEPOLIA_RPC_PUBLICNODE ??
+    env.BASE_SEPOLIA_RPC_LLAMANODES ??
     env.BASE_SEPOLIA_RPC_URL
   ) {
     chains.push("baseSepolia");
@@ -344,6 +410,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.LINEA_SEPOLIA_RPC_INFURA ??
     env.LINEA_SEPOLIA_RPC_QUIKNODE ??
     env.LINEA_SEPOLIA_RPC_ANKR ??
+    env.LINEA_SEPOLIA_RPC_PUBLICNODE ??
+    env.LINEA_SEPOLIA_RPC_LLAMANODES ??
     env.LINEA_SEPOLIA_RPC_URL
   ) {
     chains.push("lineaSepolia");
@@ -354,6 +422,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.POLYGON_AMOY_RPC_INFURA ??
     env.POLYGON_AMOY_RPC_QUIKNODE ??
     env.POLYGON_AMOY_RPC_ANKR ??
+    env.POLYGON_AMOY_RPC_PUBLICNODE ??
+    env.POLYGON_AMOY_RPC_LLAMANODES ??
     env.POLYGON_AMOY_RPC_URL
   ) {
     chains.push("polygonAmoy");
@@ -365,6 +435,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.ETHEREUM_MAINNET_RPC_INFURA ??
     env.ETHEREUM_MAINNET_RPC_QUIKNODE ??
     env.ETHEREUM_MAINNET_RPC_ANKR ??
+    env.ETHEREUM_MAINNET_RPC_PUBLICNODE ??
+    env.ETHEREUM_MAINNET_RPC_LLAMANODES ??
     env.ETHEREUM_MAINNET_RPC_URL
   ) {
     chains.push("ethereumMainnet");
@@ -375,6 +447,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.BASE_MAINNET_RPC_INFURA ??
     env.BASE_MAINNET_RPC_QUIKNODE ??
     env.BASE_MAINNET_RPC_ANKR ??
+    env.BASE_MAINNET_RPC_PUBLICNODE ??
+    env.BASE_MAINNET_RPC_LLAMANODES ??
     env.BASE_MAINNET_RPC_URL
   ) {
     chains.push("baseMainnet");
@@ -384,6 +458,8 @@ export function getConfiguredChains(env: EnvConfig): string[] {
     env.LINEA_MAINNET_RPC_ALCHEMY ??
     env.LINEA_MAINNET_RPC_INFURA ??
     env.LINEA_MAINNET_RPC_QUIKNODE ??
+    env.LINEA_MAINNET_RPC_PUBLICNODE ??
+    env.LINEA_MAINNET_RPC_LLAMANODES ??
     env.LINEA_MAINNET_RPC_URL
   ) {
     chains.push("lineaMainnet");

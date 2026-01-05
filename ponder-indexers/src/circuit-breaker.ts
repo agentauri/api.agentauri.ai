@@ -16,6 +16,23 @@ import { configLogger } from "./logger";
 
 export type CircuitState = "closed" | "open" | "half-open";
 
+/**
+ * Callback for circuit breaker state changes (used for persistence)
+ */
+export type CircuitBreakerOnChange = (providerName: string, stats: CircuitBreakerStats) => void;
+
+/**
+ * Persisted circuit breaker state for recovery
+ */
+export interface PersistedCircuitState {
+  state: CircuitState;
+  failures: number;
+  lastFailureTime: number | null;
+  lastSuccessTime: number | null;
+  totalRequests: number;
+  totalFailures: number;
+}
+
 export interface CircuitBreakerConfig {
   /** Number of failures before opening the circuit (default: 5) */
   failureThreshold: number;
@@ -52,11 +69,61 @@ export class CircuitBreaker {
   private lastSuccessTime: number | null = null;
   private totalRequests = 0;
   private totalFailures = 0;
+  private onChange?: CircuitBreakerOnChange;
 
   constructor(
     private readonly providerName: string,
     private readonly config: CircuitBreakerConfig = DEFAULT_CIRCUIT_BREAKER_CONFIG
   ) {}
+
+  /**
+   * Set callback for state changes (used for persistence)
+   */
+  setOnChange(callback: CircuitBreakerOnChange): void {
+    this.onChange = callback;
+  }
+
+  /**
+   * Restore state from persisted data (called on startup)
+   */
+  restoreState(persisted: PersistedCircuitState): void {
+    // Check if the persisted open state has timed out
+    if (persisted.state === "open" && persisted.lastFailureTime !== null) {
+      const timeSinceFailure = Date.now() - persisted.lastFailureTime;
+      if (timeSinceFailure >= this.config.resetTimeoutMs) {
+        // Circuit should have reset by now, start in half-open
+        this.state = "half-open";
+        this.failures = 0;
+        configLogger.info(
+          { provider: this.providerName, timeSinceFailure },
+          `Circuit breaker restored to half-open (timeout expired) for ${this.providerName}`
+        );
+      } else {
+        // Still within timeout, restore as open
+        this.state = persisted.state;
+        this.failures = persisted.failures;
+      }
+    } else {
+      this.state = persisted.state;
+      this.failures = persisted.failures;
+    }
+
+    this.lastFailureTime = persisted.lastFailureTime;
+    this.lastSuccessTime = persisted.lastSuccessTime;
+    this.totalRequests = persisted.totalRequests;
+    this.totalFailures = persisted.totalFailures;
+    this.halfOpenSuccesses = 0; // Always reset half-open counter
+
+    configLogger.info(
+      {
+        provider: this.providerName,
+        restoredState: this.state,
+        failures: this.failures,
+        totalRequests: this.totalRequests,
+      },
+      `Circuit breaker state restored for ${this.providerName}`
+    );
+  }
 
   /**
    * Check if a request can be made through this circuit
@@ -221,6 +288,25 @@ export class CircuitBreaker {
       },
       `Circuit breaker state transition: ${oldState} → ${newState} for ${this.providerName}`
     );
+
+    // Notify persistence layer of state change
+    this.notifyChange();
+  }
+
+  /**
+   * Notify persistence layer of state change
+   */
+  private notifyChange(): void {
+    if (this.onChange) {
+      try {
+        this.onChange(this.providerName, this.getStats());
+      } catch (error) {
+        configLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          `Failed to notify change for ${this.providerName}`
+        );
+      }
+    }
   }
 }
 
@@ -229,8 +315,34 @@ export class CircuitBreaker {
  */
 export class CircuitBreakerManager {
   private breakers = new Map<string, CircuitBreaker>();
+  private onChange?: CircuitBreakerOnChange;
 
   constructor(private readonly config: CircuitBreakerConfig = DEFAULT_CIRCUIT_BREAKER_CONFIG) {}
+
+  /**
+   * Set callback for all circuit breaker state changes (used for persistence)
+   */
+  setOnChange(callback: CircuitBreakerOnChange): void {
+    this.onChange = callback;
+    // Apply to existing breakers
+    for (const breaker of this.breakers.values()) {
+      breaker.setOnChange(callback);
+    }
+  }
+
+  /**
+   * Restore state for multiple providers from persisted data
+   */
+  restoreStates(states: Record<string, PersistedCircuitState>): void {
+    for (const [providerName, persisted] of Object.entries(states)) {
+      const breaker = this.getBreaker(providerName);
+      breaker.restoreState(persisted);
+    }
+    configLogger.info(
+      { providerCount: Object.keys(states).length },
+      "Circuit breaker states restored from persistence"
+    );
+  }
 
   /**
    * Get or create a circuit breaker for a provider
@@ -239,6 +351,10 @@ export class CircuitBreakerManager {
     let breaker = this.breakers.get(providerName);
     if (!breaker) {
       breaker = new CircuitBreaker(providerName, this.config);
+      // Apply onChange callback if set
+      if (this.onChange) {
+        breaker.setOnChange(this.onChange);
+      }
       this.breakers.set(providerName, breaker);
     }
     return breaker;

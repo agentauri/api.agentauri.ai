@@ -521,6 +521,13 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
         { name = "RPC_RATE_LIMIT_INFURA", value = "5" },
         { name = "RPC_RATE_LIMIT_ALCHEMY", value = "5" },
         { name = "RPC_RATE_LIMIT_QUIKNODE", value = "5" },
+        { name = "RPC_RATE_LIMIT_PUBLICNODE", value = "5" },
+        { name = "RPC_RATE_LIMIT_LLAMANODES", value = "5" },
+
+        # Quota Tracking Configuration
+        { name = "RPC_QUOTA_TRACKING_ENABLED", value = "true" },
+        { name = "RPC_QUOTA_WARNING_THRESHOLD", value = "0.8" },
+        { name = "RPC_QUOTA_CRITICAL_THRESHOLD", value = "0.95" },
 
         # ERC-8004 Contract Addresses - Ethereum Sepolia
         { name = "ETHEREUM_SEPOLIA_IDENTITY_ADDRESS", value = "0x8004a6090Cd10A7288092483047B097295Fb8847" },
@@ -572,10 +579,47 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
           valueFrom = aws_secretsmanager_secret.base_sepolia_rpc.arn
         },
 
-        # Linea Sepolia - Only public RPC available (Ankr doesn't support Linea)
+        # Linea Sepolia - Primary (Ankr) and Fallback (public)
+        {
+          name      = "LINEA_SEPOLIA_RPC_ANKR"
+          valueFrom = aws_secretsmanager_secret.linea_sepolia_rpc_ankr.arn
+        },
         {
           name      = "LINEA_SEPOLIA_RPC_URL"
           valueFrom = aws_secretsmanager_secret.linea_sepolia_rpc.arn
+        },
+
+        # ---------------------------------------------------------------------
+        # Tier 1: Free Unlimited Providers (PublicNode, LlamaNodes)
+        # These have no quota limits and should be preferred
+        # ---------------------------------------------------------------------
+
+        # Ethereum Sepolia - PublicNode (free, unlimited)
+        {
+          name      = "ETHEREUM_SEPOLIA_RPC_PUBLICNODE"
+          valueFrom = aws_secretsmanager_secret.eth_sepolia_rpc_publicnode.arn
+        },
+        # Ethereum Sepolia - LlamaNodes (free, unlimited)
+        {
+          name      = "ETHEREUM_SEPOLIA_RPC_LLAMANODES"
+          valueFrom = aws_secretsmanager_secret.eth_sepolia_rpc_llamanodes.arn
+        },
+
+        # Base Sepolia - PublicNode (free, unlimited)
+        {
+          name      = "BASE_SEPOLIA_RPC_PUBLICNODE"
+          valueFrom = aws_secretsmanager_secret.base_sepolia_rpc_publicnode.arn
+        },
+        # Base Sepolia - LlamaNodes (free, unlimited)
+        {
+          name      = "BASE_SEPOLIA_RPC_LLAMANODES"
+          valueFrom = aws_secretsmanager_secret.base_sepolia_rpc_llamanodes.arn
+        },
+
+        # Linea Sepolia - PublicNode (free, unlimited)
+        {
+          name      = "LINEA_SEPOLIA_RPC_PUBLICNODE"
+          valueFrom = aws_secretsmanager_secret.linea_sepolia_rpc_publicnode.arn
         }
       ]
 
