@@ -159,6 +159,12 @@ async function initializeReputationStore(): Promise<void> {
     }
   });
 
+  // Connect runtime health monitor to reputation store for latency tracking
+  if (runtimeHealthMonitor && reputationStore) {
+    runtimeHealthMonitor.linkReputationStore(reputationStore);
+    configLogger.info({}, "ReputationStore connected to RuntimeHealthMonitor for latency tracking");
+  }
+
   configLogger.info({}, "ReputationStore initialized and connected to CircuitBreakerManager");
 }
 
@@ -608,6 +614,12 @@ async function buildNetworksWithHealthChecks() {
       },
       circuitBreakerManager
     );
+
+    // Link reputation store if already initialized
+    if (reputationStore) {
+      runtimeHealthMonitor.linkReputationStore(reputationStore);
+      configLogger.info({}, "RuntimeHealthMonitor linked to ReputationStore for latency tracking");
+    }
 
     configLogger.info({
       providers: Object.keys(allProviderUrls),

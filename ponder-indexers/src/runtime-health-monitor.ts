@@ -14,6 +14,7 @@
 
 import { configLogger } from "./logger";
 import type { CircuitBreakerManager } from "./circuit-breaker";
+import type { ReputationStore } from "./reputation-store";
 
 export interface HealthCheckResult {
   provider: string;
@@ -59,6 +60,7 @@ export class RuntimeHealthMonitor {
   private providerStates = new Map<string, ProviderState>();
   private readonly config: RuntimeHealthMonitorConfig;
   private circuitBreakerManager: CircuitBreakerManager | null = null;
+  private reputationStore: ReputationStore | null = null;
 
   constructor(config: Partial<RuntimeHealthMonitorConfig> = {}) {
     this.config = { ...DEFAULT_RUNTIME_HEALTH_CONFIG, ...config };
@@ -91,6 +93,15 @@ export class RuntimeHealthMonitor {
    */
   linkCircuitBreakerManager(manager: CircuitBreakerManager): void {
     this.circuitBreakerManager = manager;
+  }
+
+  /**
+   * Link with reputation store for latency and health tracking
+   *
+   * @param store - Reputation store instance
+   */
+  linkReputationStore(store: ReputationStore): void {
+    this.reputationStore = store;
   }
 
   /**
@@ -300,6 +311,9 @@ export class RuntimeHealthMonitor {
     state.lastCheckTime = Date.now();
     state.totalChecks++;
 
+    // Extract chain info from provider name (format: "CHAIN_NAME_providerName")
+    const { chainId, chainName, providerName } = this.parseProviderName(result.provider);
+
     if (result.healthy) {
       // Provider is healthy - reset consecutive failures
       if (state.consecutiveFailures > 0) {
@@ -319,10 +333,27 @@ export class RuntimeHealthMonitor {
         const breaker = this.circuitBreakerManager.getBreaker(result.provider);
         breaker.recordSuccess();
       }
+
+      // Update reputation store with latency
+      if (this.reputationStore && result.latencyMs !== null) {
+        this.reputationStore.recordLatency(chainId, chainName, providerName, result.latencyMs);
+        this.reputationStore.updateReputation(chainId, chainName, providerName, {
+          lastSuccessAt: new Date(),
+          circuitState: "closed",
+        });
+      }
     } else {
       // Provider failed - increment failure count
       state.consecutiveFailures++;
       state.totalFailures++;
+
+      // Update reputation store with failure
+      if (this.reputationStore) {
+        this.reputationStore.updateReputation(chainId, chainName, providerName, {
+          lastFailureAt: new Date(),
+          consecutiveFailures: state.consecutiveFailures,
+        });
+      }
 
       // Check if we've hit the failure threshold
       if (state.consecutiveFailures >= this.config.failureThreshold) {
@@ -339,6 +370,13 @@ export class RuntimeHealthMonitor {
         }
         state.lastHealthy = false;
 
+        // Update reputation store with open circuit
+        if (this.reputationStore) {
+          this.reputationStore.updateReputation(chainId, chainName, providerName, {
+            circuitState: "open",
+          });
+        }
+
         // Notify circuit breaker
         if (this.circuitBreakerManager) {
           const breaker = this.circuitBreakerManager.getBreaker(result.provider);
@@ -346,6 +384,41 @@ export class RuntimeHealthMonitor {
         }
       }
     }
+  }
+
+  /**
+   * Parse provider name to extract chain info
+   * Format: "CHAIN_NAME_providerName" (e.g., "ETHEREUM_SEPOLIA_ankr")
+   */
+  private parseProviderName(fullName: string): { chainId: number; chainName: string; providerName: string } {
+    // Chain ID mapping
+    const chainIdMap: Record<string, number> = {
+      ETHEREUM_SEPOLIA: 11155111,
+      BASE_SEPOLIA: 84532,
+      LINEA_SEPOLIA: 59141,
+      ETHEREUM_MAINNET: 1,
+      BASE_MAINNET: 8453,
+      LINEA_MAINNET: 59144,
+    };
+
+    // Try to extract chain name from provider name
+    for (const [chainKey, id] of Object.entries(chainIdMap)) {
+      if (fullName.startsWith(chainKey + "_")) {
+        const providerName = fullName.slice(chainKey.length + 1);
+        return {
+          chainId: id,
+          chainName: chainKey,
+          providerName,
+        };
+      }
+    }
+
+    // Fallback: use full name as provider name
+    return {
+      chainId: 0,
+      chainName: "unknown",
+      providerName: fullName,
+    };
   }
 
   /**

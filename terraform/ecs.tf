@@ -637,7 +637,7 @@ resource "aws_ecs_task_definition" "ponder_indexer" {
         interval    = 30
         timeout     = 10
         retries     = 3
-        startPeriod = 60
+        startPeriod = 300  # 5 minutes - Ponder needs time for initial historical sync
       }
     }
   ])
