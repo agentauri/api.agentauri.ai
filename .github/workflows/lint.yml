@@ -1,8 +1,9 @@
 # ============================================================================
-# Code Quality and Linting Workflow
+# Code Quality and Linting Workflow (Extended Checks)
 # ============================================================================
-# Ensures code quality standards across all languages
-# Runs on pull requests and can be triggered manually
+# Additional quality checks that complement the main CI workflow.
+# NOTE: Rust/TypeScript linting is handled by ci.yml to avoid duplication.
+# This workflow focuses on: SQL, docs, Docker, shell scripts, and security.
 # ============================================================================
 
 name: Lint
@@ -17,8 +18,6 @@ jobs:
     name: Check File Existence
     runs-on: ubuntu-latest
     outputs:
-      rust-exists: ${{ steps.check.outputs.rust-exists }}
-      typescript-exists: ${{ steps.check.outputs.typescript-exists }}
       scripts-exist: ${{ steps.check.outputs.scripts-exist }}
     steps:
       - name: Checkout code
@@ -27,18 +26,6 @@ jobs:
       - name: Check which linters need to run
         id: check
         run: |
-          if [ -f "rust-backend/Cargo.toml" ]; then
-            echo "rust-exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "rust-exists=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [ -f "ponder-indexers/package.json" ]; then
-            echo "typescript-exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "typescript-exists=false" >> $GITHUB_OUTPUT
-          fi
-
           if ls scripts/*.sh 1> /dev/null 2>&1; then
             echo "scripts-exist=true" >> $GITHUB_OUTPUT
           else
@@ -79,146 +66,8 @@ jobs:
             echo "Found $SQL_ISSUES SQL style issues" >> $GITHUB_STEP_SUMMARY
           fi
 
-  rust-lint:
-    name: Rust Linting
-    runs-on: ubuntu-latest
-    needs: check-files
-    if: needs.check-files.outputs.rust-exists == 'true'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            rust-backend/target/
-          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('rust-backend/**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-lint-
-            ${{ runner.os }}-cargo-
-
-      - name: Check Rust formatting
-        working-directory: rust-backend
-        run: |
-          echo "## Rust Formatting Check" >> $GITHUB_STEP_SUMMARY
-          cargo fmt -- --check
-          echo "✅ Rust code is properly formatted" >> $GITHUB_STEP_SUMMARY
-
-      - name: Run Clippy
-        working-directory: rust-backend
-        env:
-          SQLX_OFFLINE: "true"
-        run: |
-          echo "## Clippy Linting Results" >> $GITHUB_STEP_SUMMARY
-          # Use --lib --bins to skip test targets that have SQLx queries not in cache
-          # Integration tests are run in CI workflow with a live database
-          cargo clippy --workspace --lib --bins --all-features -- -D warnings
-          echo "✅ No Clippy warnings found" >> $GITHUB_STEP_SUMMARY
-
-      - name: Check for unsafe code
-        working-directory: rust-backend
-        run: |
-          echo "## Unsafe Code Check" >> $GITHUB_STEP_SUMMARY
-          UNSAFE_COUNT=$(grep -r "unsafe" --include="*.rs" src/ 2>/dev/null | wc -l || echo "0")
-          echo "Found $UNSAFE_COUNT uses of unsafe code" >> $GITHUB_STEP_SUMMARY
-          if [ "$UNSAFE_COUNT" -gt 0 ]; then
-            echo "⚠️ Review unsafe code usage carefully" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Check for TODO comments
-        working-directory: rust-backend
-        run: |
-          echo "## Code Completeness Check" >> $GITHUB_STEP_SUMMARY
-          TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX" --include="*.rs" src/ 2>/dev/null | wc -l || echo "0")
-          echo "Found $TODO_COUNT TODO/FIXME comments" >> $GITHUB_STEP_SUMMARY
-
-  typescript-lint:
-    name: TypeScript/Ponder Linting
-    runs-on: ubuntu-latest
-    needs: check-files
-    if: needs.check-files.outputs.typescript-exists == 'true'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Cache pnpm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-lint-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-lint-
-            ${{ runner.os }}-pnpm-
-
-      - name: Install dependencies
-        working-directory: ponder-indexers
-        run: pnpm install --frozen-lockfile
-
-      - name: Check TypeScript formatting
-        working-directory: ponder-indexers
-        continue-on-error: true
-        run: |
-          echo "## TypeScript Formatting Check" >> $GITHUB_STEP_SUMMARY
-          if pnpm format:check 2>/dev/null; then
-            echo "✅ TypeScript code is properly formatted" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Format check script not configured yet" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Run ESLint
-        working-directory: ponder-indexers
-        continue-on-error: true
-        run: |
-          echo "## ESLint Results" >> $GITHUB_STEP_SUMMARY
-          if pnpm lint 2>/dev/null; then
-            echo "✅ No linting errors found" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ ESLint not configured yet" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Type check
-        working-directory: ponder-indexers
-        continue-on-error: true
-        run: |
-          echo "## TypeScript Type Check" >> $GITHUB_STEP_SUMMARY
-          if pnpm type-check 2>/dev/null; then
-            echo "✅ No type errors found" >> $GITHUB_STEP_SUMMARY
-          else
-            # Try running tsc directly
-            if npx tsc --noEmit 2>/dev/null; then
-              echo "✅ No type errors found" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "⚠️ Type checking not fully configured yet" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
+  # NOTE: Rust and TypeScript linting is now handled by ci.yml
+  # This avoids duplicate checks on PRs and reduces CI time.
 
   documentation-lint:
     name: Documentation Quality
@@ -342,7 +191,7 @@ jobs:
   lint-summary:
     name: Linting Summary
     runs-on: ubuntu-latest
-    needs: [sql-lint, rust-lint, typescript-lint, documentation-lint, docker-compose-lint, shell-script-lint]
+    needs: [sql-lint, documentation-lint, docker-compose-lint, shell-script-lint]
     if: always()
 
     steps:
@@ -350,21 +199,19 @@ jobs:
         run: |
           echo "## Linting Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Lint Results:" >> $GITHUB_STEP_SUMMARY
+          echo "### Extended Lint Results:" >> $GITHUB_STEP_SUMMARY
           echo "- SQL Lint: ${{ needs.sql-lint.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Rust Lint: ${{ needs.rust-lint.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- TypeScript Lint: ${{ needs.typescript-lint.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Documentation: ${{ needs.documentation-lint.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Docker Compose: ${{ needs.docker-compose-lint.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Shell Scripts: ${{ needs.shell-script-lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Note: Rust and TypeScript linting is handled by the CI workflow._" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if critical linting issues found
         if: |
           needs.sql-lint.result == 'failure' ||
           needs.documentation-lint.result == 'failure' ||
-          needs.docker-compose-lint.result == 'failure' ||
-          (needs.rust-lint.result == 'failure' && needs.rust-lint.result != 'skipped') ||
-          (needs.typescript-lint.result == 'failure' && needs.typescript-lint.result != 'skipped')
+          needs.docker-compose-lint.result == 'failure'
         run: |
           echo "Critical linting issues detected!"
           exit 1
