@@ -111,9 +111,9 @@ resource "aws_ecs_task_definition" "api_gateway" {
         { name = "SERVER_HOST", value = "0.0.0.0" },
         { name = "SERVER_PORT", value = "8080" },
         { name = "DB_SSL_MODE", value = "require" }, # TODO: Use verify-full after adding RDS CA cert to image
-        { name = "FRONTEND_URL", value = "https://${var.domain_name}" },
-        { name = "GOOGLE_REDIRECT_URI", value = "https://api.${var.domain_name}/api/v1/auth/google/callback" },
-        { name = "GITHUB_REDIRECT_URI", value = "https://api.${var.domain_name}/api/v1/auth/github/callback" }
+        { name = "FRONTEND_URL", value = "https://agentauri.ai" },
+        { name = "GOOGLE_REDIRECT_URI", value = "https://${var.domain_name}/api/v1/auth/google/callback" },
+        { name = "GITHUB_REDIRECT_URI", value = "https://${var.domain_name}/api/v1/auth/github/callback" }
       ]
 
       secrets = [
