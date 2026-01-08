@@ -16,26 +16,38 @@
       },
       {
         "indexed": false,
+        "internalType": "uint64",
+        "name": "feedbackIndex",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
         "internalType": "uint8",
         "name": "score",
         "type": "uint8"
       },
       {
         "indexed": true,
-        "internalType": "bytes32",
+        "internalType": "string",
         "name": "tag1",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "tag2",
-        "type": "bytes32"
+        "type": "string"
       },
       {
         "indexed": false,
         "internalType": "string",
-        "name": "feedbackUri",
+        "name": "tag2",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "endpoint",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "feedbackURI",
         "type": "string"
       },
       {
@@ -103,7 +115,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "responseUri",
+        "name": "responseURI",
         "type": "string"
       },
       {

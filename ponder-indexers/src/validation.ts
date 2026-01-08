@@ -355,27 +355,36 @@ export function validateMetadataValue(
 }
 
 /**
- * Validate tag value (tag1, tag2 from NewFeedback)
+ * Validate tag value (tag1, tag2 from NewFeedback, tag from ValidationResponse)
  *
- * Security: Validates bytes32 tag format and enforces length limits.
+ * Security: Validates string tag format and enforces length limits.
+ * ERC-8004 v1.0 changed tags from bytes32 to string.
  *
- * @param tag - Tag value from blockchain event (bytes32)
+ * @param tag - Tag value from blockchain event (string)
  * @param fieldName - Field name for error messages
  * @returns Validated tag string (or undefined if empty)
  */
 export function validateTag(
-  tag: Hex | undefined,
+  tag: string | undefined,
   fieldName: string
 ): string | undefined {
-  if (!tag) {
+  if (!tag || tag.length === 0) {
     return undefined;
   }
 
-  // Empty bytes32 (0x0000...0000)
-  if (tag === "0x" + "0".repeat(64)) {
-    return undefined;
+  const MAX_TAG_LENGTH = 255;
+
+  // Enforce length limit
+  if (tag.length > MAX_TAG_LENGTH) {
+    throw new Error(
+      `${fieldName} exceeds maximum length (${MAX_TAG_LENGTH} chars): ${tag.length} chars`
+    );
   }
 
-  // Validate format
-  return validateBytes32Hash(tag, fieldName);
+  // Check for null bytes (common SQLi technique)
+  if (tag.includes("\0")) {
+    throw new Error(`${fieldName} contains null bytes`);
+  }
+
+  return tag;
 }

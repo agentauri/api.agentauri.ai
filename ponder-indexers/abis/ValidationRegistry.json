@@ -17,7 +17,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "requestUri",
+        "name": "requestURI",
         "type": "string"
       },
       {
@@ -60,7 +60,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "responseUri",
+        "name": "responseURI",
         "type": "string"
       },
       {
@@ -71,9 +71,9 @@
       },
       {
         "indexed": false,
-        "internalType": "bytes32",
+        "internalType": "string",
         "name": "tag",
-        "type": "bytes32"
+        "type": "string"
       }
     ],
     "name": "ValidationResponse",

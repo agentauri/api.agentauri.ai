@@ -70,7 +70,7 @@ async function handleRegistered(event: RegisteredEvent, context: PonderContext, 
       agentId: validatedAgentId,
       eventValues: {
         owner: validateAndNormalizeAddress(event.args.owner, "owner"),
-        tokenUri: validateUri(event.args.tokenURI, "tokenURI"),
+        agentUri: validateUri(event.args.agentURI, "agentURI"),
       },
     });
   } catch (error) {
@@ -108,8 +108,8 @@ async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext
       chainId,
       agentId: validatedAgentId,
       eventValues: {
-        metadataKey: validateMetadataKey(event.args.key),
-        metadataValue: validateMetadataValue(event.args.value),
+        metadataKey: validateMetadataKey(event.args.metadataKey),
+        metadataValue: validateMetadataValue(event.args.metadataValue),
       },
     });
   } catch (error) {
@@ -122,18 +122,19 @@ async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext
 }
 
 /**
- * UriUpdated Event
- * Emitted when an agent's tokenURI is updated
+ * URIUpdated Event
+ * Emitted when an agent's agentURI is updated
+ * ERC-8004 v1.0: Event renamed from UriUpdated to URIUpdated, newUri to newURI
  */
-ponder.on("IdentityRegistryEthereumSepolia:UriUpdated", async ({ event, context }) => {
+ponder.on("IdentityRegistryEthereumSepolia:URIUpdated", async ({ event, context }) => {
   await handleUriUpdated(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:UriUpdated", async ({ event, context }) => {
+ponder.on("IdentityRegistryBaseSepolia:URIUpdated", async ({ event, context }) => {
   await handleUriUpdated(event, context, CHAIN_IDS.BASE_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryLineaSepolia:UriUpdated", async ({ event, context }) => {
+ponder.on("IdentityRegistryLineaSepolia:URIUpdated", async ({ event, context }) => {
   await handleUriUpdated(event, context, CHAIN_IDS.LINEA_SEPOLIA);
 });
 
@@ -143,16 +144,16 @@ async function handleUriUpdated(event: UriUpdatedEvent, context: PonderContext, 
 
     await processEvent(context, event.block, event.transaction, event.log, {
       registry: REGISTRIES.IDENTITY,
-      eventType: "UriUpdated",
+      eventType: "URIUpdated",
       chainId,
       agentId: validatedAgentId,
       eventValues: {
-        tokenUri: validateUri(event.args.newUri, "newUri"),
+        agentUri: validateUri(event.args.newURI, "newURI"),
         owner: validateAndNormalizeAddress(event.args.updatedBy, "updatedBy"), // Store updatedBy in owner field (schema reuse)
       },
     });
   } catch (error) {
-    console.warn(`[SKIP] UriUpdated event validation failed:`, {
+    console.warn(`[SKIP] URIUpdated event validation failed:`, {
       chainId: chainId.toString(),
       agentId: event.args.agentId.toString(),
       error: error instanceof Error ? error.message : String(error),
@@ -230,11 +231,12 @@ async function handleNewFeedback(event: NewFeedbackEvent, context: PonderContext
       agentId: validatedAgentId,
       eventValues: {
         clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
-        feedbackIndex: null, // NewFeedback doesn't emit feedbackIndex (contract-assigned)
+        feedbackIndex: validateFeedbackIndex(event.args.feedbackIndex),
         score: validateScore(event.args.score),
         tag1: validateTag(event.args.tag1, "tag1"),
         tag2: validateTag(event.args.tag2, "tag2"),
-        fileUri: validateUri(event.args.feedbackUri, "feedbackUri"),
+        endpoint: event.args.endpoint || "",
+        fileUri: validateUri(event.args.feedbackURI, "feedbackURI"),
         fileHash: validateBytes32Hash(event.args.feedbackHash, "feedbackHash"),
       },
     });
@@ -363,7 +365,7 @@ async function handleValidationResponse(event: ValidationResponseEvent, context:
         validatorAddress: validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress"),
         requestHash: validateBytes32Hash(event.args.requestHash, "requestHash"),
         response: Number(event.args.response),
-        responseUri: validateUri(event.args.responseUri, "responseUri"),
+        responseUri: validateUri(event.args.responseURI, "responseURI"),
         responseHash: validateBytes32Hash(event.args.responseHash, "responseHash"),
         tag: validateTag(event.args.tag, "tag"),
       },
@@ -405,7 +407,7 @@ async function handleValidationRequest(event: ValidationRequestEvent, context: P
       eventValues: {
         validatorAddress: validateAndNormalizeAddress(event.args.validatorAddress, "validatorAddress"),
         requestHash: validateBytes32Hash(event.args.requestHash, "requestHash"),
-        requestUri: validateUri(event.args.requestUri, "requestUri"),
+        requestUri: validateUri(event.args.requestURI, "requestURI"),
       },
     });
   } catch (error) {

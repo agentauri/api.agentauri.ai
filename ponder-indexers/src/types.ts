@@ -46,7 +46,7 @@ export interface LogInfo {
  */
 export interface RegisteredEventArgs {
   agentId: bigint;
-  tokenURI: string;
+  agentURI: string;
   owner: Address;
 }
 
@@ -63,8 +63,8 @@ export interface RegisteredEvent {
  */
 export interface MetadataSetEventArgs {
   agentId: bigint;
-  key: string;
-  value: Uint8Array; // bytes in Solidity
+  metadataKey: string;
+  metadataValue: Uint8Array; // bytes in Solidity
 }
 
 export interface MetadataSetEvent {
@@ -76,11 +76,11 @@ export interface MetadataSetEvent {
 
 /**
  * UriUpdated event arguments
- * Emitted when agent's tokenURI is updated
+ * Emitted when agent's agentURI is updated
  */
 export interface UriUpdatedEventArgs {
   agentId: bigint;
-  newUri: string;
+  newURI: string;
   updatedBy: Address;
 }
 
@@ -119,10 +119,12 @@ export interface TransferEvent {
 export interface NewFeedbackEventArgs {
   agentId: bigint;
   clientAddress: Address;
+  feedbackIndex: bigint; // uint64 in Solidity
   score: bigint; // uint8 in Solidity
-  tag1: Hex; // bytes32
-  tag2: Hex; // bytes32
-  feedbackUri: string;
+  tag1: string;
+  tag2: string;
+  endpoint: string;
+  feedbackURI: string;
   feedbackHash: Hex; // bytes32
 }
 
@@ -182,7 +184,7 @@ export interface ValidationRequestEventArgs {
   validatorAddress: Address;
   agentId: bigint;
   requestHash: Hex; // bytes32
-  requestUri: string;
+  requestURI: string;
 }
 
 export interface ValidationRequestEvent {
@@ -201,9 +203,9 @@ export interface ValidationResponseEventArgs {
   agentId: bigint;
   requestHash: Hex; // bytes32
   response: bigint; // uint256 in Solidity
-  responseUri: string;
+  responseURI: string;
   responseHash: Hex; // bytes32
-  tag: Hex; // bytes32
+  tag: string;
 }
 
 export interface ValidationResponseEvent {

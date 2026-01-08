@@ -11,7 +11,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "tokenURI",
+        "name": "agentURI",
         "type": "string"
       },
       {
@@ -36,19 +36,19 @@
       {
         "indexed": true,
         "internalType": "string",
-        "name": "indexedKey",
+        "name": "indexedMetadataKey",
         "type": "string"
       },
       {
         "indexed": false,
         "internalType": "string",
-        "name": "key",
+        "name": "metadataKey",
         "type": "string"
       },
       {
         "indexed": false,
         "internalType": "bytes",
-        "name": "value",
+        "name": "metadataValue",
         "type": "bytes"
       }
     ],
@@ -67,7 +67,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "newUri",
+        "name": "newURI",
         "type": "string"
       },
       {
@@ -77,7 +77,7 @@
         "type": "address"
       }
     ],
-    "name": "UriUpdated",
+    "name": "URIUpdated",
     "type": "event"
   },
   {

@@ -25,7 +25,7 @@ export const Event = onchainTable("Event", (t) => ({
 
   // Identity Registry specific fields
   owner: t.text(),
-  tokenUri: t.text(),
+  agentUri: t.text(),
   metadataKey: t.text(),
   metadataValue: t.text(),
 
@@ -37,6 +37,7 @@ export const Event = onchainTable("Event", (t) => ({
   tag2: t.text(),
   fileUri: t.text(),
   fileHash: t.text(),
+  endpoint: t.text(),
 
   // Validation Registry specific fields
   validatorAddress: t.text(),

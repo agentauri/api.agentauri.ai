@@ -36,7 +36,7 @@ type Event {
   agentId: BigInt
   timestamp: BigInt!
   owner: String
-  tokenUri: String
+  agentUri: String
   metadataKey: String
   metadataValue: String
   clientAddress: String
@@ -46,6 +46,7 @@ type Event {
   tag2: String
   fileUri: String
   fileHash: String
+  endpoint: String
   validatorAddress: String
   requestHash: String
   response: Int
@@ -163,16 +164,16 @@ input EventFilter {
   owner_ends_with: String
   owner_not_starts_with: String
   owner_not_ends_with: String
-  tokenUri: String
-  tokenUri_not: String
-  tokenUri_in: [String]
-  tokenUri_not_in: [String]
-  tokenUri_contains: String
-  tokenUri_not_contains: String
-  tokenUri_starts_with: String
-  tokenUri_ends_with: String
-  tokenUri_not_starts_with: String
-  tokenUri_not_ends_with: String
+  agentUri: String
+  agentUri_not: String
+  agentUri_in: [String]
+  agentUri_not_in: [String]
+  agentUri_contains: String
+  agentUri_not_contains: String
+  agentUri_starts_with: String
+  agentUri_ends_with: String
+  agentUri_not_starts_with: String
+  agentUri_not_ends_with: String
   metadataKey: String
   metadataKey_not: String
   metadataKey_in: [String]
@@ -259,6 +260,16 @@ input EventFilter {
   fileHash_ends_with: String
   fileHash_not_starts_with: String
   fileHash_not_ends_with: String
+  endpoint: String
+  endpoint_not: String
+  endpoint_in: [String]
+  endpoint_not_in: [String]
+  endpoint_contains: String
+  endpoint_not_contains: String
+  endpoint_starts_with: String
+  endpoint_ends_with: String
+  endpoint_not_starts_with: String
+  endpoint_not_ends_with: String
   validatorAddress: String
   validatorAddress_not: String
   validatorAddress_in: [String]
