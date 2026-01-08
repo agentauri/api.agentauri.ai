@@ -161,7 +161,7 @@ export interface ResponseAppendedEventArgs {
   clientAddress: Address;
   feedbackIndex: bigint; // uint64 in Solidity
   responder: Address;
-  responseUri: string;
+  responseURI: string; // ABI uses uppercase URI
   responseHash: Hex; // bytes32
 }
 

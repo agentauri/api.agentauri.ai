@@ -318,7 +318,7 @@ async function handleResponseAppended(event: ResponseAppendedEvent, context: Pon
         clientAddress: validateAndNormalizeAddress(event.args.clientAddress, "clientAddress"),
         feedbackIndex: validateFeedbackIndex(event.args.feedbackIndex),
         validatorAddress: validateAndNormalizeAddress(event.args.responder, "responder"), // Reuse validatorAddress for responder (schema reuse)
-        responseUri: validateUri(event.args.responseUri, "responseUri"),
+        responseUri: validateUri(event.args.responseURI, "responseURI"),
         responseHash: validateBytes32Hash(event.args.responseHash, "responseHash"),
       },
     });
