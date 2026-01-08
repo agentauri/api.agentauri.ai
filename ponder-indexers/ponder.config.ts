@@ -558,6 +558,26 @@ const networkEnvPrefixes: Record<string, string> = {
 
 // Build networks dynamically with async health checks
 // Using async IIFE pattern because Ponder doesn't support async config
+// Helper: Check if address is null/zero address (not deployed)
+const NULL_ADDRESS = "0x0000000000000000000000000000000000000000";
+function isNullAddress(address: string | undefined): boolean {
+  if (!address) return true;
+  return address.toLowerCase() === NULL_ADDRESS.toLowerCase();
+}
+
+// Helper: Check if a network has any deployed contracts
+function hasDeployedContracts(networkKey: string): boolean {
+  const contractAddrs = contracts[networkKey];
+  if (!contractAddrs) return false;
+
+  const identityIsNull = isNullAddress(contractAddrs["identity"]);
+  const reputationIsNull = isNullAddress(contractAddrs["reputation"]);
+  const validationIsNull = isNullAddress(contractAddrs["validation"]);
+
+  // Return true if at least one contract is deployed
+  return !identityIsNull || !reputationIsNull || !validationIsNull;
+}
+
 async function buildNetworksWithHealthChecks() {
   const configuredNetworks: Record<
     string,
@@ -577,6 +597,15 @@ async function buildNetworksWithHealthChecks() {
 
   // Build transports with healthy providers only
   for (const { networkKey, envPrefix, healthyProviders } of healthCheckResults) {
+    // Skip networks where all contracts are null (0x0) - not deployed yet
+    if (!hasDeployedContracts(networkKey)) {
+      configLogger.info({
+        networkKey,
+        reason: "All contract addresses are null (0x0)",
+      }, `Skipping network ${networkKey} - no contracts deployed`);
+      continue;
+    }
+
     const transport = createResilientTransport(envPrefix, healthyProviders);
     const networkConfig = networks[networkKey];
     if (transport && networkConfig) {
@@ -649,40 +678,60 @@ for (const networkKey of enabledNetworkKeys) {
   const pascalNetworkKey =
     networkKey.charAt(0).toUpperCase() + networkKey.slice(1);
 
-  // Debug: log what we're processing
-  configLogger.info({
-    networkKey,
-    hasContractAddrs: !!contractAddrs,
-    identityAddr: contractAddrs?.["identity"]?.slice(0, 10),
-    startBlock,
-  }, `Processing contracts for ${networkKey}`);
-
   // Skip if no contract addresses for this network
   if (!contractAddrs) continue;
 
-  // Identity Registry (ERC1967 Proxy + Implementation)
-  configuredContracts[`IdentityRegistry${pascalNetworkKey}`] = {
-    network: networkKey,
-    abi: mergeAbis([ERC1967ProxyAbi, IdentityRegistryAbi]),
-    address: contractAddrs["identity"]!,
-    startBlock,
-  };
+  // Check if ALL contracts for this network are null - skip the entire network
+  const identityIsNull = isNullAddress(contractAddrs["identity"]);
+  const reputationIsNull = isNullAddress(contractAddrs["reputation"]);
+  const validationIsNull = isNullAddress(contractAddrs["validation"]);
 
-  // Reputation Registry (ERC1967 Proxy + Implementation)
-  configuredContracts[`ReputationRegistry${pascalNetworkKey}`] = {
-    network: networkKey,
-    abi: mergeAbis([ERC1967ProxyAbi, ReputationRegistryAbi]),
-    address: contractAddrs["reputation"]!,
-    startBlock,
-  };
+  if (identityIsNull && reputationIsNull && validationIsNull) {
+    configLogger.info({
+      networkKey,
+      reason: "All contract addresses are null (0x0)",
+    }, `Skipping ${networkKey} - no contracts deployed`);
+    continue;
+  }
 
-  // Validation Registry (ERC1967 Proxy + Implementation)
-  configuredContracts[`ValidationRegistry${pascalNetworkKey}`] = {
-    network: networkKey,
-    abi: mergeAbis([ERC1967ProxyAbi, ValidationRegistryAbi]),
-    address: contractAddrs["validation"]!,
+  // Debug: log what we're processing
+  configLogger.info({
+    networkKey,
+    identityAddr: identityIsNull ? "SKIPPED (0x0)" : contractAddrs["identity"]?.slice(0, 10),
+    reputationAddr: reputationIsNull ? "SKIPPED (0x0)" : contractAddrs["reputation"]?.slice(0, 10),
+    validationAddr: validationIsNull ? "SKIPPED (0x0)" : contractAddrs["validation"]?.slice(0, 10),
     startBlock,
-  };
+  }, `Processing contracts for ${networkKey}`);
+
+  // Identity Registry (ERC1967 Proxy + Implementation) - skip if null address
+  if (!identityIsNull) {
+    configuredContracts[`IdentityRegistry${pascalNetworkKey}`] = {
+      network: networkKey,
+      abi: mergeAbis([ERC1967ProxyAbi, IdentityRegistryAbi]),
+      address: contractAddrs["identity"]!,
+      startBlock,
+    };
+  }
+
+  // Reputation Registry (ERC1967 Proxy + Implementation) - skip if null address
+  if (!reputationIsNull) {
+    configuredContracts[`ReputationRegistry${pascalNetworkKey}`] = {
+      network: networkKey,
+      abi: mergeAbis([ERC1967ProxyAbi, ReputationRegistryAbi]),
+      address: contractAddrs["reputation"]!,
+      startBlock,
+    };
+  }
+
+  // Validation Registry (ERC1967 Proxy + Implementation) - skip if null address
+  if (!validationIsNull) {
+    configuredContracts[`ValidationRegistry${pascalNetworkKey}`] = {
+      network: networkKey,
+      abi: mergeAbis([ERC1967ProxyAbi, ValidationRegistryAbi]),
+      address: contractAddrs["validation"]!,
+      startBlock,
+    };
+  }
 }
 
 // ============================================================================

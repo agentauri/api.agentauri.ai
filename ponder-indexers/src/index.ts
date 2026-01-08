@@ -51,13 +51,14 @@ ponder.on("IdentityRegistryEthereumSepolia:Registered", async ({ event, context 
   await handleRegistered(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:Registered", async ({ event, context }) => {
-  await handleRegistered(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("IdentityRegistryLineaSepolia:Registered", async ({ event, context }) => {
-  await handleRegistered(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// Uncomment when contracts are deployed and PONDER_CONFIG addresses are set
+// ponder.on("IdentityRegistryBaseSepolia:Registered", async ({ event, context }) => {
+//   await handleRegistered(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("IdentityRegistryLineaSepolia:Registered", async ({ event, context }) => {
+//   await handleRegistered(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleRegistered(event: RegisteredEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -90,13 +91,13 @@ ponder.on("IdentityRegistryEthereumSepolia:MetadataSet", async ({ event, context
   await handleMetadataSet(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:MetadataSet", async ({ event, context }) => {
-  await handleMetadataSet(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("IdentityRegistryLineaSepolia:MetadataSet", async ({ event, context }) => {
-  await handleMetadataSet(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("IdentityRegistryBaseSepolia:MetadataSet", async ({ event, context }) => {
+//   await handleMetadataSet(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("IdentityRegistryLineaSepolia:MetadataSet", async ({ event, context }) => {
+//   await handleMetadataSet(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleMetadataSet(event: MetadataSetEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -130,13 +131,13 @@ ponder.on("IdentityRegistryEthereumSepolia:URIUpdated", async ({ event, context 
   await handleUriUpdated(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:URIUpdated", async ({ event, context }) => {
-  await handleUriUpdated(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("IdentityRegistryLineaSepolia:URIUpdated", async ({ event, context }) => {
-  await handleUriUpdated(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("IdentityRegistryBaseSepolia:URIUpdated", async ({ event, context }) => {
+//   await handleUriUpdated(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("IdentityRegistryLineaSepolia:URIUpdated", async ({ event, context }) => {
+//   await handleUriUpdated(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleUriUpdated(event: UriUpdatedEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -169,13 +170,13 @@ ponder.on("IdentityRegistryEthereumSepolia:Transfer", async ({ event, context })
   await handleTransfer(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("IdentityRegistryBaseSepolia:Transfer", async ({ event, context }) => {
-  await handleTransfer(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("IdentityRegistryLineaSepolia:Transfer", async ({ event, context }) => {
-  await handleTransfer(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("IdentityRegistryBaseSepolia:Transfer", async ({ event, context }) => {
+//   await handleTransfer(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("IdentityRegistryLineaSepolia:Transfer", async ({ event, context }) => {
+//   await handleTransfer(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleTransfer(event: TransferEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -212,13 +213,13 @@ ponder.on("ReputationRegistryEthereumSepolia:NewFeedback", async ({ event, conte
   await handleNewFeedback(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryBaseSepolia:NewFeedback", async ({ event, context }) => {
-  await handleNewFeedback(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("ReputationRegistryLineaSepolia:NewFeedback", async ({ event, context }) => {
-  await handleNewFeedback(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("ReputationRegistryBaseSepolia:NewFeedback", async ({ event, context }) => {
+//   await handleNewFeedback(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("ReputationRegistryLineaSepolia:NewFeedback", async ({ event, context }) => {
+//   await handleNewFeedback(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleNewFeedback(event: NewFeedbackEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -257,13 +258,13 @@ ponder.on("ReputationRegistryEthereumSepolia:FeedbackRevoked", async ({ event, c
   await handleFeedbackRevoked(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryBaseSepolia:FeedbackRevoked", async ({ event, context }) => {
-  await handleFeedbackRevoked(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("ReputationRegistryLineaSepolia:FeedbackRevoked", async ({ event, context }) => {
-  await handleFeedbackRevoked(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("ReputationRegistryBaseSepolia:FeedbackRevoked", async ({ event, context }) => {
+//   await handleFeedbackRevoked(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("ReputationRegistryLineaSepolia:FeedbackRevoked", async ({ event, context }) => {
+//   await handleFeedbackRevoked(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleFeedbackRevoked(event: FeedbackRevokedEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -296,13 +297,13 @@ ponder.on("ReputationRegistryEthereumSepolia:ResponseAppended", async ({ event, 
   await handleResponseAppended(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
 });
 
-ponder.on("ReputationRegistryBaseSepolia:ResponseAppended", async ({ event, context }) => {
-  await handleResponseAppended(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("ReputationRegistryLineaSepolia:ResponseAppended", async ({ event, context }) => {
-  await handleResponseAppended(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("ReputationRegistryBaseSepolia:ResponseAppended", async ({ event, context }) => {
+//   await handleResponseAppended(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("ReputationRegistryLineaSepolia:ResponseAppended", async ({ event, context }) => {
+//   await handleResponseAppended(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleResponseAppended(event: ResponseAppendedEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -340,17 +341,19 @@ async function handleResponseAppended(event: ResponseAppendedEvent, context: Pon
  * ValidationResponse Event
  * Emitted when a validation response is submitted
  */
-ponder.on("ValidationRegistryEthereumSepolia:ValidationResponse", async ({ event, context }) => {
-  await handleValidationResponse(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
-});
+// NOTE: Validation Registry not yet deployed on Ethereum Sepolia - handler commented out
+// Uncomment when ValidationRegistry is deployed and ETHEREUM_SEPOLIA_VALIDATION_ADDRESS is set
+// ponder.on("ValidationRegistryEthereumSepolia:ValidationResponse", async ({ event, context }) => {
+//   await handleValidationResponse(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+// });
 
-ponder.on("ValidationRegistryBaseSepolia:ValidationResponse", async ({ event, context }) => {
-  await handleValidationResponse(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("ValidationRegistryLineaSepolia:ValidationResponse", async ({ event, context }) => {
-  await handleValidationResponse(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("ValidationRegistryBaseSepolia:ValidationResponse", async ({ event, context }) => {
+//   await handleValidationResponse(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("ValidationRegistryLineaSepolia:ValidationResponse", async ({ event, context }) => {
+//   await handleValidationResponse(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleValidationResponse(event: ValidationResponseEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
@@ -383,17 +386,19 @@ async function handleValidationResponse(event: ValidationResponseEvent, context:
  * ValidationRequest Event
  * Emitted when a validation is requested for an agent
  */
-ponder.on("ValidationRegistryEthereumSepolia:ValidationRequest", async ({ event, context }) => {
-  await handleValidationRequest(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
-});
+// NOTE: Validation Registry not yet deployed on Ethereum Sepolia - handler commented out
+// Uncomment when ValidationRegistry is deployed and ETHEREUM_SEPOLIA_VALIDATION_ADDRESS is set
+// ponder.on("ValidationRegistryEthereumSepolia:ValidationRequest", async ({ event, context }) => {
+//   await handleValidationRequest(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+// });
 
-ponder.on("ValidationRegistryBaseSepolia:ValidationRequest", async ({ event, context }) => {
-  await handleValidationRequest(event, context, CHAIN_IDS.BASE_SEPOLIA);
-});
-
-ponder.on("ValidationRegistryLineaSepolia:ValidationRequest", async ({ event, context }) => {
-  await handleValidationRequest(event, context, CHAIN_IDS.LINEA_SEPOLIA);
-});
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("ValidationRegistryBaseSepolia:ValidationRequest", async ({ event, context }) => {
+//   await handleValidationRequest(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("ValidationRegistryLineaSepolia:ValidationRequest", async ({ event, context }) => {
+//   await handleValidationRequest(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
 
 async function handleValidationRequest(event: ValidationRequestEvent, context: PonderContext, chainId: bigint): Promise<void> {
   try {
