@@ -163,7 +163,7 @@ resource "aws_cloudwatch_log_group" "grafana" {
   count = var.grafana_enabled ? 1 : 0
 
   name              = "/ecs/${local.name_prefix}/grafana"
-  retention_in_days = var.environment == "production" ? 7 : 7 # Cost optimization: 7 days sufficient for dashboards
+  retention_in_days = 7 # Cost optimization: 7 days sufficient for dashboards
 
   tags = {
     Name = "${local.name_prefix}-grafana-logs"
@@ -397,9 +397,9 @@ resource "aws_ecs_service" "grafana" {
   }
 
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   # Note: ALB was removed for cost optimization. Grafana will need API Gateway
@@ -417,7 +417,7 @@ resource "aws_ecs_service" "grafana" {
 # -----------------------------------------------------------------------------
 # ALB Target Group and Listener Rule (REMOVED)
 # -----------------------------------------------------------------------------
-# ALB was removed for cost optimization (~$15-17/mese savings).
+# ALB was removed for cost optimization (~$15-17/month savings).
 # To re-enable Grafana, add API Gateway integration with a /grafana route.
 # See api_gateway.tf for the pattern used for the main API.
 

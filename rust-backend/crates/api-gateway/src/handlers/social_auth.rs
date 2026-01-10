@@ -4,7 +4,7 @@
 //! They support both login/registration and account linking flows.
 
 use actix_web::{http::header, web, HttpRequest, HttpResponse, Responder};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use shared::{Config, DbPool};
 use uuid::Uuid;
 
@@ -32,6 +32,52 @@ pub struct OAuthCallbackQuery {
     state: String,
 }
 
+// ============================================================================
+// Helper Functions for OAuth Response Handling
+// ============================================================================
+
+/// Helper to create OAuth redirect response or error
+fn oauth_redirect_response(
+    result: Result<String, SocialAuthError>,
+    provider: &str,
+) -> HttpResponse {
+    match result {
+        Ok(url) => HttpResponse::Found()
+            .insert_header((header::LOCATION, url))
+            .finish(),
+        Err(e) => {
+            tracing::error!("Failed to generate {} auth URL: {}", provider, e);
+            HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "oauth_error",
+                format!("Failed to initialize {} authentication", provider),
+            ))
+        }
+    }
+}
+
+/// Helper to create OAuth redirect response for account linking
+fn oauth_link_redirect_response(
+    result: Result<String, SocialAuthError>,
+    provider: &str,
+) -> HttpResponse {
+    match result {
+        Ok(url) => HttpResponse::Found()
+            .insert_header((header::LOCATION, url))
+            .finish(),
+        Err(e) => {
+            tracing::error!(
+                "Failed to generate {} auth URL for linking: {}",
+                provider,
+                e
+            );
+            HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "oauth_error",
+                "Failed to initialize account linking",
+            ))
+        }
+    }
+}
+
 /// Initiate Google OAuth login
 ///
 /// Redirects the user to Google's OAuth consent screen.
@@ -52,18 +98,10 @@ pub async fn google_auth(
     social_auth: web::Data<SocialAuthService>,
     query: web::Query<OAuthInitQuery>,
 ) -> impl Responder {
-    match social_auth.google_auth_url(None, query.redirect_after.clone()) {
-        Ok(url) => HttpResponse::Found()
-            .insert_header((header::LOCATION, url))
-            .finish(),
-        Err(e) => {
-            tracing::error!("Failed to generate Google auth URL: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "oauth_error",
-                "Failed to initialize Google authentication",
-            ))
-        }
-    }
+    oauth_redirect_response(
+        social_auth.google_auth_url(None, query.redirect_after.clone()),
+        "Google",
+    )
 }
 
 /// Initiate GitHub OAuth login
@@ -86,18 +124,10 @@ pub async fn github_auth(
     social_auth: web::Data<SocialAuthService>,
     query: web::Query<OAuthInitQuery>,
 ) -> impl Responder {
-    match social_auth.github_auth_url(None, query.redirect_after.clone()) {
-        Ok(url) => HttpResponse::Found()
-            .insert_header((header::LOCATION, url))
-            .finish(),
-        Err(e) => {
-            tracing::error!("Failed to generate GitHub auth URL: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "oauth_error",
-                "Failed to initialize GitHub authentication",
-            ))
-        }
-    }
+    oauth_redirect_response(
+        social_auth.github_auth_url(None, query.redirect_after.clone()),
+        "GitHub",
+    )
 }
 
 // ============================================================================
@@ -137,18 +167,10 @@ pub async fn link_google(
         Err(response) => return response,
     };
 
-    match social_auth.google_auth_url(Some(user_id), query.redirect_after.clone()) {
-        Ok(url) => HttpResponse::Found()
-            .insert_header((header::LOCATION, url))
-            .finish(),
-        Err(e) => {
-            tracing::error!("Failed to generate Google auth URL for linking: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "oauth_error",
-                "Failed to initialize account linking",
-            ))
-        }
-    }
+    oauth_link_redirect_response(
+        social_auth.google_auth_url(Some(user_id), query.redirect_after.clone()),
+        "Google",
+    )
 }
 
 /// Link GitHub account to existing user
@@ -184,18 +206,10 @@ pub async fn link_github(
         Err(response) => return response,
     };
 
-    match social_auth.github_auth_url(Some(user_id), query.redirect_after.clone()) {
-        Ok(url) => HttpResponse::Found()
-            .insert_header((header::LOCATION, url))
-            .finish(),
-        Err(e) => {
-            tracing::error!("Failed to generate GitHub auth URL for linking: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse::new(
-                "oauth_error",
-                "Failed to initialize account linking",
-            ))
-        }
-    }
+    oauth_link_redirect_response(
+        social_auth.github_auth_url(Some(user_id), query.redirect_after.clone()),
+        "GitHub",
+    )
 }
 
 /// Extract user_id from JWT in request (header or cookie)
@@ -204,16 +218,11 @@ fn extract_user_id_from_request(
     config: &Config,
 ) -> Result<String, HttpResponse> {
     // Extract token from Authorization header or cookie
-    let token = extract_token_from_request(req);
-
-    let token = match token {
-        Some(t) => t,
-        None => {
-            return Err(HttpResponse::Unauthorized().json(ErrorResponse::new(
-                "unauthorized",
-                "Authentication required to link accounts",
-            )));
-        }
+    let Some(token) = extract_token_from_request(req) else {
+        return Err(HttpResponse::Unauthorized().json(ErrorResponse::new(
+            "unauthorized",
+            "Authentication required to link accounts",
+        )));
     };
 
     // Validate JWT and extract user_id
@@ -888,17 +897,12 @@ fn validate_redirect_path(path: &str) -> Result<String, &'static str> {
 /// This prevents tokens from being exposed in URLs/browser history.
 async fn generate_jwt_and_redirect(
     pool: &DbPool,
-    config: web::Data<Config>,
+    _config: web::Data<Config>,
     social_auth: web::Data<SocialAuthService>,
     user: shared::models::User,
     redirect_after: Option<String>,
 ) -> HttpResponse {
-    use crate::services::{OAuthCodeService, UserRefreshTokenService, REFRESH_TOKEN_VALIDITY_DAYS};
-
-    // Check environment
-    let is_production = std::env::var("ENVIRONMENT")
-        .map(|e| e.to_lowercase() == "production")
-        .unwrap_or(false);
+    use crate::services::OAuthCodeService;
 
     // Validate and sanitize redirect path to prevent open redirect attacks
     let redirect_path = match redirect_after {
@@ -915,95 +919,35 @@ async fn generate_jwt_and_redirect(
 
     let frontend_url = social_auth.frontend_url();
 
-    // In development, use Authorization Code Flow to avoid exposing tokens in URLs
-    if !is_production {
-        let code_service = OAuthCodeService::new();
-        let code = match code_service.create_code(pool, &user.id).await {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::error!("Failed to generate OAuth code: {}", e);
-                return redirect_with_error(
-                    &social_auth,
-                    "internal_error",
-                    "Failed to generate authentication code",
-                );
-            }
-        };
-
-        // Redirect with code parameter - frontend will exchange it via POST /api/v1/auth/exchange
-        let separator = if redirect_path.contains('?') {
-            "&"
-        } else {
-            "?"
-        };
-        let redirect_url = format!(
-            "{}{}{}code={}",
-            frontend_url, redirect_path, separator, code
-        );
-
-        return HttpResponse::Found()
-            .insert_header((header::LOCATION, redirect_url))
-            .finish();
-    }
-
-    // Production flow: Generate tokens and set as cookies
-    let claims = Claims::new(user.id.clone(), user.username.clone(), 1); // 1 hour
-    let token = match encode(
-        &Header::new(Algorithm::HS256),
-        &claims,
-        &EncodingKey::from_secret(config.server.jwt_secret.as_bytes()),
-    ) {
-        Ok(token) => token,
+    // Always use Authorization Code Flow for consistent frontend integration
+    // The frontend exchanges the code via POST /api/v1/auth/exchange
+    // This is more secure as tokens never appear in URLs/browser history
+    let code_service = OAuthCodeService::new();
+    let code = match code_service.create_code(pool, &user.id).await {
+        Ok(c) => c,
         Err(e) => {
-            tracing::error!("Failed to generate JWT: {}", e);
-            return redirect_with_error(&social_auth, "internal_error", "Failed to generate token");
-        }
-    };
-
-    // Generate refresh token
-    let refresh_service = UserRefreshTokenService::new();
-    let refresh_token = match refresh_service
-        .create_refresh_token(pool, &user.id, None, None)
-        .await
-    {
-        Ok(rt) => rt,
-        Err(e) => {
-            tracing::error!("Failed to generate refresh token: {}", e);
+            tracing::error!("Failed to generate OAuth code: {}", e);
             return redirect_with_error(
                 &social_auth,
                 "internal_error",
-                "Failed to generate refresh token",
+                "Failed to generate authentication code",
             );
         }
     };
 
-    // Build redirect URL with validated path
-    let redirect_url = format!("{}{}", frontend_url, redirect_path);
-
-    // Build auth-token cookie with security flags
-    let auth_cookie = actix_web::cookie::Cookie::build("auth-token", &token)
-        .path("/")
-        .http_only(true)
-        .secure(true) // Production always uses HTTPS
-        .same_site(actix_web::cookie::SameSite::Lax) // Lax for OAuth redirects
-        .max_age(actix_web::cookie::time::Duration::hours(1))
-        .finish();
-
-    // Build refresh-token cookie with longer expiry
-    let refresh_cookie = actix_web::cookie::Cookie::build("refresh-token", &refresh_token)
-        .path("/")
-        .http_only(true)
-        .secure(true)
-        .same_site(actix_web::cookie::SameSite::Lax)
-        .max_age(actix_web::cookie::time::Duration::days(
-            REFRESH_TOKEN_VALIDITY_DAYS,
-        ))
-        .finish();
+    // Redirect with code parameter - frontend will exchange it via POST /api/v1/auth/exchange
+    let separator = if redirect_path.contains('?') {
+        "&"
+    } else {
+        "?"
+    };
+    let redirect_url = format!(
+        "{}{}{}code={}",
+        frontend_url, redirect_path, separator, code
+    );
 
     HttpResponse::Found()
         .insert_header((header::LOCATION, redirect_url))
-        .cookie(auth_cookie)
-        .cookie(refresh_cookie)
         .finish()
 }
 

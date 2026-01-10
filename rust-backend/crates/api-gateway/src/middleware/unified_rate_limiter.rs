@@ -67,6 +67,50 @@ static MONITORING_TOKEN: Lazy<Option<String>> = Lazy::new(|| {
         .filter(|t| !t.is_empty())
 });
 
+/// Rate limit mode configuration (loaded once at startup)
+/// Returns (is_production, mode_string)
+static RATE_LIMIT_CONFIG: Lazy<(bool, String)> = Lazy::new(|| {
+    let is_production = std::env::var("ENVIRONMENT")
+        .map(|e| e == "production")
+        .unwrap_or(false);
+    let default_mode = if is_production { "enforcing" } else { "shadow" };
+    let mode = std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| default_mode.to_string());
+    (is_production, mode)
+});
+
+/// Add rate limit headers to a response
+///
+/// # Arguments
+/// * `headers` - Mutable reference to response headers
+/// * `limit` - Maximum requests allowed in window
+/// * `remaining` - Remaining quota
+/// * `reset_at` - Unix timestamp when limit resets
+/// * `window_seconds` - Window size in seconds
+fn add_rate_limit_headers(
+    headers: &mut actix_web::http::header::HeaderMap,
+    limit: i64,
+    remaining: i64,
+    reset_at: i64,
+    window_seconds: i64,
+) {
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-limit"),
+        HeaderValue::from(limit),
+    );
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-remaining"),
+        HeaderValue::from(remaining),
+    );
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-reset"),
+        HeaderValue::from(reset_at),
+    );
+    headers.insert(
+        HeaderName::from_static("x-ratelimit-window"),
+        HeaderValue::from(window_seconds),
+    );
+}
+
 /// Unified rate limiter middleware
 pub struct UnifiedRateLimiter {
     rate_limiter: Rc<RateLimiter>,
@@ -159,13 +203,18 @@ where
                 }
             }
 
-            // Skip rate limiting for health check, metrics, and documentation endpoints
-            // These are called frequently by load balancers, monitoring systems, and Swagger UI
+            // Skip rate limiting for health check, metrics, documentation, and OAuth endpoints
+            // These are called frequently by load balancers, monitoring systems, Swagger UI,
+            // and OAuth providers (Google, GitHub) during authentication flow
             let path = req.path();
             if path == "/api/v1/health"
                 || path == "/metrics"
                 || path == "/api/v1/openapi.json"
                 || path.starts_with("/api-docs")
+                || path.starts_with("/api/v1/auth/google")
+                || path.starts_with("/api/v1/auth/github")
+                || path.starts_with("/api/v1/auth/link/")
+                || path == "/api/v1/auth/exchange"
             {
                 return service.call(req).await;
             }
@@ -232,15 +281,8 @@ where
 
             // Check if rate limit exceeded
             if !result.allowed {
-                // Check rate limit mode (shadow or enforcing)
-                // In production (ENVIRONMENT=production), default to enforcing
-                // In development, default to shadow mode for easier testing
-                let is_production = std::env::var("ENVIRONMENT")
-                    .map(|e| e == "production")
-                    .unwrap_or(false);
-                let default_mode = if is_production { "enforcing" } else { "shadow" };
-                let mode =
-                    std::env::var("RATE_LIMIT_MODE").unwrap_or_else(|_| default_mode.to_string());
+                // Use pre-computed rate limit mode from static config
+                let (is_production, ref mode) = *RATE_LIMIT_CONFIG;
 
                 // Warn if shadow mode is used in production (should be intentional)
                 if is_production && mode == "shadow" {
@@ -268,21 +310,12 @@ where
                         HeaderName::from_static("x-ratelimit-status"),
                         HeaderValue::from_static("shadow-violation"),
                     );
-                    headers.insert(
-                        HeaderName::from_static("x-ratelimit-limit"),
-                        HeaderValue::from(result.limit),
-                    );
-                    headers.insert(
-                        HeaderName::from_static("x-ratelimit-remaining"),
-                        HeaderValue::from(0),
-                    );
-                    headers.insert(
-                        HeaderName::from_static("x-ratelimit-reset"),
-                        HeaderValue::from(result.reset_at),
-                    );
-                    headers.insert(
-                        HeaderName::from_static("x-ratelimit-window"),
-                        HeaderValue::from(window_seconds),
+                    add_rate_limit_headers(
+                        headers,
+                        result.limit,
+                        0,
+                        result.reset_at,
+                        window_seconds,
                     );
                     return Ok(res);
                 } else {
@@ -315,23 +348,13 @@ where
             let mut res = service.call(req).await?;
 
             // Add rate limit headers to response
-            let headers = res.headers_mut();
-            headers.insert(
-                HeaderName::from_static("x-ratelimit-limit"),
-                HeaderValue::from(result.limit),
+            add_rate_limit_headers(
+                res.headers_mut(),
+                result.limit,
+                result.remaining,
+                result.reset_at,
+                window_seconds,
             );
-            headers.insert(
-                HeaderName::from_static("x-ratelimit-remaining"),
-                HeaderValue::from(result.remaining),
-            );
-            headers.insert(
-                HeaderName::from_static("x-ratelimit-reset"),
-                HeaderValue::from(result.reset_at),
-            );
-            // Use configured window size instead of hardcoded value
-            if let Ok(window_str) = HeaderValue::try_from(window_seconds.to_string()) {
-                headers.insert(HeaderName::from_static("x-ratelimit-window"), window_str);
-            }
 
             Ok(res)
         })
