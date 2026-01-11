@@ -106,10 +106,12 @@ jobs:
           key: sqlx-${{ hashFiles('rust-backend/.sqlx/**/*.json') }}
           restore-keys: sqlx-
 
-      # Run database migrations in single transaction for speed
+      # Run database migrations
       - name: Run database migrations
         run: |
-          cat database/migrations/*.sql | PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend --single-transaction
+          for migration in database/migrations/*.sql; do
+            PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f "$migration"
+          done
 
       # Run database-specific tests in parallel with format check
       - name: Run database schema tests
