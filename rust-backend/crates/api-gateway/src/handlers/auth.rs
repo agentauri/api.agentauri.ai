@@ -1089,11 +1089,34 @@ pub async fn wallet_login(
         ));
     }
 
-    // Mark nonce as used
-    let _ = sqlx::query(r#"UPDATE used_nonces SET used_at = NOW() WHERE nonce = $1"#)
-        .bind(&nonce)
-        .execute(pool.get_ref())
-        .await;
+    // Mark nonce as used - CRITICAL: This must succeed to prevent replay attacks
+    // Using UPDATE...WHERE used_at IS NULL RETURNING to make this atomic
+    let rows_affected = match sqlx::query(
+        r#"UPDATE used_nonces SET used_at = NOW() WHERE nonce = $1 AND used_at IS NULL"#,
+    )
+    .bind(&nonce)
+    .execute(pool.get_ref())
+    .await
+    {
+        Ok(result) => result.rows_affected(),
+        Err(e) => {
+            // SECURITY: Fail-closed on database error to prevent potential replay attacks
+            tracing::error!(nonce = %nonce, error = %e, "Failed to mark nonce as used - rejecting request");
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to verify nonce",
+            ));
+        }
+    };
+
+    // If no rows were updated, the nonce was already used (race condition or replay attempt)
+    if rows_affected == 0 {
+        tracing::warn!(nonce = %nonce, "Nonce already used - potential replay attack");
+        return HttpResponse::Unauthorized().json(ErrorResponse::new(
+            "invalid_nonce",
+            "Nonce has already been used",
+        ));
+    }
 
     // Parse and verify signature (EIP-191 personal sign)
     let signature = match req.signature.parse::<PrimitiveSignature>() {
@@ -1225,9 +1248,9 @@ pub async fn wallet_login(
             ));
         }
 
-        // Create personal organization
+        // Create personal organization - CRITICAL: Must succeed for proper user setup
         let base_slug = format!("{}-personal", &checksummed_address[2..10].to_lowercase());
-        if let Ok(org) = OrganizationRepository::create_with_executor(
+        let org = match OrganizationRepository::create_with_executor(
             &mut *tx,
             &format!("{}'s Personal", short_address),
             &base_slug,
@@ -1237,9 +1260,35 @@ pub async fn wallet_login(
         )
         .await
         {
-            let _ =
-                MemberRepository::add_with_executor(&mut *tx, &org.id, &user.id, ROLE_OWNER, None)
-                    .await;
+            Ok(org) => org,
+            Err(e) => {
+                tracing::error!(
+                    user_id = %user.id,
+                    wallet = %checksummed_address,
+                    error = %e,
+                    "Failed to create personal organization for wallet user"
+                );
+                return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                    "internal_error",
+                    "Failed to complete user setup",
+                ));
+            }
+        };
+
+        // Add user as owner of their personal organization
+        if let Err(e) =
+            MemberRepository::add_with_executor(&mut *tx, &org.id, &user.id, ROLE_OWNER, None).await
+        {
+            tracing::error!(
+                user_id = %user.id,
+                org_id = %org.id,
+                error = %e,
+                "Failed to add wallet user as organization owner"
+            );
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to complete user setup",
+            ));
         }
 
         // Commit transaction

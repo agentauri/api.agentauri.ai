@@ -32,26 +32,49 @@ static METRICS_INITIALIZED: OnceLock<()> = OnceLock::new();
 ///
 /// * `addr` - Socket address for the Prometheus scrape endpoint (e.g., "0.0.0.0:9090")
 ///
-/// # Panics
+/// # Returns
 ///
-/// Panics if the exporter cannot bind to the specified address.
-pub fn init_metrics(addr: SocketAddr) {
+/// Returns `true` if metrics were successfully initialized, `false` if initialization
+/// failed or was already done.
+pub fn init_metrics(addr: SocketAddr) -> bool {
+    let mut success = false;
     METRICS_INITIALIZED.get_or_init(|| {
-        PrometheusBuilder::new()
-            .with_http_listener(addr)
-            .install()
-            .expect("Failed to install Prometheus exporter");
-
-        tracing::info!(addr = %addr, "Prometheus metrics exporter initialized");
+        match PrometheusBuilder::new().with_http_listener(addr).install() {
+            Ok(()) => {
+                tracing::info!(addr = %addr, "Prometheus metrics exporter initialized");
+                success = true;
+            }
+            Err(e) => {
+                // Log error but don't panic - metrics are optional functionality
+                tracing::error!(
+                    addr = %addr,
+                    error = %e,
+                    "Failed to install Prometheus exporter - metrics will be unavailable"
+                );
+            }
+        }
     });
+    success
 }
 
 /// Initialize metrics with default address (for testing or when address not configured)
 ///
 /// Uses 0.0.0.0:9090 as the default address.
-pub fn init_metrics_default() {
-    let addr: SocketAddr = "0.0.0.0:9090".parse().expect("Invalid default address");
-    init_metrics(addr);
+///
+/// # Returns
+///
+/// Returns `true` if metrics were successfully initialized, `false` otherwise.
+pub fn init_metrics_default() -> bool {
+    // Use const for the default - this is a compile-time constant and cannot fail
+    const DEFAULT_ADDR: &str = "0.0.0.0:9090";
+    match DEFAULT_ADDR.parse::<SocketAddr>() {
+        Ok(addr) => init_metrics(addr),
+        Err(e) => {
+            // This should never happen with a const valid address, but handle gracefully
+            tracing::error!(error = %e, "Invalid default metrics address");
+            false
+        }
+    }
 }
 
 /// Record a successful job completion

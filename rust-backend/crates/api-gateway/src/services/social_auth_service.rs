@@ -223,7 +223,11 @@ impl SocialAuthService {
             .connect_timeout(std::time::Duration::from_secs(5)) // Fail fast on connection
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .expect("Failed to create HTTP client");
+            .unwrap_or_else(|e| {
+                // This should rarely fail (only on TLS backend issues), but handle gracefully
+                tracing::error!(error = %e, "Failed to create custom HTTP client, using default");
+                reqwest::Client::new()
+            });
 
         Self {
             google_config,

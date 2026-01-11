@@ -4,15 +4,29 @@
 
 This document describes how the api.agentauri.ai backend integrates with the ERC-8004 standard for on-chain agent economy. It covers the three core registries, event structures, and integration patterns.
 
+> **⚠️ IMPORTANT**: This documentation reflects the **Jan 2026 Specification Update**. See [Breaking Changes](#jan-2026-specification-changes) section for migration details.
+
+## Quick Links (Always Keep in Context)
+
+| Resource | URL |
+|----------|-----|
+| **ERC-8004 Specification** | https://eips.ethereum.org/EIPS/eip-8004 |
+| **Jan 2026 Spec Changes** | https://github.com/erc-8004/erc-8004-contracts/blob/master/SpecsJan26Update.md |
+| **Contracts Repository** | https://github.com/erc-8004/erc-8004-contracts |
+| **Contract ABIs** | https://github.com/erc-8004/erc-8004-contracts/tree/master/abis |
+| **Subgraph Repository** | https://github.com/agent0lab/subgraph |
+
 ## ERC-8004 Standard
 
-**Specification**: https://eips.ethereum.org/EIPS/eip-8004
+**Status**: Draft (in peer-review process)
+**Created**: August 13, 2025
+**Authors**: Marco De Rossi, Davide Crapis, Jordan Ellis, Erik Reppel
 
 The ERC-8004 standard defines three on-chain registries that establish the foundation for the agent economy:
 
-1. **IdentityRegistry**: Who is the agent?
-2. **ReputationRegistry**: How is the agent evaluated?
-3. **ValidationRegistry**: How is the agent's work validated?
+1. **IdentityRegistry**: Who is the agent? (ERC-721 based portable identifiers)
+2. **ReputationRegistry**: How is the agent evaluated? (Scores 0-100 with tags)
+3. **ValidationRegistry**: How is the agent's work validated? (TEE, ZK proofs, re-execution)
 
 ## Contract Addresses
 
@@ -20,14 +34,95 @@ The ERC-8004 standard defines three on-chain registries that establish the found
 
 ### Testnet Deployments
 
-| Network | Chain ID | Identity Registry | Reputation Registry | Validation Registry |
-|---------|----------|-------------------|---------------------|---------------------|
-| Ethereum Sepolia | 11155111 | TBD | TBD | TBD |
-| Base Sepolia | 84532 | TBD | TBD | TBD |
-| Linea Sepolia | 59141 | TBD | TBD | TBD |
-| Polygon Amoy | 80002 | TBD | TBD | TBD |
+| Network | Chain ID | Identity Registry | Reputation Registry | Status |
+|---------|----------|-------------------|---------------------|--------|
+| **Ethereum Sepolia** | 11155111 | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | ✅ Live |
+| Base Sepolia | 84532 | - | - | ⏳ Pending |
+| Linea Sepolia | 59141 | - | - | ⏳ Pending |
+| Polygon Amoy | 80002 | - | - | ⏳ Pending |
+| Hedera Testnet | 296 | - | - | ⏳ Pending |
+| HyperEVM Testnet | 998 | - | - | ⏳ Pending |
+| SKALE Base Sepolia | 1351057110 | - | - | ⏳ Pending |
 
-> **Note**: Actual addresses should be populated from the erc-8004-contracts repository.
+> **Note**: ValidationRegistry addresses are pending the TEE community integration (planned for later 2026).
+
+## Subgraph
+
+**Repository**: https://github.com/agent0lab/subgraph
+
+### Endpoints
+
+| Network | Status | Endpoint |
+|---------|--------|----------|
+| Ethereum Sepolia | ✅ Live | `https://gateway.thegraph.com/api/subgraphs/id/6wQRC7geo9XYAhckfmfo8kbMRLeWU8KQd3XsJqFKmZLT` |
+| Other networks | ⏳ Pending | Contact maintainers to add chains |
+
+### Indexed Contracts
+- IdentityRegistry: Agent registration and metadata
+- ReputationRegistry: Feedback and reputation tracking
+- ValidationRegistry: Agent validation and attestation
+
+---
+
+## Jan 2026 Specification Changes
+
+> **🔴 BREAKING CHANGES** - Review carefully before updating integrations.
+
+### 1. Elimination of Feedback Pre-Authorization
+
+**OLD Model**: Agents signed `feedbackAuth` structures authorizing specific client addresses.
+
+**NEW Model**: Any address can submit feedback via `giveFeedback()` without pre-authorization.
+
+```solidity
+// OLD signature
+function giveFeedback(uint256 agentId, uint8 score, bytes32 tag1, bytes32 tag2,
+                      string fileuri, bytes32 filehash, bytes feedbackAuth);
+
+// NEW signature
+function giveFeedback(uint256 agentId, uint8 score, string tag1, string tag2,
+                      string endpoint, string feedbackURI, bytes32 feedbackHash);
+```
+
+**Why**: Removes friction; spam resistance moved to off-chain aggregation.
+
+### 2. Agent Wallet Address Verification
+
+**OLD**: Optional off-chain endpoint field.
+
+**NEW**: Reserved on-chain metadata key with cryptographic verification:
+- Cannot be set via `setMetadata()` or during `register()`
+- Updated only through EIP-712 signatures (EOAs) or ERC-1271 (smart contracts)
+- Resets to zero address upon token transfer
+
+### 3. Tags Changed from bytes32 to string
+
+All tag fields in events and functions now use `string` type instead of `bytes32`.
+
+### 4. Renamed Fields
+
+| Old Name | New Name |
+|----------|----------|
+| `tokenURI` | `agentURI` |
+| `tokenId` | `agentId` |
+| `fileuri` | `feedbackURI` |
+| `filehash` | `feedbackHash` |
+| `responseUri` | `responseURI` |
+
+### 5. Registration JSON Schema Updates
+
+**Added Fields**:
+- `web` and `email` endpoints
+- `x402Support: false`
+- `active: true`
+
+**Changed**:
+- MCP capabilities: object `{}` → array `[]`
+- OASF endpoint version: `0.7` → `0.8`
+
+For complete details, see: https://github.com/erc-8004/erc-8004-contracts/blob/master/SpecsJan26Update.md
+
+---
 
 ## IdentityRegistry
 
@@ -208,20 +303,23 @@ pub async fn handle_metadata_set_event(event: MetadataSetEvent) {
 
 Tracks agent performance through client feedback. Clients submit scores (0-100) with optional semantic tags and supporting files.
 
+> **📋 Jan 2026 Update**: Tags are now `string` instead of `bytes32`. Pre-authorization (`feedbackAuth`) has been removed.
+
 ### Contract Interface
 
 ```solidity
 interface IReputationRegistry {
-    // Events
+    // Events (Jan 2026 Updated)
     event NewFeedback(
         uint256 indexed agentId,
         address indexed clientAddress,
         uint256 feedbackIndex,
         uint8 score,
-        bytes32 tag1,
-        bytes32 tag2,
-        string fileuri,
-        bytes32 filehash
+        string indexed tag1,      // Changed from bytes32
+        string tag2,              // Changed from bytes32
+        string endpoint,          // NEW field
+        string feedbackURI,       // Renamed from fileuri
+        bytes32 feedbackHash      // Renamed from filehash
     );
 
     event FeedbackRevoked(
@@ -235,21 +333,30 @@ interface IReputationRegistry {
         address indexed clientAddress,
         uint256 feedbackIndex,
         address responder,
-        string responseUri
+        string responseURI        // Renamed from responseUri
     );
 
-    // Functions
+    // Functions (Jan 2026 Updated - NO feedbackAuth required)
     function giveFeedback(
         uint256 agentId,
         uint8 score,
-        bytes32 tag1,
-        bytes32 tag2,
-        string memory fileuri,
-        bytes32 filehash
+        string memory tag1,       // Changed from bytes32
+        string memory tag2,       // Changed from bytes32
+        string memory endpoint,   // NEW field
+        string memory feedbackURI,
+        bytes32 feedbackHash
     ) external returns (uint256);
 
     function revokeFeedback(uint256 agentId, uint256 feedbackIndex) external;
-    function respondToFeedback(uint256 agentId, uint256 feedbackIndex, string memory responseUri) external;
+    function respondToFeedback(uint256 agentId, uint256 feedbackIndex, string memory responseURI) external;
+
+    // Read functions (Jan 2026 Updated)
+    function getSummary(uint256 agentId, string memory tag1, string memory tag2)
+        external view returns (uint256 count, uint256 totalScore);
+    function readFeedback(uint256 agentId, address client, uint256 feedbackIndex)
+        external view returns (Feedback memory);
+    function readAllFeedback(uint256 agentId, bool includeRevoked)
+        external view returns (Feedback[] memory, uint64[] memory feedbackIndexes);
 }
 ```
 
@@ -685,6 +792,31 @@ Monitor actual testnet deployments to verify real-world behavior and reorg handl
 
 ## References
 
-- **ERC-8004 Specification**: https://eips.ethereum.org/EIPS/eip-8004
-- **Contract Repository**: https://github.com/erc-8004/erc-8004-contracts
+### Core Resources (Always Keep in Context)
+
+| Resource | URL | Description |
+|----------|-----|-------------|
+| **ERC-8004 Specification** | https://eips.ethereum.org/EIPS/eip-8004 | Official EIP document |
+| **Jan 2026 Spec Changes** | https://github.com/erc-8004/erc-8004-contracts/blob/master/SpecsJan26Update.md | Breaking changes guide |
+| **Contracts Repository** | https://github.com/erc-8004/erc-8004-contracts | Solidity implementations |
+| **Contract ABIs** | https://github.com/erc-8004/erc-8004-contracts/tree/master/abis | JSON ABIs for integration |
+| **Subgraph** | https://github.com/agent0lab/subgraph | GraphQL indexing layer |
+
+### Related Standards
+
 - **OASF Schema**: https://github.com/agntcy/oasf
+- **A2A Protocol**: https://google.github.io/A2A
+- **MCP Protocol**: https://modelcontextprotocol.io/docs
+
+### Deployed Contract Addresses (Ethereum Sepolia)
+
+```
+IdentityRegistry:   0x8004A818BFB912233c491871b3d84c89A494BD9e
+ReputationRegistry: 0x8004B663056A597Dffe9eCcC1965A193B7388713
+```
+
+### Subgraph Endpoint (Ethereum Sepolia)
+
+```
+https://gateway.thegraph.com/api/subgraphs/id/6wQRC7geo9XYAhckfmfo8kbMRLeWU8KQd3XsJqFKmZLT
+```

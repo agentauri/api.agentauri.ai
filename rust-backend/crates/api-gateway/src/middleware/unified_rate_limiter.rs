@@ -54,6 +54,7 @@ use std::{
     future::{ready, Ready},
     rc::Rc,
 };
+use subtle::ConstantTimeEq;
 use tracing::{debug, error, warn};
 
 /// Default window size in seconds (1 hour)
@@ -196,7 +197,12 @@ where
                     .get("X-Monitoring-Token")
                     .and_then(|h| h.to_str().ok())
                 {
-                    if provided_token == expected_token {
+                    // Use constant-time comparison to prevent timing attacks
+                    let expected_bytes = expected_token.as_bytes();
+                    let provided_bytes = provided_token.as_bytes();
+                    if expected_bytes.len() == provided_bytes.len()
+                        && expected_bytes.ct_eq(provided_bytes).into()
+                    {
                         debug!("Monitoring token valid - bypassing rate limit");
                         return service.call(req).await;
                     }

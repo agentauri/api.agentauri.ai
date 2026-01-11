@@ -96,10 +96,22 @@ pub async fn create_organization(
         return resp;
     }
 
+    // Start transaction for atomic organization + member creation
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse::new(
+                "internal_error",
+                "Failed to create organization",
+            ));
+        }
+    };
+
     // Create organization - let the database handle uniqueness via constraint
     // This avoids the check-then-insert race condition
-    let org = match OrganizationRepository::create(
-        &pool,
+    let org = match OrganizationRepository::create_with_executor(
+        &mut *tx,
         &req.name,
         &req.slug,
         req.description.as_deref(),
@@ -139,11 +151,21 @@ pub async fn create_organization(
         }
     };
 
-    // Add creator as owner
-    if let Err(e) = MemberRepository::add(&pool, &org.id, &user_id, ROLE_OWNER, None).await {
+    // Add creator as owner (within the same transaction)
+    if let Err(e) =
+        MemberRepository::add_with_executor(&mut *tx, &org.id, &user_id, ROLE_OWNER, None).await
+    {
         tracing::error!("Failed to add owner to organization: {}", e);
-        // Try to clean up the organization
-        let _ = OrganizationRepository::delete(&pool, &org.id).await;
+        // Transaction will be rolled back automatically on drop
+        return HttpResponse::InternalServerError().json(ErrorResponse::new(
+            "internal_error",
+            "Failed to create organization",
+        ));
+    }
+
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        tracing::error!("Failed to commit organization creation: {}", e);
         return HttpResponse::InternalServerError().json(ErrorResponse::new(
             "internal_error",
             "Failed to create organization",

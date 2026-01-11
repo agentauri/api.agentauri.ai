@@ -345,6 +345,31 @@ Key tables in `database/migrations/`:
 
 ## External References
 
-- **ERC-8004 Spec**: https://eips.ethereum.org/EIPS/eip-8004
+### ERC-8004 Resources (Keep in Context)
+
+| Resource | URL |
+|----------|-----|
+| **ERC-8004 Spec** | https://eips.ethereum.org/EIPS/eip-8004 |
+| **Jan 2026 Spec Changes** | https://github.com/erc-8004/erc-8004-contracts/blob/master/SpecsJan26Update.md |
+| **Contracts Repo** | https://github.com/erc-8004/erc-8004-contracts |
+| **Contract ABIs** | https://github.com/erc-8004/erc-8004-contracts/tree/master/abis |
+| **Subgraph** | https://github.com/agent0lab/subgraph |
+
+### Deployed Contracts (Ethereum Sepolia)
+
+```
+IdentityRegistry:   0x8004A818BFB912233c491871b3d84c89A494BD9e
+ReputationRegistry: 0x8004B663056A597Dffe9eCcC1965A193B7388713
+```
+
+### Subgraph Endpoint (Ethereum Sepolia)
+
+```
+https://gateway.thegraph.com/api/subgraphs/id/6wQRC7geo9XYAhckfmfo8kbMRLeWU8KQd3XsJqFKmZLT
+```
+
+### Other References
+
 - **MCP Protocol**: https://modelcontextprotocol.io/docs
 - **Ponder Docs**: https://ponder.sh/docs
+- **A2A Protocol**: https://google.github.io/A2A

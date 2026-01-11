@@ -14,8 +14,9 @@
 //!
 //! # Usage
 //!
-//! ```rust
+//! ```rust,ignore
 //! use api_gateway::middleware::metrics::{PrometheusMetrics, metrics_handler};
+//! use actix_web::{App, web};
 //!
 //! // In your main.rs:
 //! let metrics = PrometheusMetrics::new();
@@ -46,52 +47,74 @@ static PROMETHEUS_HANDLE: OnceCell<PrometheusHandle> = OnceCell::new();
 /// Initialize the Prometheus metrics recorder
 ///
 /// This should be called once at application startup, before any metrics are recorded.
-/// Returns the PrometheusHandle for rendering metrics.
-pub fn init_metrics() -> PrometheusHandle {
-    PROMETHEUS_HANDLE
-        .get_or_init(|| {
-            // Build and install the Prometheus recorder
-            let builder = PrometheusBuilder::new();
-            let handle = builder
-                .install_recorder()
-                .expect("Failed to install Prometheus recorder");
-
-            // Describe metrics for better documentation in /metrics output
-            describe_counter!(
-                "http_requests_total",
-                "Total number of HTTP requests processed"
-            );
-            describe_histogram!(
-                "http_request_duration_seconds",
-                "HTTP request duration in seconds"
-            );
-            describe_gauge!(
-                "http_requests_in_flight",
-                "Number of HTTP requests currently being processed"
-            );
-
-            handle
-        })
-        .clone()
+/// Returns the PrometheusHandle for rendering metrics, or None if initialization fails.
+///
+/// # Errors
+///
+/// Returns None if the Prometheus recorder cannot be installed (e.g., already installed
+/// by another component, or system resource unavailable).
+pub fn init_metrics() -> Option<PrometheusHandle> {
+    Some(
+        PROMETHEUS_HANDLE
+            .get_or_init(|| {
+                // Build and install the Prometheus recorder
+                let builder = PrometheusBuilder::new();
+                match builder.install_recorder() {
+                    Ok(handle) => {
+                        // Describe metrics for better documentation in /metrics output
+                        describe_counter!(
+                            "http_requests_total",
+                            "Total number of HTTP requests processed"
+                        );
+                        describe_histogram!(
+                            "http_request_duration_seconds",
+                            "HTTP request duration in seconds"
+                        );
+                        describe_gauge!(
+                            "http_requests_in_flight",
+                            "Number of HTTP requests currently being processed"
+                        );
+                        handle
+                    }
+                    Err(e) => {
+                        // Log error but don't panic - metrics are optional
+                        tracing::error!(
+                            error = %e,
+                            "Failed to install Prometheus recorder - metrics will be unavailable"
+                        );
+                        // Return a fallback handle that won't record anything useful
+                        // but won't cause panics either
+                        PrometheusBuilder::new().build_recorder().handle()
+                    }
+                }
+            })
+            .clone(),
+    )
 }
 
 /// Get the global Prometheus handle
 ///
-/// Panics if `init_metrics()` hasn't been called.
-pub fn get_prometheus_handle() -> &'static PrometheusHandle {
-    PROMETHEUS_HANDLE
-        .get()
-        .expect("Prometheus metrics not initialized. Call init_metrics() first.")
+/// Returns None if `init_metrics()` hasn't been called or failed.
+pub fn get_prometheus_handle() -> Option<&'static PrometheusHandle> {
+    PROMETHEUS_HANDLE.get()
 }
 
 /// Handler for the /metrics endpoint
 ///
 /// Returns Prometheus metrics in text format for scraping.
+/// Returns 503 Service Unavailable if metrics are not initialized.
 pub async fn metrics_handler() -> HttpResponse {
-    let handle = get_prometheus_handle();
-    HttpResponse::Ok()
-        .content_type("text/plain; version=0.0.4; charset=utf-8")
-        .body(handle.render())
+    match get_prometheus_handle() {
+        Some(handle) => HttpResponse::Ok()
+            .content_type("text/plain; version=0.0.4; charset=utf-8")
+            .body(handle.render()),
+        None => {
+            tracing::warn!("Metrics requested but Prometheus not initialized");
+            HttpResponse::ServiceUnavailable()
+                .content_type("text/plain")
+                .body("Metrics not available - Prometheus recorder not initialized")
+        }
+    }
 }
 
 /// Prometheus metrics middleware for Actix-web

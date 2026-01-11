@@ -645,7 +645,7 @@ fn extract_client_ip(req: &HttpRequest) -> String {
         if let Ok(value) = forwarded.to_str() {
             // Take the first IP (client IP)
             if let Some(first_ip) = value.split(',').next() {
-                return first_ip.trim().to_string();
+                return strip_port(first_ip.trim());
             }
         }
     }
@@ -653,8 +653,39 @@ fn extract_client_ip(req: &HttpRequest) -> String {
     // Fall back to peer address
     req.connection_info()
         .peer_addr()
-        .map(|s| s.to_string())
+        .map(strip_port)
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Strip port from IP address, handling both IPv4 and IPv6 formats
+///
+/// Examples:
+/// - "192.168.1.1:8080" -> "192.168.1.1"
+/// - "[2600:1f16::1]:443" -> "2600:1f16::1"
+/// - "2600:1f16::1" -> "2600:1f16::1" (no port, IPv6)
+/// - "192.168.1.1" -> "192.168.1.1" (no port, IPv4)
+fn strip_port(addr: &str) -> String {
+    // Handle IPv6 with brackets: [addr]:port
+    if let Some(stripped) = addr.strip_prefix('[') {
+        if let Some(bracket_end) = stripped.find(']') {
+            return stripped[..bracket_end].to_string();
+        }
+        // Malformed, return as-is without leading bracket
+        return stripped.to_string();
+    }
+
+    // Count colons to distinguish IPv6 from IPv4:port
+    let colon_count = addr.chars().filter(|&c| c == ':').count();
+
+    if colon_count == 1 {
+        // IPv4 with port: "1.2.3.4:8080"
+        addr.rsplit_once(':')
+            .map(|(ip, _port)| ip.to_string())
+            .unwrap_or_else(|| addr.to_string())
+    } else {
+        // IPv6 without brackets (no port) or plain IPv4: return as-is
+        addr.to_string()
+    }
 }
 
 // ============================================================================
@@ -699,12 +730,10 @@ pub async fn handle_stripe_webhook(
         .unwrap_or_else(|_| !cfg!(debug_assertions)); // Enabled by default in release builds
 
     if ip_whitelist_enabled {
+        // extract_client_ip already strips port and handles IPv6
         let client_ip = extract_client_ip(&req_http);
 
-        // Strip port if present (e.g., "127.0.0.1:8080" -> "127.0.0.1")
-        let ip_only = client_ip.split(':').next().unwrap_or(&client_ip);
-
-        if !is_stripe_ip(ip_only) {
+        if !is_stripe_ip(&client_ip) {
             warn!(
                 client_ip = %client_ip,
                 "Stripe webhook rejected: IP not in whitelist"

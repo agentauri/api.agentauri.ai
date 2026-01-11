@@ -7,6 +7,7 @@ pub mod a2a_audit;
 pub mod a2a_task_processor;
 pub mod api_key_service;
 pub mod auth_rate_limiter;
+pub mod auth_token_service;
 pub mod oauth_client_service;
 pub mod oauth_code_service;
 pub mod oauth_token_service;
@@ -21,6 +22,7 @@ pub use a2a_audit::{A2aAuditService, AuditActor, AuditEventType, AuditLogParams}
 pub use a2a_task_processor::{start_a2a_task_processor, A2aTaskProcessor, A2aTaskProcessorConfig};
 pub use api_key_service::ApiKeyService;
 pub use auth_rate_limiter::AuthRateLimiter;
+pub use auth_token_service::AuthTokenService;
 pub use oauth_client_service::OAuthClientService;
 pub use oauth_code_service::{OAuthCodeError, OAuthCodeService};
 pub use oauth_token_service::OAuthTokenService;

@@ -21,32 +21,28 @@ Response:
 {
   "chains": [
     {
+      "chain": "ethereumSepolia",
       "chain_id": 11155111,
-      "chain_name": "Ethereum Sepolia",
-      "status": "synced",
-      "block_number": 5234567,
-      "block_timestamp": "2024-01-15T10:00:00Z",
-      "lag_seconds": 12
+      "current_block": 10003725,
+      "is_synced": true
     },
     {
+      "chain": "baseSepolia",
       "chain_id": 84532,
-      "chain_name": "Base Sepolia",
-      "status": "syncing",
-      "block_number": 1234560,
-      "block_timestamp": "2024-01-15T09:58:00Z",
-      "lag_seconds": 120
+      "current_block": 0,
+      "is_synced": false
     },
     {
+      "chain": "lineaSepolia",
       "chain_id": 59141,
-      "chain_name": "Linea Sepolia",
-      "status": "synced",
-      "block_number": 987654,
-      "block_timestamp": "2024-01-15T10:00:00Z",
-      "lag_seconds": 3
+      "current_block": 0,
+      "is_synced": false
     }
   ],
-  "overall_status": "syncing",
-  "updated_at": "2024-01-15T10:00:05Z"
+  "status": "partial",
+  "namespace": "ponder",
+  "total_events": 163,
+  "last_activity_at": "1767888528"
 }
 ```
 
@@ -54,20 +50,23 @@ Response:
 
 | Status | Description |
 |--------|-------------|
-| `synced` | Up to date with blockchain |
-| `syncing` | Catching up to latest block |
+| `synced` | All chains up to date |
+| `partial` | Some chains synced, others pending |
+| `syncing` | Catching up to latest blocks |
 | `error` | Indexer has encountered an error |
-| `stopped` | Indexer is not running |
 
 ### Response Fields
 
 | Field | Description |
 |-------|-------------|
-| `chain_id` | Network identifier |
-| `chain_name` | Human-readable network name |
-| `block_number` | Last indexed block |
-| `block_timestamp` | Timestamp of last block |
-| `lag_seconds` | Seconds behind chain head |
+| `chain` | Chain identifier (e.g., "ethereumSepolia") |
+| `chain_id` | Network chain ID |
+| `current_block` | Last indexed block (0 if not configured) |
+| `is_synced` | Whether chain is up to date |
+| `status` | Overall indexer status |
+| `namespace` | Ponder database namespace |
+| `total_events` | Total events indexed |
+| `last_activity_at` | Unix timestamp of last activity |
 
 ## Event Statistics
 
