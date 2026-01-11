@@ -83,12 +83,22 @@ jobs:
           components: rustfmt, clippy
 
       - name: Setup sccache
+        id: sccache
         uses: mozilla-actions/sccache-action@v0.0.6
+        continue-on-error: true
 
-      - name: Configure sccache
+      - name: Configure sccache (if available)
+        if: steps.sccache.outcome == 'success'
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          # Test if sccache can connect to GitHub's cache service
+          if sccache --start-server 2>/dev/null && timeout 5 sccache --show-stats 2>/dev/null; then
+            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            echo "::notice::sccache enabled - using GitHub Actions cache"
+          else
+            echo "::warning::sccache cache service unavailable - building without sccache"
+            sccache --stop-server 2>/dev/null || true
+          fi
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
