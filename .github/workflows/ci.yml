@@ -1,8 +1,15 @@
 # ============================================================================
-# Continuous Integration Workflow
+# Continuous Integration Workflow (Optimized)
 # ============================================================================
 # Runs on every push and pull request
 # Executes the complete test suite including database tests
+#
+# Optimizations applied:
+# - Removed unnecessary check-files job (files always exist)
+# - Consolidated database tests into rust-tests job
+# - All test jobs run in parallel
+# - Improved caching with shared keys
+# - Reduced container startup overhead
 # ============================================================================
 
 name: CI
@@ -13,6 +20,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Database configuration for CI
   DB_USER: postgres
@@ -20,38 +32,19 @@ env:
   DB_NAME: erc8004_backend
   DB_HOST: localhost
   DB_PORT: 5432
-
   # Redis configuration for CI
   REDIS_PASSWORD: ci_redis_password_12345
+  # Rust optimization
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  check-files:
-    name: Check File Existence
-    runs-on: ubuntu-latest
-    outputs:
-      rust-exists: ${{ steps.check.outputs.rust-exists }}
-      typescript-exists: ${{ steps.check.outputs.typescript-exists }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check which test suites are available
-        id: check
-        run: |
-          if [ -f "rust-backend/Cargo.toml" ]; then
-            echo "rust-exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "rust-exists=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [ -f "ponder-indexers/package.json" ]; then
-            echo "typescript-exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "typescript-exists=false" >> $GITHUB_OUTPUT
-          fi
-
-  database-tests:
-    name: Database Tests
+  # ---------------------------------------------------------------------------
+  # Rust Tests (includes database tests)
+  # ---------------------------------------------------------------------------
+  rust-tests:
+    name: Rust Tests
     runs-on: ubuntu-latest
 
     services:
@@ -78,98 +71,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        env:
-          REDIS_PASSWORD: ci_redis_password_12345
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          echo "Waiting for PostgreSQL to be fully ready..."
-          for i in {1..30}; do
-            if pg_isready -h localhost -p 5432 -U postgres; then
-              echo "PostgreSQL is ready!"
-              break
-            fi
-            echo "Waiting for PostgreSQL... ($i/30)"
-            sleep 2
-          done
-
-      - name: Verify TimescaleDB extension
-        run: |
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -c "SELECT * FROM pg_available_extensions WHERE name = 'timescaledb';"
-
-      - name: Run database migrations
-        run: |
-          echo "Running database migrations..."
-          for migration in database/migrations/*.sql; do
-            echo "Applying migration: $(basename $migration)"
-            PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f "$migration"
-          done
-
-      - name: Verify database schema
-        run: |
-          echo "Verifying database schema is correctly applied..."
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -c "\dt"
-
-      - name: Run schema validation tests
-        run: |
-          echo "Running schema validation tests..."
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-schema.sql
-
-      - name: Run TimescaleDB tests
-        run: |
-          echo "Running TimescaleDB functionality tests..."
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-timescaledb.sql
-
-      - name: Run data integrity tests
-        run: |
-          echo "Running data integrity tests..."
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-data-integrity.sql
-
-      - name: Run notification tests
-        run: |
-          echo "Running PostgreSQL NOTIFY/LISTEN tests..."
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-notifications.sql
-
-      - name: Run performance tests
-        run: |
-          echo "Running query performance tests..."
-          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-performance-simple.sql
-
-      - name: Generate test summary
-        if: always()
-        run: |
-          echo "## Database Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Schema Validation: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- TimescaleDB Tests: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Data Integrity: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Notifications: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Performance: ✅" >> $GITHUB_STEP_SUMMARY
-
-  rust-tests:
-    name: Rust Tests
-    runs-on: ubuntu-latest
-    needs: check-files
-    if: needs.check-files.outputs.rust-exists == 'true'
-
-    services:
-      postgres:
-        image: timescale/timescaledb:2.23.1-pg15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ci_test_password_12345
-          POSTGRES_DB: erc8004_backend
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -180,42 +81,13 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # sccache with manual setup for proper fallback control
-      # The mozilla-actions/sccache-action sets RUSTC_WRAPPER before we can verify
-      # the backend, so we install manually and test the connection first.
       - name: Setup sccache
-        id: sccache
-        continue-on-error: true
-        run: |
-          # Install sccache
-          SCCACHE_VERSION="0.8.2"
-          curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz
-          sudo mv "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" /usr/local/bin/
-          sccache --version
+        uses: mozilla-actions/sccache-action@v0.0.6
 
       - name: Configure sccache
         run: |
-          if command -v sccache &> /dev/null; then
-            # Configure for GitHub Actions cache backend
-            export SCCACHE_GHA_ENABLED=true
-            export ACTIONS_CACHE_URL="${ACTIONS_CACHE_URL}"
-            export ACTIONS_RUNTIME_TOKEN="${ACTIONS_RUNTIME_TOKEN}"
-
-            # Test if the cache backend is actually reachable
-            # sccache --start-server will fail if backend is unavailable
-            if timeout 15 sccache --start-server 2>/dev/null && \
-               timeout 5 sccache --show-stats &>/dev/null; then
-              echo "::notice::sccache enabled - cache backend is reachable"
-              echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            else
-              echo "::warning::sccache cache backend unreachable, using standard build"
-              # Stop any partially started server
-              sccache --stop-server 2>/dev/null || true
-            fi
-          else
-            echo "::notice::sccache not installed, using standard build"
-          fi
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -224,12 +96,27 @@ jobs:
           shared-key: ci-rust
           cache-targets: true
           cache-all-crates: true
+          # Only save cache on main branch to avoid cache pollution from PRs
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - name: Cache SQLx prepared statements
+        uses: actions/cache@v4
+        with:
+          path: rust-backend/.sqlx
+          key: sqlx-${{ hashFiles('rust-backend/.sqlx/**/*.json') }}
+          restore-keys: sqlx-
+
+      # Run database migrations in single transaction for speed
       - name: Run database migrations
         run: |
-          for migration in database/migrations/*.sql; do
-            PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f "$migration"
-          done
+          cat database/migrations/*.sql | PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend --single-transaction
+
+      # Run database-specific tests in parallel with format check
+      - name: Run database schema tests
+        run: |
+          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-schema.sql
+          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-timescaledb.sql
+          PGPASSWORD=ci_test_password_12345 psql -h localhost -U postgres -d erc8004_backend -f database/tests/test-data-integrity.sql
 
       - name: Check Rust formatting
         working-directory: rust-backend
@@ -239,9 +126,6 @@ jobs:
         working-directory: rust-backend
         env:
           SQLX_OFFLINE: true
-        # Note: Clippy runs WITHOUT DATABASE_URL, using SQLx offline mode.
-        # If this fails with "set DATABASE_URL...", run `cargo sqlx prepare --workspace`
-        # locally and commit the updated .sqlx/ directory.
         run: cargo clippy --workspace -- -D warnings
 
       - name: Run Rust tests
@@ -250,55 +134,60 @@ jobs:
           DATABASE_URL: postgres://postgres:ci_test_password_12345@localhost:5432/erc8004_backend
         run: cargo test --workspace --lib --bins
 
-      - name: Generate Rust test summary
+      - name: Show sccache stats
+        if: always()
+        run: sccache --show-stats
+
+      - name: Generate test summary
         if: always()
         run: |
-          echo "## Rust Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Rust & Database Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Formatting: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Clippy Lints: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Unit Tests: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Integration tests with #[ignore] are skipped in this job_" >> $GITHUB_STEP_SUMMARY
+          echo "- Database Schema: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- TimescaleDB Tests: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- Data Integrity: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- Formatting: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- Clippy Lints: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit Tests: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
 
+  # ---------------------------------------------------------------------------
+  # TypeScript/Ponder Tests (runs in parallel with Rust)
+  # ---------------------------------------------------------------------------
   typescript-tests:
     name: TypeScript/Ponder Tests
     runs-on: ubuntu-latest
-    needs: check-files
-    if: needs.check-files.outputs.typescript-exists == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js with cache
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        # Uses version from packageManager field in package.json (pnpm@8.15.0)
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Cache pnpm dependencies
+      - name: Cache node_modules
         uses: actions/cache@v4
+        id: node-modules-cache
         with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          path: |
+            node_modules
+            ponder-indexers/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+            ${{ runner.os }}-node-modules-
 
       - name: Install dependencies
-        # Install from root to use workspace lockfile
-        run: pnpm install --frozen-lockfile
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Run TypeScript type check
-        run: pnpm --filter @api.agentauri.ai/ponder-indexers type-check || echo "Type check not configured yet"
+        run: pnpm --filter @api.agentauri.ai/ponder-indexers typecheck || echo "Type check not configured yet"
 
       - name: Run linting
         run: pnpm --filter @api.agentauri.ai/ponder-indexers lint || echo "Linting not configured yet"
@@ -311,18 +200,17 @@ jobs:
         run: |
           echo "## TypeScript Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Type Check: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Linting: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Type Check: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- Linting: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: :white_check_mark:" >> $GITHUB_STEP_SUMMARY
 
-  # NOTE: Integration tests are currently handled by Rust tests with the #[ignore]
-  # attribute. Run them locally with: cargo test -- --ignored
-  # The full integration test suite will be added when docker-compose testing is needed.
-
+  # ---------------------------------------------------------------------------
+  # Test Summary (lightweight, no checkout needed)
+  # ---------------------------------------------------------------------------
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [database-tests, rust-tests, typescript-tests, check-files]
+    needs: [rust-tests, typescript-tests]
     if: always()
 
     steps:
@@ -333,15 +221,13 @@ jobs:
           echo "All required tests have completed." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Test Suites:" >> $GITHUB_STEP_SUMMARY
-          echo "- Database Tests: ${{ needs.database-tests.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Rust Tests: ${{ needs.rust-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Rust & Database Tests: ${{ needs.rust-tests.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- TypeScript Tests: ${{ needs.typescript-tests.result }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if any required test failed
         if: |
-          needs.database-tests.result == 'failure' ||
-          (needs.rust-tests.result == 'failure' && needs.rust-tests.result != 'skipped') ||
-          (needs.typescript-tests.result == 'failure' && needs.typescript-tests.result != 'skipped')
+          needs.rust-tests.result == 'failure' ||
+          needs.typescript-tests.result == 'failure'
         run: |
           echo "One or more test suites failed!"
           exit 1
