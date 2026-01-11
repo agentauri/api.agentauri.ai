@@ -28,6 +28,8 @@ import type {
   MetadataSetEvent,
   UriUpdatedEvent,
   TransferEvent,
+  ApprovalEvent,
+  ApprovalForAllEvent,
   NewFeedbackEvent,
   FeedbackRevokedEvent,
   ResponseAppendedEvent,
@@ -196,6 +198,87 @@ async function handleTransfer(event: TransferEvent, context: PonderContext, chai
     console.warn(`[SKIP] Transfer event validation failed:`, {
       chainId: chainId.toString(),
       tokenId: event.args.tokenId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Approval Event (ERC721)
+ * Emitted when approval is granted for a single token
+ */
+ponder.on("IdentityRegistryEthereumSepolia:Approval", async ({ event, context }) => {
+  await handleApproval(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+});
+
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("IdentityRegistryBaseSepolia:Approval", async ({ event, context }) => {
+//   await handleApproval(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("IdentityRegistryLineaSepolia:Approval", async ({ event, context }) => {
+//   await handleApproval(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
+
+async function handleApproval(event: ApprovalEvent, context: PonderContext, chainId: bigint): Promise<void> {
+  try {
+    const validatedAgentId = validateAgentId(event.args.tokenId);
+
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.IDENTITY,
+      eventType: "Approval",
+      chainId,
+      agentId: validatedAgentId,
+      eventValues: {
+        owner: validateAndNormalizeAddress(event.args.owner, "owner"),
+        clientAddress: validateAndNormalizeAddress(event.args.approved, "approved"), // Approved address (schema reuse)
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] Approval event validation failed:`, {
+      chainId: chainId.toString(),
+      tokenId: event.args.tokenId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * ApprovalForAll Event (ERC721)
+ * Emitted when approval is granted/revoked for all tokens
+ */
+ponder.on("IdentityRegistryEthereumSepolia:ApprovalForAll", async ({ event, context }) => {
+  await handleApprovalForAll(event, context, CHAIN_IDS.ETHEREUM_SEPOLIA);
+});
+
+// NOTE: Base Sepolia and Linea Sepolia handlers disabled until v1.0 contracts are deployed
+// ponder.on("IdentityRegistryBaseSepolia:ApprovalForAll", async ({ event, context }) => {
+//   await handleApprovalForAll(event, context, CHAIN_IDS.BASE_SEPOLIA);
+// });
+// ponder.on("IdentityRegistryLineaSepolia:ApprovalForAll", async ({ event, context }) => {
+//   await handleApprovalForAll(event, context, CHAIN_IDS.LINEA_SEPOLIA);
+// });
+
+async function handleApprovalForAll(event: ApprovalForAllEvent, context: PonderContext, chainId: bigint): Promise<void> {
+  try {
+    // ApprovalForAll is not token-specific, use 0 as placeholder agentId
+    const placeholderAgentId = BigInt(0);
+
+    await processEvent(context, event.block, event.transaction, event.log, {
+      registry: REGISTRIES.IDENTITY,
+      eventType: "ApprovalForAll",
+      chainId,
+      agentId: placeholderAgentId,
+      eventValues: {
+        owner: validateAndNormalizeAddress(event.args.owner, "owner"),
+        clientAddress: validateAndNormalizeAddress(event.args.operator, "operator"), // Operator address (schema reuse)
+        // Store approval status as string in a reusable field
+        tag1: event.args.approved ? "approved" : "revoked",
+      },
+    });
+  } catch (error) {
+    console.warn(`[SKIP] ApprovalForAll event validation failed:`, {
+      chainId: chainId.toString(),
+      owner: event.args.owner,
       error: error instanceof Error ? error.message : String(error),
     });
   }

@@ -108,6 +108,40 @@ export interface TransferEvent {
   log: LogInfo;
 }
 
+/**
+ * Approval event arguments (ERC721)
+ * Emitted when approval is granted for a single token
+ */
+export interface ApprovalEventArgs {
+  owner: Address;
+  approved: Address;
+  tokenId: bigint;
+}
+
+export interface ApprovalEvent {
+  args: ApprovalEventArgs;
+  block: BlockInfo;
+  transaction: TransactionInfo;
+  log: LogInfo;
+}
+
+/**
+ * ApprovalForAll event arguments (ERC721)
+ * Emitted when approval is granted/revoked for all tokens
+ */
+export interface ApprovalForAllEventArgs {
+  owner: Address;
+  operator: Address;
+  approved: boolean;
+}
+
+export interface ApprovalForAllEvent {
+  args: ApprovalForAllEventArgs;
+  block: BlockInfo;
+  transaction: TransactionInfo;
+  log: LogInfo;
+}
+
 // ============================================================================
 // REPUTATION REGISTRY EVENT TYPES
 // ============================================================================
@@ -248,6 +282,8 @@ export type AnyEvent =
   | MetadataSetEvent
   | UriUpdatedEvent
   | TransferEvent
+  | ApprovalEvent
+  | ApprovalForAllEvent
   | NewFeedbackEvent
   | FeedbackRevokedEvent
   | ResponseAppendedEvent
