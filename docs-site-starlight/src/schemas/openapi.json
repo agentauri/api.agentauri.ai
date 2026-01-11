@@ -1298,6 +1298,101 @@
         ]
       }
     },
+    "/api/v1/api-keys/{id}/regenerate": {
+      "post": {
+        "tags": [
+          "API Keys"
+        ],
+        "summary": "Regenerate an API key (alias for rotate)",
+        "description": "POST /api/v1/api-keys/{id}/regenerate - Alias for /rotate endpoint",
+        "operationId": "regenerate_api_key",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "API Key ID to regenerate",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Optional new name and expiration",
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RotateApiKeyRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "API key regenerated - new key shown once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_RotateApiKeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot regenerate revoked key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/exchange": {
       "post": {
         "tags": [

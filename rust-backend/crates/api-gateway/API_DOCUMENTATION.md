@@ -323,9 +323,27 @@ Handle the OAuth callback from GitHub.
 
 ### Token Refresh
 
-**Status**: Coming in Phase 3
+**Endpoint**: `POST /api/v1/auth/refresh`
 
-Currently, JWT tokens expire after 1 hour. Users must login again to get a new token. A token refresh mechanism will be added in Phase 3 to allow extending sessions without re-entering credentials.
+**Headers**: `Content-Type: application/json`
+
+**Request Body**:
+```json
+{
+  "refresh_token": "rt_abc123..."
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "rt_new_token...",
+  "expires_in": 3600
+}
+```
+
+JWT tokens expire after 1 hour. Use the refresh token to obtain a new access token without re-entering credentials. Refresh tokens are single-use and automatically rotated on each refresh.
 
 ---
 
@@ -1129,13 +1147,18 @@ Get system capabilities and metadata.
       ]
     },
     "pull_layer": {
-      "enabled": false,
-      "features": [],
-      "note": "Coming soon in Phase 5"
+      "enabled": true,
+      "features": [
+        "a2a_protocol",
+        "mcp_server",
+        "async_tasks"
+      ],
+      "endpoints": "/api/v1/a2a/*"
     },
     "authentication": {
-      "methods": ["jwt", "api_key", "wallet_signature"],
-      "oauth2_supported": false
+      "methods": ["jwt", "api_key", "wallet_signature", "oauth2"],
+      "oauth2_supported": true,
+      "oauth2_providers": ["google", "github"]
     },
     "rate_limiting": {
       "enabled": true,
