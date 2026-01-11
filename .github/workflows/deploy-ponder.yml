@@ -1,0 +1,183 @@
+# =============================================================================
+# AgentAuri Ponder Indexer - Deployment Workflow
+# =============================================================================
+# This workflow handles:
+# - Building Docker images for Ponder blockchain indexer
+# - Pushing images to Amazon ECR
+# - Deploying to AWS ECS (Fargate Spot)
+#
+# Triggers:
+# - Push to main with changes in ponder-indexers/
+# - Tag ponder-v*: Build, deploy, and create GitHub release
+# - Manual: Build and deploy to production
+# =============================================================================
+
+name: Deploy Ponder
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ponder-indexers/**'
+      - '.github/workflows/deploy-ponder.yml'
+    tags:
+      - 'ponder-v*'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment even without changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: agentauri-ponder
+  ECS_CLUSTER: agentauri-production
+  ECS_SERVICE: ponder-indexer
+  TASK_DEFINITION_FAMILY: agentauri-production-ponder-indexer
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and Push Docker Image
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC authentication with AWS
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_uri: ${{ steps.build-output.outputs.image_uri }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=match,pattern=ponder-v(.*),group=1
+            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./ponder-indexers/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          provenance: false
+
+      - name: Output image URI
+        id: build-output
+        run: |
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.version }}"
+          echo "Image URI: $IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Production
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write  # For creating releases
+      id-token: write
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEFINITION_FAMILY }} \
+            --query 'taskDefinition' \
+            | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            > task-definition.json
+
+      - name: Update task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ponder-indexer
+          image: ${{ needs.build.outputs.image_uri }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Verify deployment health
+        run: |
+          echo "Waiting for service to stabilize..."
+          sleep 30
+
+          # Check if service is running
+          RUNNING_COUNT=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].runningCount' \
+            --output text)
+
+          if [ "$RUNNING_COUNT" -lt 1 ]; then
+            echo "Service not running properly. Running count: $RUNNING_COUNT"
+            exit 1
+          fi
+
+          echo "Ponder indexer deployed successfully with $RUNNING_COUNT running task(s)"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/ponder-v')
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          body: |
+            ## Ponder Indexer Deployment
+            - **Image Tag**: ${{ needs.build.outputs.image_tag }}
+            - **Environment**: Production
+            - **Cluster**: ${{ env.ECS_CLUSTER }}
+            - **Service**: ${{ env.ECS_SERVICE }}
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "::notice::Successfully deployed Ponder indexer to production"
+          echo "Image: ${{ needs.build.outputs.image_uri }}"
