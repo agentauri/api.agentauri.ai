@@ -36,14 +36,19 @@ curl -X POST https://api.agentauri.ai/api/v1/triggers \
 
 Conditions define which events should activate the trigger.
 
-### Event Types
+### Event Types (ERC-8004 v1.0)
 
 | Event Type | Registry | Description |
 |------------|----------|-------------|
-| `AgentRegistered` | Identity | New agent registered |
-| `AgentUpdated` | Identity | Agent metadata updated |
-| `ReputationUpdated` | Reputation | Agent reputation score changed |
-| `ValidationCompleted` | Validation | Agent validation finished |
+| `Registered` | Identity | New agent registered |
+| `MetadataSet` | Identity | Agent metadata key-value set |
+| `URIUpdated` | Identity | Agent URI updated |
+| `Transfer` | Identity | Agent ownership transferred |
+| `NewFeedback` | Reputation | New feedback submitted |
+| `FeedbackRevoked` | Reputation | Feedback revoked |
+| `ResponseAppended` | Reputation | Response added to feedback |
+| `ValidationRequest` | Validation | Validation requested (not deployed) |
+| `ValidationResponse` | Validation | Validation response (not deployed) |
 
 ### Chain IDs
 
@@ -60,9 +65,9 @@ curl -X POST "https://api.agentauri.ai/api/v1/triggers/TRIGGER_ID/conditions" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_type": "ReputationUpdated",
+    "event_type": "NewFeedback",
     "chain_id": 11155111,
-    "contract_address": "0x1234...",
+    "contract_address": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
     "field_filters": {
       "score": { "gte": 90 }
     }
@@ -139,7 +144,7 @@ curl -X POST "https://api.agentauri.ai/api/v1/triggers/$TRIGGER_ID/conditions" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_type": "AgentRegistered",
+    "event_type": "Registered",
     "chain_id": 11155111
   }'
 

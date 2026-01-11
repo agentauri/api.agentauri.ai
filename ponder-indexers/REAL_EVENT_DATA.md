@@ -11,12 +11,30 @@ This document contains **real transaction data** extracted from blockchain explo
 
 ---
 
+## Current Production Contracts (ERC-8004 v1.0)
+
+> **Note**: The system now indexes **ERC-8004 v1.0** contracts deployed January 2026.
+> See `.env.local` or Terraform for current configuration.
+
+| Registry | Address | Deployed |
+|----------|---------|----------|
+| **IdentityRegistry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | 2026-01-06 |
+| **ReputationRegistry** | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | 2026-01-06 |
+| **ValidationRegistry** | Not yet deployed | - |
+
+---
+
+## Historical Test Data (Legacy Contracts - Pre-v1.0)
+
+> **Warning**: The event data below is from **LEGACY contracts** (pre-v1.0, 2025).
+> These addresses are NO LONGER indexed. Data preserved for historical reference only.
+
 ## Ethereum Sepolia (Chain ID: 11155111)
 
-### Contract Addresses
-- **IdentityRegistry**: `0x8004a6090Cd10A7288092483047B097295Fb8847`
-- **ReputationRegistry**: `0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E`
-- **ValidationRegistry**: `0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5`
+### Legacy Contract Addresses (Pre-v1.0 - DEPRECATED)
+- **IdentityRegistry**: `0x8004a6090Cd10A7288092483047B097295Fb8847` *(LEGACY)*
+- **ReputationRegistry**: `0x8004B8FD1A363aa02fDC07635C0c5F94f6Af5B7E` *(LEGACY)*
+- **ValidationRegistry**: `0x8004CB39f29c09145F24Ad9dDe2A108C1A2cdfC5` *(LEGACY)*
 
 ---
 

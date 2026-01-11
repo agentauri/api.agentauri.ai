@@ -379,60 +379,22 @@ See `.env.example` for configuration guidelines.
 
 ## Roadmap
 
-See [docs/operations/PRODUCTION_READINESS_PLAN.md](./docs/operations/PRODUCTION_READINESS_PLAN.md) for production deployment timeline.
+**Current Phase**: Phase 8 Complete (Performance Optimizations)
+**Production Readiness**: 90%+
 
-**Total Timeline**: 24 weeks (Phases 1-7)
+### Completed
+- ✅ Core Infrastructure (REST API, PostgreSQL/TimescaleDB, Redis)
+- ✅ Ponder Indexers for ERC-8004 events
+- ✅ Protocol Integrations (A2A, MCP Server)
+- ✅ Security Hardening (AWS Secrets Manager, OWASP compliance)
+- ✅ Auto-Scaling (ECS Fargate, CloudWatch)
+- ✅ Performance Optimizations
 
-### Phase 1-2: Foundation & Event Ingestion (Weeks 1-7) - ✅ COMPLETE
-- ✅ Documentation and project structure (CLAUDE.md, README.md, docs/)
-- ✅ Database schema and migrations (PostgreSQL + TimescaleDB)
-- ✅ Comprehensive test suite (108 database tests, 100% coverage)
-- ✅ Ponder indexers (24 event handlers across 4 networks)
-- ✅ API Gateway CRUD endpoints (15 endpoints, JWT auth)
+### Upcoming
+- Phase 9: Production Hardening (Multi-region, DR)
+- Phase 10: Agent Intelligence (Trend prediction, anomaly detection)
 
-### Phase 3: Core Backend (Weeks 8-10) - ✅ COMPLETE
-- ✅ Event Processor with trigger matching
-- ✅ Telegram Worker with security hardening
-- ✅ Integration Testing (206 total tests across workspace)
-
-### Phase 3.5: Payment Foundation (Weeks 11-12) - ✅ COMPLETE
-- ✅ Organizations & multi-tenant account model (database + API)
-- ✅ Credits system & Stripe integration (Week 12)
-- ✅ Wallet Authentication Layer 2 (EIP-191, Week 12)
-- ✅ Agent Linking with on-chain verification (Week 12)
-- ✅ API Key Authentication Layer 1 with security hardening (Week 11)
-- ✅ Role-based access (admin, member, viewer)
-
-### Phase 4: Advanced Triggers & Actions (Weeks 13-15) - ✅ COMPLETE
-- ✅ Auth Completion + Rate Limiting + OAuth 2.0 (Week 13)
-- ✅ Stateful Triggers (EMA + Rate Counters) (Week 14)
-- ✅ Social Login (Google + GitHub OAuth 2.0)
-- ✅ Account Lockout (progressive: 15min → 4h)
-- ✅ Circuit Breaker for trigger resilience
-- ✅ Discovery endpoint (`/.well-known/agent.json`)
-- ✅ OpenAPI 3.0 documentation with Swagger UI (`/api-docs/`)
-
-### Phase 5: MCP + A2A Integration (Weeks 16-18)
-- ⏳ A2A Protocol (Google Agent-to-Agent)
-- ⏳ MCP Query Tools (Tier 0-3)
-- ⏳ x402 crypto payment integration
-- ⏳ Query caching and usage metering
-
-### Phase 6: Testing & Observability (Weeks 19-21)
-- ⏳ Comprehensive test suite (unit, integration, e2e)
-- ⏳ Payment integration tests
-- ⏳ Prometheus metrics & Grafana dashboards
-
-### Phase 7: Production Deployment (Weeks 22-24)
-- ⏳ CI/CD pipelines
-- ⏳ Security audit and hardening
-- ✅ API documentation (OpenAPI/Swagger) - completed in Phase 4
-
-### Phase 8: AI Integration (Week 25+)
-- ⏳ Natural language trigger creation
-- ⏳ Trend prediction and anomaly detection
-
-Legend: ✅ Complete | 🔄 In Progress | ⏳ Planned
+See [docs/ROADMAP.md](./docs/ROADMAP.md) for detailed roadmap and timeline.
 
 ---
 

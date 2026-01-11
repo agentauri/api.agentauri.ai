@@ -146,9 +146,9 @@ curl -X DELETE "https://api.agentauri.ai/api/v1/agents/123/follow" \
 
 | Registry | Events |
 |----------|--------|
-| **Identity** | `Registered`, `UriUpdated`, `MetadataSet`, `Transfer` |
-| **Reputation** | `NewFeedback`, `ResponseAppended`, `ScoreUpdated` |
-| **Validation** | `ValidationRequested`, `ValidationResponse` |
+| **Identity** | `Registered`, `URIUpdated`, `MetadataSet`, `Transfer` |
+| **Reputation** | `NewFeedback`, `FeedbackRevoked`, `ResponseAppended` |
+| **Validation** | `ValidationRequest`, `ValidationResponse` (not yet deployed) |
 
 ## Template Variables
 

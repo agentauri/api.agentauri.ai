@@ -12,8 +12,8 @@ AgentAuri uses [Ponder](https://ponder.sh/) to index blockchain events. These en
 Check the sync status of blockchain indexers:
 
 ```bash
-curl "https://api.agentauri.ai/api/v1/ponder/status" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# Note: Ponder status endpoints are PUBLIC (no authentication required)
+curl "https://api.agentauri.ai/api/v1/ponder/status"
 ```
 
 Response:
@@ -73,8 +73,7 @@ Response:
 Get statistics about indexed events:
 
 ```bash
-curl "https://api.agentauri.ai/api/v1/ponder/events" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl "https://api.agentauri.ai/api/v1/ponder/events"
 ```
 
 Response:
@@ -85,11 +84,13 @@ Response:
       "chain_id": 11155111,
       "chain_name": "Ethereum Sepolia",
       "events": {
-        "AgentRegistered": 1250,
-        "AgentUpdated": 340,
-        "ReputationUpdated": 5670,
-        "FeedbackSubmitted": 12340,
-        "ValidationCompleted": 890
+        "Registered": 1250,
+        "MetadataSet": 340,
+        "URIUpdated": 120,
+        "Transfer": 85,
+        "NewFeedback": 5670,
+        "FeedbackRevoked": 45,
+        "ResponseAppended": 890
       },
       "total_events": 20490
     },
@@ -97,8 +98,8 @@ Response:
       "chain_id": 84532,
       "chain_name": "Base Sepolia",
       "events": {
-        "AgentRegistered": 890,
-        "ReputationUpdated": 3450
+        "Registered": 890,
+        "NewFeedback": 3450
       },
       "total_events": 4340
     }
@@ -114,15 +115,13 @@ Response:
 ### Filter by Chain
 
 ```bash
-curl "https://api.agentauri.ai/api/v1/ponder/events?chain_id=11155111" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl "https://api.agentauri.ai/api/v1/ponder/events?chain_id=11155111"
 ```
 
 ### Filter by Time Range
 
 ```bash
-curl "https://api.agentauri.ai/api/v1/ponder/events?from=2024-01-10&to=2024-01-15" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl "https://api.agentauri.ai/api/v1/ponder/events?from=2026-01-01&to=2026-01-15"
 ```
 
 ## Monitoring Integration
@@ -142,7 +141,7 @@ agentauri_ponder_block_number{chain_id="11155111"} 5234567
 agentauri_ponder_lag_seconds{chain_id="11155111"} 12
 
 # Total events indexed
-agentauri_ponder_events_total{chain_id="11155111",event_type="AgentRegistered"} 1250
+agentauri_ponder_events_total{chain_id="11155111",event_type="Registered"} 1250
 ```
 
 ### Health Check

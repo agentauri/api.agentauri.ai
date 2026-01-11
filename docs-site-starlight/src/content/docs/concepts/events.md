@@ -28,33 +28,35 @@ Blockchain Transaction
    Actions Executed
 ```
 
-## Event Types
+## Event Types (ERC-8004 v1.0)
 
 ### Identity Registry
 
 | Event | Description | Key Fields |
 |-------|-------------|------------|
-| `AgentRegistered` | New agent created | `agent_id`, `owner`, `metadata_uri` |
-| `AgentUpdated` | Agent metadata changed | `agent_id`, `metadata_uri` |
-| `AgentDeactivated` | Agent marked inactive | `agent_id` |
-| `OwnershipTransferred` | Agent ownership changed | `agent_id`, `from`, `to` |
+| `Registered` | New agent created | `agentId`, `owner`, `agentURI` |
+| `MetadataSet` | Agent metadata key-value set | `agentId`, `metadataKey`, `metadataValue` |
+| `URIUpdated` | Agent URI changed | `agentId`, `newURI`, `updatedBy` |
+| `Transfer` | Agent ownership transferred (ERC-721) | `tokenId`, `from`, `to` |
 
 ### Reputation Registry
 
 | Event | Description | Key Fields |
 |-------|-------------|------------|
-| `ReputationUpdated` | Score changed | `agent_id`, `score`, `category` |
-| `FeedbackSubmitted` | New feedback received | `agent_id`, `from`, `rating`, `comment` |
-| `DisputeOpened` | Reputation dispute | `agent_id`, `disputer`, `reason` |
-| `DisputeResolved` | Dispute resolved | `agent_id`, `outcome` |
+| `NewFeedback` | Feedback submitted | `agentId`, `clientAddress`, `feedbackIndex`, `score`, `tag1`, `tag2`, `feedbackUri` |
+| `FeedbackRevoked` | Feedback revoked by client | `agentId`, `clientAddress`, `feedbackIndex` |
+| `ResponseAppended` | Response added to feedback | `agentId`, `clientAddress`, `feedbackIndex`, `responder`, `responseUri` |
 
-### Validation Registry
+### Validation Registry (Not Yet Deployed)
 
 | Event | Description | Key Fields |
 |-------|-------------|------------|
-| `ValidationRequested` | Validation started | `agent_id`, `validator`, `criteria` |
-| `ValidationCompleted` | Validation finished | `agent_id`, `validator`, `passed` |
-| `ValidatorRegistered` | New validator added | `validator`, `criteria` |
+| `ValidationRequest` | Validation requested | `agentId`, `validatorAddress`, `requestHash` |
+| `ValidationResponse` | Validation response submitted | `agentId`, `validatorAddress`, `response` |
+
+:::note
+The Validation Registry contract is not yet deployed on any network. Events listed above reflect the ERC-8004 v1.0 specification.
+:::
 
 ## Event Structure
 
@@ -63,19 +65,19 @@ Every event contains:
 ```json
 {
   "id": "evt_abc123xyz789",
-  "event_type": "AgentRegistered",
+  "event_type": "Registered",
   "chain_id": 11155111,
   "block_number": 12345678,
-  "block_timestamp": "2024-01-15T10:00:00Z",
+  "block_timestamp": "2026-01-15T10:00:00Z",
   "transaction_hash": "0xabc...def",
   "log_index": 0,
-  "contract_address": "0x1234...5678",
+  "contract_address": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
   "data": {
-    "agent_id": "0xagent...",
+    "agentId": "42",
     "owner": "0xowner...",
-    "metadata_uri": "ipfs://Qm..."
+    "agentURI": "ipfs://Qm..."
   },
-  "indexed_at": "2024-01-15T10:00:05Z"
+  "indexed_at": "2026-01-15T10:00:05Z"
 }
 ```
 
@@ -91,7 +93,7 @@ curl "https://api.agentauri.ai/api/v1/events?limit=10" \
 ### Filter by Event Type
 
 ```bash
-curl "https://api.agentauri.ai/api/v1/events?event_type=AgentRegistered" \
+curl "https://api.agentauri.ai/api/v1/events?event_type=Registered" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -120,9 +122,13 @@ curl "https://api.agentauri.ai/api/v1/events?agent_id=0x1234..." \
 
 | Network | Chain ID | Status | Block Time |
 |---------|----------|--------|------------|
-| Ethereum Sepolia | 11155111 | Active | ~12s |
-| Base Sepolia | 84532 | Active | ~2s |
-| Linea Sepolia | 59141 | Active | ~3s |
+| Ethereum Sepolia | 11155111 | **Active** | ~12s |
+| Base Sepolia | 84532 | Planned | ~2s |
+| Linea Sepolia | 59141 | Planned | ~3s |
+
+:::note
+Currently only Ethereum Sepolia has deployed ERC-8004 v1.0 contracts. Other networks are pending deployment.
+:::
 
 ## Data Retention
 

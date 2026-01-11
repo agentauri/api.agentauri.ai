@@ -22,10 +22,10 @@ Wallet authentication (Layer 2) allows you to prove ownership of an Ethereum add
 4. Receive JWT token on success
 ```
 
-## Step 1: Request a Challenge
+## Step 1: Request a Challenge (Nonce)
 
 ```bash
-curl -X POST "https://api.agentauri.ai/api/v1/auth/wallet/challenge" \
+curl -X POST "https://api.agentauri.ai/api/v1/auth/nonce" \
   -H "Content-Type: application/json" \
   -d '{
     "wallet_address": "0x1234567890abcdef1234567890abcdef12345678"
@@ -35,9 +35,9 @@ curl -X POST "https://api.agentauri.ai/api/v1/auth/wallet/challenge" \
 Response:
 ```json
 {
-  "challenge": "Sign this message to authenticate with AgentAuri:\n\nNonce: abc123def456\nTimestamp: 2024-01-15T10:00:00Z\nAddress: 0x1234...5678",
   "nonce": "abc123def456",
-  "expires_at": "2024-01-15T10:05:00Z"
+  "message": "Sign this message to authenticate with AgentAuri:\n\nNonce: abc123def456\nTimestamp: 2026-01-15T10:00:00Z\nAddress: 0x1234...5678",
+  "expires_at": "2026-01-15T10:05:00Z"
 }
 ```
 
@@ -80,21 +80,22 @@ const signature = await ethereum.request({
 ## Step 3: Verify the Signature
 
 ```bash
-curl -X POST "https://api.agentauri.ai/api/v1/auth/wallet/verify" \
+curl -X POST "https://api.agentauri.ai/api/v1/auth/wallet" \
   -H "Content-Type: application/json" \
   -d '{
     "wallet_address": "0x1234567890abcdef1234567890abcdef12345678",
     "signature": "0x...",
-    "nonce": "abc123def456"
+    "message": "Sign this message to authenticate with AgentAuri:\n\nNonce: abc123def456\nTimestamp: 2026-01-15T10:00:00Z\nAddress: 0x1234...5678"
   }'
 ```
 
 Response:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "expires_at": "2024-01-15T11:00:00Z",
-  "wallet_address": "0x1234...5678"
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "expires_at": "2026-01-15T11:00:00Z",
+  "token_type": "Bearer"
 }
 ```
 
@@ -183,8 +184,8 @@ Wallet authentication endpoints are rate limited:
 
 | Endpoint | Rate Limit |
 |----------|------------|
-| `/wallet/challenge` | 10/minute per IP |
-| `/wallet/verify` | 5/minute per IP |
+| `/auth/nonce` | 10/minute per IP |
+| `/auth/wallet` | 5/minute per IP |
 
 ## Error Codes
 
@@ -206,24 +207,24 @@ const API_BASE = 'https://api.agentauri.ai/api/v1';
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
 
 async function authenticateWithWallet() {
-  // 1. Request challenge
-  const challengeRes = await axios.post(`${API_BASE}/auth/wallet/challenge`, {
+  // 1. Request nonce
+  const nonceRes = await axios.post(`${API_BASE}/auth/nonce`, {
     wallet_address: wallet.address
   });
 
-  const { challenge, nonce } = challengeRes.data;
+  const { message } = nonceRes.data;
 
-  // 2. Sign challenge
-  const signature = await wallet.signMessage(challenge);
+  // 2. Sign message
+  const signature = await wallet.signMessage(message);
 
-  // 3. Verify and get token
-  const verifyRes = await axios.post(`${API_BASE}/auth/wallet/verify`, {
+  // 3. Verify and get tokens
+  const verifyRes = await axios.post(`${API_BASE}/auth/wallet`, {
     wallet_address: wallet.address,
     signature,
-    nonce
+    message
   });
 
-  return verifyRes.data.token;
+  return verifyRes.data.access_token;
 }
 
 // Usage

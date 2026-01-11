@@ -308,5 +308,14 @@ impl Modify for SecurityAddon {
                 "Organization UUID. Required for organization-scoped operations.",
             ))),
         );
+
+        // Cookie-based authentication (HttpOnly auth-token cookie)
+        components.add_security_scheme(
+            "cookie_auth",
+            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::with_description(
+                "auth-token",
+                "Authentication token stored in HttpOnly cookie. Set automatically by OAuth callbacks.",
+            ))),
+        );
     }
 }
