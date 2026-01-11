@@ -352,24 +352,37 @@ describe("validateMetadataValue", () => {
 });
 
 describe("validateTag", () => {
-  it("should accept valid tags", () => {
-    const validTag = "0x" + "1".repeat(64);
-    expect(validateTag(validTag as `0x${string}`, "tag1")).toBe(validTag);
+  it("should accept valid string tags", () => {
+    // ERC-8004 v1.0: tags are now strings, not bytes32
+    const validTag = "quality";
+    expect(validateTag(validTag, "tag1")).toBe(validTag);
   });
 
-  it("should return undefined for empty tags", () => {
-    const emptyTag = "0x" + "0".repeat(64);
-    expect(validateTag(emptyTag as `0x${string}`, "tag1")).toBeUndefined();
+  it("should accept hex-formatted tags as valid strings", () => {
+    // Hex strings are still valid as string tags
+    const hexTag = "0x" + "1".repeat(64);
+    expect(validateTag(hexTag, "tag1")).toBe(hexTag);
+  });
+
+  it("should return undefined for empty string tags", () => {
+    expect(validateTag("", "tag1")).toBeUndefined();
   });
 
   it("should return undefined for undefined input", () => {
     expect(validateTag(undefined, "tag1")).toBeUndefined();
   });
 
-  it("should validate tag format", () => {
-    const invalidTag = "0xINVALID";
-    expect(() => validateTag(invalidTag as `0x${string}`, "tag1")).toThrow(
-      "must be 32-byte hex string"
+  it("should reject tags exceeding maximum length", () => {
+    const longTag = "a".repeat(256); // Exceeds 255 char limit
+    expect(() => validateTag(longTag, "tag1")).toThrow(
+      "exceeds maximum length"
+    );
+  });
+
+  it("should reject tags with null bytes", () => {
+    const tagWithNull = "valid\0tag";
+    expect(() => validateTag(tagWithNull, "tag1")).toThrow(
+      "contains null bytes"
     );
   });
 });
@@ -380,12 +393,13 @@ describe("validateTag", () => {
 
 describe("Integration: Validate NewFeedback Event", () => {
   it("should validate all fields from a valid NewFeedback event", () => {
+    // ERC-8004 v1.0: tags are now strings, not bytes32
     const mockEvent = {
       agentId: 123n,
       clientAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5",
       score: 85n,
-      tag1: "0x" + "1".repeat(64),
-      tag2: "0x" + "0".repeat(64), // Empty tag
+      tag1: "quality",
+      tag2: "", // Empty tag
       feedbackUri: "https://ipfs.io/ipfs/QmXxxxxx",
       feedbackHash: "0x" + "a".repeat(64),
     };
@@ -396,8 +410,8 @@ describe("Integration: Validate NewFeedback Event", () => {
       mockEvent.clientAddress.toLowerCase()
     );
     expect(validateScore(mockEvent.score)).toBe(85);
-    expect(validateTag(mockEvent.tag1 as `0x${string}`, "tag1")).toBe(mockEvent.tag1);
-    expect(validateTag(mockEvent.tag2 as `0x${string}`, "tag2")).toBeUndefined();
+    expect(validateTag(mockEvent.tag1, "tag1")).toBe(mockEvent.tag1);
+    expect(validateTag(mockEvent.tag2, "tag2")).toBeUndefined(); // Empty string returns undefined
     expect(validateUri(mockEvent.feedbackUri, "feedbackUri")).toBe(mockEvent.feedbackUri);
     expect(validateBytes32Hash(mockEvent.feedbackHash as `0x${string}`, "feedbackHash")).toBe(
       mockEvent.feedbackHash
@@ -409,7 +423,7 @@ describe("Integration: Validate NewFeedback Event", () => {
       agentId: -1n, // Invalid (negative)
       clientAddress: "0xINVALID", // Invalid address
       score: 150n, // Out of range (will be clamped)
-      tag1: "0xINVALID", // Invalid hash
+      tag1: "a".repeat(256), // Too long (exceeds 255 char limit)
       feedbackUri: "http://localhost/evil", // SSRF attempt
       feedbackHash: "0xINVALID", // Invalid hash
     };
@@ -417,7 +431,7 @@ describe("Integration: Validate NewFeedback Event", () => {
     expect(() => validateAgentId(mockEvent.agentId)).toThrow();
     expect(() => validateAndNormalizeAddress(mockEvent.clientAddress, "clientAddress")).toThrow();
     expect(validateScore(mockEvent.score)).toBe(100); // Clamped to max
-    expect(() => validateTag(mockEvent.tag1 as `0x${string}`, "tag1")).toThrow();
+    expect(() => validateTag(mockEvent.tag1, "tag1")).toThrow("exceeds maximum length");
     expect(() => validateUri(mockEvent.feedbackUri, "feedbackUri")).toThrow();
     expect(() => validateBytes32Hash(mockEvent.feedbackHash as `0x${string}`, "feedbackHash")).toThrow();
   });
